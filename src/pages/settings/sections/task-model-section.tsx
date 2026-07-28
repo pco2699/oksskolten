@@ -40,6 +40,7 @@ export function TaskModelSection({ settings, t }: { settings: Settings; t: TFunc
   const anthropicKey = useSWR<{ configured: boolean }>(`/api/settings/api-keys/anthropic`, fetcher, SWR_KEY_OPTS)
   const geminiKey = useSWR<{ configured: boolean }>(`/api/settings/api-keys/gemini`, fetcher, SWR_KEY_OPTS)
   const openaiKey = useSWR<{ configured: boolean }>(`/api/settings/api-keys/openai`, fetcher, SWR_KEY_OPTS)
+  const openrouterKey = useSWR<{ configured: boolean }>(`/api/settings/api-keys/openrouter`, fetcher, SWR_KEY_OPTS)
   const googleTranslateKey = useSWR<{ configured: boolean }>(`/api/settings/api-keys/google-translate`, fetcher, SWR_KEY_OPTS)
   const deeplKey = useSWR<{ configured: boolean }>(`/api/settings/api-keys/deepl`, fetcher, SWR_KEY_OPTS)
   const { data: claudeCodeStatus } = useSWR<{ loggedIn?: boolean; error?: string }>(
@@ -57,15 +58,17 @@ export function TaskModelSection({ settings, t }: { settings: Settings; t: TFunc
     map['claude-code'] = claudeCodeReady
     map['ollama'] = true  // Ollama requires no API key; always available
     map['vllm'] = true    // vLLM requires no API key by default; always available
+    map['openrouter'] = !!openrouterKey.data?.configured
     return map
     // Recompute only when any key's configured status changes
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     anthropicKey.data?.configured, geminiKey.data?.configured, openaiKey.data?.configured,
+    openrouterKey.data?.configured,
     googleTranslateKey.data?.configured, deeplKey.data?.configured, claudeCodeReady,
   ])
   // Ollama/vLLM requires no API key, so the task section is always enabled when they are available.
-  const hasAnyLlmKey = LLM_API_PROVIDERS.some(p => configuredKeys[p]) || claudeCodeReady || configuredKeys['ollama'] || configuredKeys['vllm']
+  const hasAnyLlmKey = LLM_API_PROVIDERS.some(p => configuredKeys[p]) || claudeCodeReady || configuredKeys['ollama'] || configuredKeys['vllm'] || configuredKeys['openrouter']
   const hasAnyTranslateKey = TRANSLATE_SERVICE_PROVIDERS.some(p => configuredKeys[p])
   const hasAnyKey = hasAnyLlmKey || hasAnyTranslateKey
   const keysLoading = llmKeyStatuses.some(s => !s.data) || translateKeyStatuses.some(s => !s.data)
@@ -76,8 +79,8 @@ export function TaskModelSection({ settings, t }: { settings: Settings; t: TFunc
       providerValue: settings.chatProvider || '',
       setProvider: (v) => {
         settings.setChatProvider(v)
-        // Ollama/vLLM models are dynamic; don't set a default (auto-selected by ModelSelect)
-        if (v !== 'ollama' && v !== 'vllm') settings.setChatModel(DEFAULT_MODELS[v] || DEFAULT_MODELS.anthropic)
+        // Ollama/vLLM/OpenRouter models are dynamic; don't set a default (auto-selected by ModelSelect)
+        if (!isDynamicModelProvider(v)) settings.setChatModel(DEFAULT_MODELS[v] || DEFAULT_MODELS.anthropic)
         else settings.setChatModel('')
       },
       modelValue: settings.chatModel || '',
@@ -89,7 +92,7 @@ export function TaskModelSection({ settings, t }: { settings: Settings; t: TFunc
       providerValue: settings.summaryProvider || '',
       setProvider: (v) => {
         settings.setSummaryProvider(v)
-        if (v !== 'ollama' && v !== 'vllm') settings.setSummaryModel(DEFAULT_MODELS[v] || DEFAULT_MODELS.anthropic)
+        if (!isDynamicModelProvider(v)) settings.setSummaryModel(DEFAULT_MODELS[v] || DEFAULT_MODELS.anthropic)
         else settings.setSummaryModel('')
       },
       modelValue: settings.summaryModel || '',
@@ -104,7 +107,7 @@ export function TaskModelSection({ settings, t }: { settings: Settings; t: TFunc
       providerValue: settings.translateProvider || '',
       setProvider: (v) => {
         settings.setTranslateProvider(v)
-        if (v !== 'ollama' && v !== 'vllm') settings.setTranslateModel(DEFAULT_MODELS[v] || DEFAULT_MODELS.anthropic)
+        if (!isDynamicModelProvider(v)) settings.setTranslateModel(DEFAULT_MODELS[v] || DEFAULT_MODELS.anthropic)
         else settings.setTranslateModel('')
       },
       modelValue: settings.translateModel || '',
@@ -166,6 +169,11 @@ function getModelGroups(provider: string): ModelGroup[] {
 
 function isTranslateService(provider: string): boolean {
   return (TRANSLATE_SERVICE_PROVIDERS as readonly string[]).includes(provider)
+}
+
+/** Providers whose model list is fetched from the server instead of the static lists */
+function isDynamicModelProvider(provider: string): boolean {
+  return provider === 'ollama' || provider === 'vllm' || provider === 'openrouter'
 }
 
 /* ── Task Model Row ── */
@@ -307,6 +315,13 @@ function ModelSelect({ provider, modelValue, setModel, t }: { provider: string; 
     { revalidateOnFocus: false },
   )
 
+  // OpenRouter: fetch dynamic model list
+  const { data: openrouterModels } = useSWR<{ models: Array<{ name: string; label: string; vendor: string }> }>(
+    provider === 'openrouter' ? '/api/settings/openrouter/models' : null,
+    fetcher,
+    { revalidateOnFocus: false },
+  )
+
   // Auto-select first Ollama model when switching to ollama and no model is set
   useEffect(() => {
     if (provider === 'ollama' && ollamaModels?.models?.length && !modelValue) {
@@ -320,6 +335,8 @@ function ModelSelect({ provider, modelValue, setModel, t }: { provider: string; 
       setModel(vllmModels.models[0].name)
     }
   }, [provider, vllmModels, modelValue, setModel])
+
+  // No auto-select for OpenRouter: the catalog is huge and paid, so the id is typed or picked explicitly
 
   if (!provider) {
     return (
@@ -389,6 +406,55 @@ function ModelSelect({ provider, modelValue, setModel, t }: { provider: string; 
           </SelectGroup>
         </SelectContent>
       </Select>
+    )
+  }
+
+  if (provider === 'openrouter') {
+    const models = openrouterModels?.models || []
+    // OpenRouter serves hundreds of models and adds new ones constantly, so the id is
+    // typed directly. The dropdown below is a picker over the catalog, not the only way in.
+    const byVendor = new Map<string, typeof models>()
+    for (const m of models) {
+      const list = byVendor.get(m.vendor)
+      if (list) list.push(m)
+      else byVendor.set(m.vendor, [m])
+    }
+    return (
+      <div className="space-y-2">
+        <Input
+          type="text"
+          value={modelValue}
+          onChange={e => setModel(e.target.value.trim())}
+          placeholder={t('openrouter.modelIdPlaceholder')}
+          spellCheck={false}
+          aria-label={t('openrouter.modelId')}
+        />
+        <span className="block text-[11px] text-muted/70 select-none">{t('openrouter.modelIdDesc')}</span>
+        {models.length === 0 ? (
+          <Select disabled>
+            <SelectTrigger>
+              <SelectValue placeholder={t('openrouter.noModels')} />
+            </SelectTrigger>
+            <SelectContent />
+          </Select>
+        ) : (
+          <Select value={models.some(m => m.name === modelValue) ? modelValue : undefined} onValueChange={setModel}>
+            <SelectTrigger>
+              <SelectValue placeholder={t('openrouter.pickFromCatalog')} />
+            </SelectTrigger>
+            <SelectContent>
+              {[...byVendor.entries()].map(([vendor, vendorModels]) => (
+                <SelectGroup key={vendor}>
+                  <SelectLabel>{vendor}</SelectLabel>
+                  {vendorModels.map(m => (
+                    <SelectItem key={m.name} value={m.name}>{m.label} ({m.name})</SelectItem>
+                  ))}
+                </SelectGroup>
+              ))}
+            </SelectContent>
+          </Select>
+        )}
+      </div>
     )
   }
 
