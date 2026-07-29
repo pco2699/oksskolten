@@ -7,8 +7,9 @@
 ### Route Definitions
 
 ```
-/                              → Redirect to /inbox
-/inbox                         → Unread articles list
+/                              → Redirect to /all
+/all                           → All feeds, aggregated (defaults to unread-only; respects the show-read-articles toggle, same as category views)
+/inbox                         → Redirect to /all (legacy bookmarks/PWA shortcuts)
 /bookmarks                     → Bookmarked articles list
 /likes                         → Liked articles list
 /history                       → Read articles list (read_at IS NOT NULL)
@@ -43,10 +44,10 @@ The command palette (`Cmd+K`) provides unified access to navigation, actions, fe
 | `Cmd+Shift+K` | Open article search |
 | `Cmd+N` | Add new feed |
 | `Cmd+,` | Open settings |
-| `Cmd+1`–`5` | Navigate to Inbox / Bookmarks / Likes / History / Chat |
+| `Cmd+1`–`5` | Navigate to All / Bookmarks / Likes / History / Chat |
 
 Command palette groups:
-- **Navigation** — Inbox, Bookmarks, Likes, History, Chat, Settings
+- **Navigation** — All, Bookmarks, Likes, History, Chat, Settings
 - **Actions** — Search articles, Add feed, Import/Export OPML
 - **Feeds** — Dynamic list from SWR, shown only when search input is non-empty (clip feeds excluded)
 - **Appearance** — Theme, layout, and color mode switching
@@ -62,7 +63,7 @@ Global shortcuts are managed by `useGlobalShortcuts` hook in `src/hooks/use-glob
 |---|---|
 | Library | SWR |
 | Pagination | Infinite scroll (`useSWRInfinite`, `limit=20` per page) |
-| Display range limit | Smart Floor — For feed/category views, adopts whichever range contains the most articles among three candidates: "last 1 week", "latest 20 articles", and "up to the oldest unread". Skipped if fewer than 20 articles exist. Not applied to Inbox/Bookmarks/Likes/History/Clips |
+| Display range limit | Smart Floor — For feed/category views, adopts whichever range contains the most articles among three candidates: "last 1 week", "latest 20 articles", and "up to the oldest unread". Skipped if fewer than 20 articles exist. Not applied to All/Bookmarks/Likes/History/Clips |
 | Show older articles | When Smart Floor hides articles, a "show older articles (N)" button appears at the end of the list. Clicking it re-fetches with `no_floor=1` to show all articles |
 | Scroll stop condition | Stops when response `has_more === false` |
 | Loading | Skeleton UI |
@@ -77,7 +78,7 @@ Global shortcuts are managed by `useGlobalShortcuts` hook in `src/hooks/use-glob
 | No new articles | `No new articles` (default) |
 | Error | `Fetch failed` (error) |
 
-Pull-to-refresh calls `startFeedFetch(feedId)` on individual feed pages to fetch from the RSS source. On aggregate pages (Inbox, etc.), it only performs SWR `mutate()` as before.
+Pull-to-refresh calls `startFeedFetch(feedId)` on individual feed pages to fetch from the RSS source. On aggregate pages (All, etc.), it only performs SWR `mutate()` as before.
 
 **Fetch progress sharing**: The `useFetchProgress` hook is shared via `FetchProgressContext`, allowing the sidebar and article list to reference the same progress state.
 
@@ -102,7 +103,7 @@ Displays update frequency and activity level for feeds.
 - Display controlled by setting `reading.show_feed_activity` (on/off, default: on)
 
 **Metrics bar (below article list header)**
-- Shown only on individual feed views (`/feeds/:feedId`). Hidden on Inbox and category views
+- Shown only on individual feed views (`/feeds/:feedId`). Hidden on All and category views
 - Displayed items: total article count, update frequency (X.X/wk), last updated (relative time), average article length
 - Lightweight data (article count, update frequency, last updated) is obtained from the `/api/feeds` SWR cache
 - Heavy data (average article length) is fetched on demand from `/api/feeds/:id/metrics`
@@ -171,7 +172,7 @@ Progressive Web App support via `vite-plugin-pwa`.
 |---|---|
 | Registration method | `autoUpdate` |
 | Display mode | `standalone` |
-| Start URL | `/inbox` |
+| Start URL | `/all` |
 | Cache strategy (Favicon) | CacheFirst (30 days) |
 | Cache strategy (Article detail API) | StaleWhileRevalidate (7 days) |
 | Cache strategy (General API) | NetworkFirst (24 hours, 5s timeout) |

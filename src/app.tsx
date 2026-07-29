@@ -126,7 +126,7 @@ function ArticleListPage() {
   const { feedId, categoryId } = useParams<{ feedId?: string; categoryId?: string }>()
   const location = useLocation()
   const { t } = useI18n()
-  const isInbox = location.pathname === '/inbox'
+  const isAll = location.pathname === '/all'
   const isBookmarks = location.pathname === '/bookmarks'
   const isLikes = location.pathname === '/likes'
   const isHistory = location.pathname === '/history'
@@ -140,8 +140,8 @@ function ArticleListPage() {
       ? t('feeds.likes')
       : isBookmarks
         ? t('feeds.bookmarks')
-        : isInbox
-          ? t('feeds.inbox')
+        : isAll
+          ? t('feeds.all')
           : isClips
             ? t('feeds.clips')
             : feedId
@@ -158,7 +158,7 @@ function ArticleListPage() {
       feedName={headerName}
       feedListProps={{ onMarkAllRead: revalidateArticles, onArticleMoved: revalidateArticles }}
     >
-      {isInbox && <HintBanner storageKey="hint-dismissed-inbox">{t('hint.inbox')}</HintBanner>}
+      {isAll && <HintBanner storageKey="hint-dismissed-all">{t('hint.all')}</HintBanner>}
       {isBookmarks && <HintBanner storageKey="hint-dismissed-bookmarks">{t('hint.bookmarks')}</HintBanner>}
       {isLikes && <HintBanner storageKey="hint-dismissed-likes">{t('hint.likes')}</HintBanner>}
       {isHistory && <HintBanner storageKey="hint-dismissed-history">{t('hint.history')}</HintBanner>}
@@ -235,7 +235,7 @@ function ArticleDetailPage() {
 
   return (
     <>
-      <Header mode="detail" onBack={() => navigate(lastListUrl || '/inbox')} />
+      <Header mode="detail" onBack={() => navigate(lastListUrl || '/all')} />
       <ArticleDetail articleUrl={articleUrl} enableZapNavigation />
     </>
   )
@@ -243,7 +243,7 @@ function ArticleDetailPage() {
 
 // Determine the "page type" for animation decisions
 function getPageType(pathname: string): 'detail' | 'list' {
-  if (pathname === '/' || pathname === '/inbox' || pathname === '/bookmarks' || pathname === '/likes' || pathname === '/history' || pathname === '/clips' || pathname.startsWith('/feeds/') || pathname.startsWith('/categories/') || pathname.startsWith('/settings') || pathname.startsWith('/chat')) {
+  if (pathname === '/' || pathname === '/all' || pathname === '/inbox' || pathname === '/bookmarks' || pathname === '/likes' || pathname === '/history' || pathname === '/clips' || pathname.startsWith('/feeds/') || pathname.startsWith('/categories/') || pathname.startsWith('/settings') || pathname.startsWith('/chat')) {
     return 'list'
   }
   return 'detail'
@@ -315,7 +315,8 @@ function AnimatedRoutes() {
         <Routes location={location}>
           <Route element={<AppLayout />}>
             <Route path="/" element={<HomePageWrapper />} />
-            <Route path="/inbox" element={<ArticleListPage />} />
+            <Route path="/all" element={<ArticleListPage />} />
+            <Route path="/inbox" element={<Navigate to="/all" replace />} />
             <Route path="/bookmarks" element={<ArticleListPage />} />
             <Route path="/likes" element={<ArticleListPage />} />
             <Route path="/history" element={<ArticleListPage />} />

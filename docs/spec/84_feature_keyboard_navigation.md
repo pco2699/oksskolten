@@ -37,7 +37,7 @@ Global shortcuts implemented in `src/hooks/use-global-shortcuts.ts`:
 | `Cmd/Ctrl + Shift + K` | Open search dialog |
 | `Cmd/Ctrl + N` | Open add feed modal |
 | `Cmd/Ctrl + ,` | Navigate to settings |
-| `Cmd/Ctrl + 1` | Navigate to Inbox |
+| `Cmd/Ctrl + 1` | Navigate to All |
 | `Cmd/Ctrl + 2` | Navigate to Bookmarks |
 | `Cmd/Ctrl + 3` | Navigate to Likes |
 | `Cmd/Ctrl + 4` | Navigate to History |

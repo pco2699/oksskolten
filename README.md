@@ -40,7 +40,7 @@ Because Oksskolten always has the complete text, AI summarization and translatio
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="docs/images/screenshots/inbox-default-dark.png">
     <source media="(prefers-color-scheme: light)" srcset="docs/images/screenshots/inbox-default-light.png">
-    <img alt="Inbox" src="docs/images/screenshots/inbox-default-dark.png" width="49%">
+    <img alt="All" src="docs/images/screenshots/inbox-default-dark.png" width="49%">
   </picture>
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="docs/images/screenshots/article-chat-default-dark.png">

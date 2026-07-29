@@ -15,7 +15,7 @@ const dict = {
 
   // FeedList
   'feeds.title': { ja: 'フィード', en: 'Feeds', zh: '订阅源'},
-  'feeds.inbox': { ja: 'Inbox', en: 'Inbox', zh: '收件箱'},
+  'feeds.all': { ja: 'すべて', en: 'All', zh: '全部'},
   'feeds.add': { ja: 'フィード', en: 'Feed', zh: '订阅源'},
   'feeds.theme': { ja: 'テーマ', en: 'Theme', zh: '主题'},
   'feeds.colorMode': { ja: 'カラーモード', en: 'Color mode', zh: '颜色模式'},
@@ -132,7 +132,7 @@ const dict = {
 
   // Hint banners
   'hint.today': { ja: 'あなたの行動をもとにスコアリングされたおすすめ記事。AIに「今日何読む？」と聞くこともできます。', en: 'Articles scored by your engagement. You can also ask the AI "What should I read today?"', zh: '根据您的互动评分的文章。您也可以问 AI「今天读什么？」' },
-  'hint.inbox': { ja: '未読記事だけが集まるOksskoltenの玄関口。既読にするとInboxには表示されなくなります。', en: 'The front door of Oksskolten, where only unread articles live. Once marked as read, they won\'t appear in Inbox anymore.', zh: 'Oksskolten 的入口，只有未读文章。标为已读后将不再出现在收件箱中。' },
+  'hint.all': { ja: 'すべてのフィードの未読記事をまとめて表示するOksskoltenの玄関口。既読記事も設定から表示できます。', en: 'The front door of Oksskolten — unread articles from every feed, all in one place. You can show read articles too from the settings.', zh: 'Oksskolten 的入口，汇集所有订阅源的未读文章。也可以在设置中显示已读文章。' },
   'hint.bookmarks': { ja: '気になる記事を一旦キープ。あとで読みたいときに使えます。', en: 'Keep articles for later. A quick way to save something you want to come back to.', zh: '保留文章以便稍后阅读。快速保存您想回来看的内容。' },
   'hint.likes': { ja: 'いいねした記事がここに。検索やレコメンドのスコアリングにも反映されます。', en: 'Articles you\'ve liked live here. Likes also boost search and recommendation scoring.', zh: '您点赞的文章在这里。点赞也会提升搜索和推荐评分。' },
   'hint.clips': { ja: 'フィードを追跡するほどじゃない相手の記事を、URL指定で個別に保存できます。', en: 'Save individual articles by URL — perfect for sources you don\'t need a full feed for.', zh: '通过 URL 保存单篇文章 — 适合不需要完整订阅的来源。' },
@@ -345,9 +345,9 @@ const dict = {
   'settings.internalLinksOff': { ja: 'オフ', en: 'Off', zh: '关'},
   'settings.categoryUnreadOnly': { ja: 'カテゴリで未読のみ表示', en: 'Show Only Unread In Categories', zh: '分类中仅显示未读'},
   'settings.categoryUnreadOnlyDesc': {
-    ja: 'カテゴリビューで未読記事のみを表示します（Inboxと同様の動作）',
-    en: 'Show only unread articles in category views (same behavior as Inbox)',
-    zh: '在分类视图中仅显示未读文章（与收件箱行为相同）'
+    ja: 'カテゴリビューとAllビューで未読記事のみを表示します',
+    en: 'Show only unread articles in category views and the All view',
+    zh: '在分类视图和"全部"视图中仅显示未读文章'
   },
   'settings.categoryUnreadOnlyOn': { ja: 'オン', en: 'On', zh: '开'},
   'settings.categoryUnreadOnlyOff': { ja: 'オフ', en: 'Off', zh: '关'},

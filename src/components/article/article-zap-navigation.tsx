@@ -28,7 +28,7 @@ export function ArticleZapNavigation({ currentArticleId, onBookmarkToggle, onOpe
     onBookmarkToggle: onBookmarkToggle ? () => onBookmarkToggle() : undefined,
     onOpenExternal: onOpenExternal ? () => onOpenExternal() : undefined,
     onEscape: () => {
-      void navigate(lastListUrl || '/inbox')
+      void navigate(lastListUrl || '/all')
     },
     enabled: keyboardNavigation === 'on' && articleIds.length > 0,
     keyBindings: keybindings,

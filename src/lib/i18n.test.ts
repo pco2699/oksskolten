@@ -11,7 +11,7 @@ function makeWrapper(locale: 'ja' | 'en') {
 describe('useI18n', () => {
   it('returns Japanese text when locale is ja', () => {
     const { result } = renderHook(() => useI18n(), { wrapper: makeWrapper('ja') })
-    expect(result.current.t('feeds.inbox')).toBe('Inbox')
+    expect(result.current.t('feeds.all')).toBe('すべて')
     expect(result.current.t('feeds.title')).toBe('フィード')
   })
 
