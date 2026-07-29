@@ -21,6 +21,7 @@ import { toast } from 'sonner'
 import { Mascot } from '../ui/mascot'
 import { FeedErrorBanner } from '../feed/feed-error-banner'
 import { Skeleton } from '../ui/skeleton'
+import { ConfirmDialog } from '../ui/confirm-dialog'
 import { useKeyboardNavigationContext } from '../../contexts/keyboard-navigation-context'
 import { useKeyboardNavigation } from '../../hooks/use-keyboard-navigation'
 import { apiPatch } from '../../lib/fetcher'
@@ -73,6 +74,7 @@ export const ArticleList = forwardRef<ArticleListHandle, object>(function Articl
   const readOnly = isHistory
   const { autoMarkRead, dateMode, indicatorStyle, layout, articleOpenMode, keyboardNavigation, keybindings } = settings
   const [overlayUrl, setOverlayUrl] = useState<string | null>(null)
+  const [markAllReadConfirmOpen, setMarkAllReadConfirmOpen] = useState(false)
   const [noFloor, setNoFloor] = useState(false)
   const displayConfig: ArticleDisplayConfig = useMemo(() => ({
     dateMode,
@@ -216,6 +218,41 @@ export const ArticleList = forwardRef<ArticleListHandle, object>(function Articl
       const article = articleMap.get(id)
       if (article?.url) window.open(article.url, '_blank')
     },
+    onToggleRead: (id) => {
+      const article = articleMap.get(id)
+      if (!article) return
+      const next = article.seen_at == null
+      // Optimistic update on the list's SWR cache
+      void mutate(
+        (pages) => pages?.map(page => ({
+          ...page,
+          articles: page.articles.map(a =>
+            String(a.id) === id
+              ? { ...a, seen_at: next ? new Date().toISOString() : null }
+              : a
+          ),
+        })),
+        { revalidate: false },
+      )
+      // Also update the by-url cache so an open overlay/detail view reflects the change
+      const byUrlKey = `/api/articles/by-url?url=${encodeURIComponent(article.url)}`
+      void globalMutate(
+        byUrlKey,
+        (curr: { seen_at: string | null } | undefined) =>
+          curr ? { ...curr, seen_at: next ? new Date().toISOString() : null } : curr,
+        { revalidate: false },
+      )
+      apiPatch(`/api/articles/${article.id}/seen`, { seen: next })
+        .then(() => {
+          void globalMutate((key: string) => typeof key === 'string' && key.startsWith('/api/feeds'))
+        })
+        .catch(() => {
+          // Roll back on failure
+          void mutate()
+          void globalMutate(byUrlKey)
+        })
+    },
+    onMarkAllRead: () => setMarkAllReadConfirmOpen(true),
     onNearEnd: () => loadMoreRef.current(),
     enabled: isKeyboardNavEnabled,
     keyBindings: keybindings,
@@ -312,6 +349,21 @@ export const ArticleList = forwardRef<ArticleListHandle, object>(function Articl
   // Stable ref so the observer callback always sees the latest markRead
   const markReadRef = useRef(markRead)
   markReadRef.current = markRead
+
+  // Mark all currently loaded articles in this view as read (Shift+A shortcut)
+  const handleMarkAllReadConfirmed = useCallback(() => {
+    setMarkAllReadConfirmOpen(false)
+    const ids = articles.map(a => a.id)
+    if (ids.length === 0) return
+    setAutoReadIds(prev => {
+      const next = new Set(prev)
+      ids.forEach(id => next.add(id))
+      return next
+    })
+    markSeenOnServer(ids)
+      .then(() => globalMutate((key: string) => typeof key === 'string' && key.startsWith('/api/feeds')))
+      .catch(() => {})
+  }, [articles, globalMutate])
 
   const isAutoMarkEnabled = autoMarkRead === 'on'
   const isTouchDevice = useIsTouchDevice()
@@ -558,11 +610,29 @@ export const ArticleList = forwardRef<ArticleListHandle, object>(function Articl
         </div>
       )}
 
-      <ArticleOverlay articleUrl={overlayUrl} onClose={() => {
-        setOverlayUrl(null)
-        escapeDebounceRef.current = true
-        setTimeout(() => { escapeDebounceRef.current = false }, 100)
-      }} />
+      <ArticleOverlay
+        articleUrl={overlayUrl}
+        onNavigate={(url) => {
+          const article = articles.find(a => a.url === url)
+          if (article) setFocusedItemId(String(article.id))
+          setOverlayUrl(url)
+        }}
+        onClose={() => {
+          setOverlayUrl(null)
+          escapeDebounceRef.current = true
+          setTimeout(() => { escapeDebounceRef.current = false }, 100)
+        }}
+      />
+
+      {markAllReadConfirmOpen && (
+        <ConfirmDialog
+          title={t('feeds.markAllRead')}
+          message={t('articles.markAllReadConfirm')}
+          confirmLabel={t('feeds.markAllRead')}
+          onConfirm={handleMarkAllReadConfirmed}
+          onCancel={() => setMarkAllReadConfirmOpen(false)}
+        />
+      )}
     </main>
   )
 })

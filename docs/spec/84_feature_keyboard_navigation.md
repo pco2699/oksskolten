@@ -82,8 +82,40 @@ In overlay mode, `Enter` is not used. Articles are automatically displayed in th
 
 | Shortcut | Action |
 |---|---|
-| `b` (default) | Read Later (toggle bookmark: add if not bookmarked, remove if bookmarked) |
-| `;` (default) | Open the original article in a new browser tab (`window.open(url, '_blank')`) |
+| `b` (default, customizable) | Read Later (toggle bookmark: add if not bookmarked, remove if bookmarked) |
+| `;` (default, customizable) | Open the original article in a new browser tab (`window.open(url, '_blank')`) |
+
+#### Feedly-Style Fixed Keys
+
+In addition to the four customizable bindings above, a set of fixed (non-customizable) keys mirrors Feedly's default shortcuts. These are always active alongside whatever the user has configured for next/prev/bookmark/openExternal:
+
+| Shortcut | Action |
+|---|---|
+| `o` | Open the focused article — same as `Enter` (list view only; no-op in the detail/overlay reader) |
+| `v` | Open the original article in a new tab — fixed alias for the open-external binding |
+| `s` | Toggle Read Later — fixed alias for the bookmark binding |
+| `m` | Toggle read/unread status of the focused (list) or current (detail/overlay) article |
+| `Shift + A` | Mark all articles currently loaded in this list view as read (shows a confirmation dialog first) |
+| `?` | Show the keyboard shortcuts help dialog (works globally, including on the article detail page) |
+
+`o`, `v`, and `s` are implemented in `use-keyboard-navigation.ts` as additional key checks that reuse the same `onEnter` / `onOpenExternal` / `onBookmarkToggle` callbacks as the configurable bindings, so no extra wiring is needed at call sites. `m` and `Shift+A` have their own callbacks (`onToggleRead`, `onMarkAllRead`). `?` is handled by a separate hook (`use-keyboard-shortcuts-help.ts`) mounted at the top of the app so it works on every page, including the standalone article detail route which has no `PageLayout`/sidebar.
+
+Toggling read/unread (`m`) uses the existing `PATCH /api/articles/:id/seen` endpoint (`{ seen: boolean }`), which already supports un-marking an article as read (`seen_at` is cleared). No new server endpoint was needed.
+
+### Prev/Next Edge Arrows
+
+Feedly-style chevron buttons (`ChevronLeft`/`ChevronRight`) are pinned to the far left/right edges of the reading view, vertically centered. Desktop only — hidden below the `md` breakpoint and on touch devices (`useIsTouchDevice`).
+
+Implemented in `src/components/article/article-nav-arrows.tsx` (`ArticleNavArrows`). It reads `articleIds`/`articleUrls` from `KeyboardNavigationContext`, resolves the current article's position via a reverse URL lookup, and renders disabled/hidden buttons at the ends of the list.
+
+Rendered in both reading modes:
+
+- **Page mode**: mounted in `ArticleDetailPage` (`src/app.tsx`) with `variant="page"`. Positioned `fixed` relative to the viewport; navigates using `useNavigate()` + `articleUrlToPath()`, the same mechanism as `ArticleZapNavigation`.
+- **Overlay mode**: mounted inside `ArticleOverlay` (`src/components/article/article-overlay.tsx`) with `variant="overlay"`. Positioned `absolute` relative to the dialog's `Content` element (which is itself `position: fixed`, establishing the containing block) — this keeps the arrows pinned to the overlay panel's actual edges without hardcoding its width. An `onNavigate` callback is threaded from `article-list.tsx` (owner of the `overlayUrl` state) through `ArticleOverlay` down to `ArticleNavArrows`, so clicking an arrow swaps the article shown in the overlay instead of navigating the router. The overlay's scrollable content was moved into an inner wrapper `div` (`h-full overflow-y-auto`) so the arrows, as direct children of `Content`, don't scroll away with the article body.
+
+### Keyboard Shortcuts Help Overlay
+
+Pressing `?` opens `KeyboardShortcutsDialog` (`src/components/ui/keyboard-shortcuts-dialog.tsx`), a simple dialog listing all shortcuts (next/prev, open, open-external, bookmark, toggle-read, mark-all-read, close, and `?` itself), reflecting the user's current custom key bindings. Standard dialog z-index (`z-[70]` via the shared `Dialog` component).
 
 ### Custom Key Bindings
 
@@ -198,6 +230,11 @@ When the article list is empty (no articles), pressing the next/prev key does no
 | `src/hooks/use-keybindings-setting.ts` | Custom key bindings state management and localStorage persistence |
 | `src/hooks/use-keybindings-setting.test.ts` | Tests for keybindings setting hook |
 | `src/components/layout/page-layout.tsx` | Provider placement |
-| `src/components/article/article-list.tsx` | Article list keyboard nav integration, visual feedback, overlay coordination |
-| `src/components/article/article-overlay.tsx` | `data-keyboard-nav-passthrough` attribute for j/k passthrough |
+| `src/components/article/article-list.tsx` | Article list keyboard nav integration, visual feedback, overlay coordination, mark-all-read confirm dialog |
+| `src/components/article/article-overlay.tsx` | `data-keyboard-nav-passthrough` attribute for j/k passthrough; hosts `ArticleNavArrows` (overlay variant) |
+| `src/components/article/article-nav-arrows.tsx` | Prev/next edge chevrons for both page and overlay reading modes |
+| `src/components/article/article-zap-navigation.tsx` | j/k/o/v/s/m navigation and actions in the page-mode article detail reader |
+| `src/hooks/use-article-actions.ts` | `isRead`/`toggleReadState` (backs the `m` shortcut in the detail/overlay reader) |
+| `src/hooks/use-keyboard-shortcuts-help.ts` | Global `?` shortcut, mounted in `AppLayout` |
+| `src/components/ui/keyboard-shortcuts-dialog.tsx` | `?` help dialog listing all shortcuts |
 | `src/pages/settings/sections/reading-section.tsx` | KeybindingsEditor UI (shown when keyboard navigation is on) |

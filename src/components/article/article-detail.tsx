@@ -58,7 +58,7 @@ export function ArticleDetail({ articleUrl, enableZapNavigation = false }: Artic
   const { viewMode, setViewMode, translating, translatingText, fullTextTranslated, handleTranslate, translatingHtml, error: translateError } = useTranslate(translateInput, metrics)
   const {
     isBookmarked, isLiked, archivingImages, deleteConfirmOpen, setDeleteConfirmOpen,
-    toggleBookmark, toggleLike, handleArchiveImages, handleDelete,
+    toggleBookmark, toggleLike, toggleReadState, handleArchiveImages, handleDelete,
   } = useArticleActions(article, articleKey)
   const chat = useChatInline(article?.id ?? 0)
 
@@ -187,6 +187,7 @@ export function ArticleDetail({ articleUrl, enableZapNavigation = false }: Artic
           currentArticleId={String(article.id)}
           onBookmarkToggle={toggleBookmark}
           onOpenExternal={() => window.open(article.url, '_blank')}
+          onToggleRead={toggleReadState}
         />
       )}
       <article ref={articleRef} className="article-card max-w-2xl md:max-w-3xl mx-auto px-6 md:px-10 py-8">
