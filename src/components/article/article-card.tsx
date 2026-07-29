@@ -132,32 +132,32 @@ function ListCard({ article, dateMode, indicatorStyle, showUnreadIndicator, show
       href={href}
       data-original-url={originalUrl}
       onClick={handleClick}
-      className={`article-card block w-full text-left border-b border-border py-3 px-4 md:px-6 transition-[background-color,transform,box-shadow,border-color] duration-100 hover:bg-hover hover:-translate-y-px hover:shadow-sm select-none no-underline text-inherit ${
+      className={`article-card block w-full text-left border-b border-border py-3 md:py-5 px-4 md:px-6 transition-[background-color,transform,box-shadow,border-color] duration-100 hover:bg-hover hover:-translate-y-px hover:shadow-sm select-none no-underline text-inherit ${
         indicatorStyle === 'line'
           ? `border-l-2 transition-[border-color] duration-500 ${showIndicator ? 'border-l-accent' : 'border-l-transparent'}`
           : ''
       }`}
     >
-      <div className="flex items-center gap-2">
+      <div className="flex items-center md:items-start gap-2 md:gap-4">
         {indicatorStyle === 'dot' && (
-          <div className="flex items-center w-3 shrink-0">
+          <div className="flex items-center w-3 shrink-0 md:mt-2">
             <span className={`w-1.5 h-1.5 rounded-full bg-accent transition-opacity duration-500 ${showIndicator ? 'opacity-100' : 'opacity-0'}`} />
           </div>
         )}
         <div className="flex-1 min-w-0">
           <span
-            className={`text-[15px] truncate transition-colors duration-500 block ${
+            className={`text-[15px] md:text-base max-md:truncate md:line-clamp-2 transition-colors duration-500 block ${
               isUnread ? 'font-semibold text-text' : 'font-normal text-muted'
             }`}
           >
             {article.title}
           </span>
           {article.excerpt && (
-            <p className="text-[13px] text-muted truncate mt-0.5">
+            <p className="text-[13px] md:text-sm text-muted max-md:truncate md:line-clamp-2 mt-0.5 md:mt-1.5">
               {article.excerpt}
             </p>
           )}
-          <div className="flex items-center gap-1 text-[12px] text-muted mt-1 whitespace-nowrap min-w-0">
+          <div className="flex items-center gap-1 text-[12px] text-muted mt-1 md:mt-2 whitespace-nowrap min-w-0">
             {domain && (
               <>
                 <img
@@ -174,7 +174,7 @@ function ListCard({ article, dateMode, indicatorStyle, showUnreadIndicator, show
             <span className="shrink-0">{dateText}</span>
           </div>
         </div>
-        {showThumbnails && <Thumbnail src={article.og_image} articleUrl={article.url} />}
+        {showThumbnails && <Thumbnail src={article.og_image} articleUrl={article.url} className="w-16 h-16 md:w-28 md:h-20" />}
       </div>
     </a>
   )

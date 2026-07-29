@@ -712,18 +712,18 @@ function ArticleListSkeleton({ layout = 'list', count = 3, showThumbnails = true
   return (
     <>
       {Array.from({ length: count }).map((_, i) => (
-        <div key={i} className="border-b border-border py-3 px-4 md:px-6">
-          <div className="flex items-center gap-2">
+        <div key={i} className="border-b border-border py-3 md:py-5 px-4 md:px-6">
+          <div className="flex items-center md:items-start gap-2 md:gap-4">
             <div className="w-3 shrink-0" />
-            <div className="flex-1 min-w-0 space-y-1.5">
-              <Skeleton className="h-4 w-3/4" />
-              <Skeleton className="h-3 w-1/2" />
-              <div className="flex items-center gap-1 mt-0.5">
+            <div className="flex-1 min-w-0 space-y-1.5 md:space-y-2">
+              <Skeleton className="h-4 w-3/4 md:h-5" />
+              <Skeleton className="h-3 w-1/2 md:h-4 md:w-2/3" />
+              <div className="flex items-center gap-1 mt-0.5 md:mt-1">
                 <Skeleton className="w-3.5 h-3.5 shrink-0" />
                 <Skeleton className="h-3 w-28" />
               </div>
             </div>
-            {showThumbnails && <Skeleton className="w-16 h-16 shrink-0" />}
+            {showThumbnails && <Skeleton className="w-16 h-16 md:w-28 md:h-20 shrink-0" />}
           </div>
         </div>
       ))}
