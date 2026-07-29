@@ -158,12 +158,33 @@ export const ArticleList = forwardRef<ArticleListHandle, object>(function Articl
     items: articleIds,
     focusedItemId,
     onFocusChange: (id) => {
+      // Advancing past an article with the next key (j) marks the article the
+      // user is leaving as read — a Feedly-style "mark read on advance"
+      // behavior. Only forward moves count: moving backward (k) or the initial
+      // focus (no previous item yet) never marks anything. Reuses the same
+      // auto-read pipeline (autoReadIds + batchQueue) as the scroll-based
+      // auto-mark-read above, so the UI updates instantly and the server sync
+      // stays batched — the Set-based queue naturally dedupes with any id the
+      // scroll observer already enqueued.
+      if (autoMarkRead === 'on' && focusedItemId != null) {
+        const fromIndex = articleIds.indexOf(focusedItemId)
+        const toIndex = articleIds.indexOf(id)
+        const isAdvance = fromIndex !== -1 && toIndex !== -1 && toIndex > fromIndex
+        if (isAdvance) {
+          const prevArticle = articleMap.get(focusedItemId)
+          if (prevArticle && prevArticle.seen_at == null && !autoReadIds.has(prevArticle.id)) {
+            markRead(prevArticle.id)
+          }
+        }
+      }
       setFocusedItemId(id)
       const el = document.querySelector(`[data-article-id="${id}"]`)
       el?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
       // Overlay mode: if the overlay is already open, j/k swaps the article
       // shown in it (in sync with the new focus). If the overlay is closed,
       // j/k only moves the list selection — it must not auto-open the overlay.
+      // (When the overlay is open, the departed article was already marked
+      // read on mount by ArticleDetail, so the advance-mark above is a no-op.)
       if (isOverlayMode && overlayUrl != null) {
         const article = articleMap.get(id)
         if (article) setOverlayUrl(article.url)

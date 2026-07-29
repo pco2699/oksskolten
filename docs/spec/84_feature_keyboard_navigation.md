@@ -198,7 +198,11 @@ When focus moves to an off-screen item via the next/prev key, `scrollIntoView({ 
 
 ### Read Status
 
-No keyboard-navigation-specific read marking. Since `scrollIntoView` triggers scrolling, the existing IntersectionObserver-based auto-read feature fires naturally.
+Beyond the scroll-triggered auto-read (via `scrollIntoView`), advancing focus with the next key (`j`) also marks the article being left as read: when focus moves from article A to article B and B comes after A in `articleIds`, A is marked read if it is currently unread. Moving backward with the prev key (`k`) never marks anything, and the initial focus (no previous item) never marks anything either. This only happens when the auto-mark-read setting (`autoMarkRead`) is `'on'` — if the setting is off, `j`/`k` never mark articles read.
+
+The marking reuses the same `autoReadIds` + batched-queue pipeline as the scroll-based auto-read in `article-list.tsx` (see "Auto-mark-as-read on scroll" in `50_frontend.md` or the inline comments in `article-list.tsx`), so the unread indicator clears instantly in the UI while the server PATCH is batched every ~1.5s. The batch queue is a `Set`, so an id enqueued by both the keyboard advance and the scroll observer is deduped naturally.
+
+In overlay mode, when the overlay is open, `j`/`k` swap the article shown in it, and `ArticleDetail` already marks the newly shown article read on mount; the advance-mark of the departed article described above still runs but is a no-op since that article is already read by the time it happens.
 
 ### Conflict Avoidance
 

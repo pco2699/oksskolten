@@ -559,4 +559,76 @@ describe('ArticleList', () => {
       expect(focusedEl?.getAttribute('aria-selected')).toBe('true')
     })
   })
+
+  describe('auto-mark-read on keyboard advance (j/k)', () => {
+    function setUpKeyboardNavArticles() {
+      mockSettings.articleOpenMode = 'page' as any
+      mockSettings.keyboardNavigation = 'on' as any
+      swrInfiniteReturn = {
+        data: [{
+          articles: [
+            makeArticle({ id: 1, title: 'First Article', url: 'https://example.com/1', seen_at: null }),
+            makeArticle({ id: 2, title: 'Second Article', url: 'https://example.com/2', seen_at: null }),
+            makeArticle({ id: 3, title: 'Third Article', url: 'https://example.com/3', seen_at: null }),
+          ],
+          total: 3,
+          has_more: false,
+        }],
+        error: undefined,
+        size: 1,
+        setSize: vi.fn(),
+        isLoading: false,
+        isValidating: false,
+        mutate: vi.fn(),
+      }
+    }
+
+    function unreadFlag(id: number) {
+      return document.querySelector(`[data-article-id="${id}"]`)?.getAttribute('data-article-unread')
+    }
+
+    it('j advance marks the previously focused article read when autoMarkRead is on', () => {
+      mockSettings.autoMarkRead = 'on' as any
+      setUpKeyboardNavArticles()
+      renderArticleList()
+
+      // First j: no previous focus yet, nothing is marked.
+      fireEvent.keyDown(document, { key: 'j' })
+      expect(unreadFlag(1)).toBe('1')
+
+      // Second j: advances from article 1 to article 2 — article 1 is now read.
+      fireEvent.keyDown(document, { key: 'j' })
+      expect(unreadFlag(1)).toBe('0')
+      expect(unreadFlag(2)).toBe('1')
+    })
+
+    it('k backward move does not mark anything read', () => {
+      mockSettings.autoMarkRead = 'on' as any
+      setUpKeyboardNavArticles()
+      renderArticleList()
+
+      // Move forward to article 3 (marking 1 and 2 read along the way).
+      fireEvent.keyDown(document, { key: 'j' })
+      fireEvent.keyDown(document, { key: 'j' })
+      fireEvent.keyDown(document, { key: 'j' })
+      expect(unreadFlag(1)).toBe('0')
+      expect(unreadFlag(2)).toBe('0')
+      expect(unreadFlag(3)).toBe('1')
+
+      // Moving backward from article 3 to article 2 must not mark article 3 read.
+      fireEvent.keyDown(document, { key: 'k' })
+      expect(unreadFlag(3)).toBe('1')
+    })
+
+    it('does not mark anything read when autoMarkRead is off', () => {
+      mockSettings.autoMarkRead = 'off' as any
+      setUpKeyboardNavArticles()
+      renderArticleList()
+
+      fireEvent.keyDown(document, { key: 'j' })
+      fireEvent.keyDown(document, { key: 'j' })
+      expect(unreadFlag(1)).toBe('1')
+      expect(unreadFlag(2)).toBe('1')
+    })
+  })
 })
