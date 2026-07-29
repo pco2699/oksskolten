@@ -153,10 +153,15 @@ export async function settingsRoutes(api: FastifyInstance): Promise<void> {
       if (key === 'reading.keybindings') {
         try {
           const parsed = JSON.parse(value)
-          const validKeys = new Set(['next', 'prev', 'bookmark', 'openExternal'])
+          // toggleRead is optional so legacy 4-field values (stored before it was
+          // introduced) remain valid; the frontend backfills it with the default on read.
+          const requiredKeys = ['next', 'prev', 'bookmark', 'openExternal']
+          const optionalKeys = ['toggleRead']
+          const validKeys = new Set([...requiredKeys, ...optionalKeys])
           const keys = Object.keys(parsed)
-          if (keys.length !== 4 || !keys.every(k => validKeys.has(k))) {
-            reply.status(400).send({ error: 'Invalid keybindings: keys must be next, prev, bookmark, openExternal' })
+          const hasAllRequired = requiredKeys.every(k => keys.includes(k))
+          if (!hasAllRequired || !keys.every(k => validKeys.has(k))) {
+            reply.status(400).send({ error: 'Invalid keybindings: keys must be next, prev, bookmark, openExternal, and optionally toggleRead' })
             return
           }
           const PRINTABLE_RE = /^[!-~]$/

@@ -17,6 +17,7 @@ import { useLayout } from './use-layout'
 import { useMascot, type MascotChoice } from './use-mascot'
 import { useKeyboardNavSetting } from './use-keyboard-nav-setting'
 import { useKeybindingsSetting } from './use-keybindings-setting'
+import { DEFAULT_KEY_BINDINGS, type KeyBindings } from './use-keyboard-navigation'
 import type { LayoutName } from '../data/layouts'
 import type { Theme } from '../data/themes'
 import { fetcher, apiPatch, authHeaders } from '../lib/fetcher'
@@ -162,7 +163,9 @@ export function useSettings() {
       { key: 'reading.keyboard_navigation', setter: setKeyboardNavigation, backfillRef: keyboardNavigationRef,
         validate: v => v === 'on' || v === 'off' },
       { key: 'reading.keybindings', setter: (v: string) => {
-        try { const parsed = JSON.parse(v); setKeybindings(parsed) } catch { /* ignore invalid JSON */ }
+        // Backfill fields introduced after this value was stored (e.g. legacy 4-field
+        // data from before `toggleRead` was added) so callers always see a full KeyBindings.
+        try { const parsed = JSON.parse(v); setKeybindings({ ...DEFAULT_KEY_BINDINGS, ...parsed }) } catch { /* ignore invalid JSON */ }
       } },
       { key: 'appearance.highlight_theme', setter: setHighlightTheme },
       { key: 'appearance.font_family', setter: setArticleFont },
@@ -334,7 +337,7 @@ export function useSettings() {
       syncedSetArticleFont: make<string>('appearance.font_family', setArticleFont),
       syncedSetMascot: make<MascotChoice>('appearance.mascot', setMascot),
       syncedSetKeyboardNavigation: make<'on' | 'off'>('reading.keyboard_navigation', setKeyboardNavigation),
-      syncedSetKeybindings: (value: import('./use-keyboard-navigation').KeyBindings) => {
+      syncedSetKeybindings: (value: KeyBindings) => {
         dirtyKeysRef.current.add('reading.keybindings')
         setKeybindings(value)
         pendingRef.current['reading.keybindings'] = JSON.stringify(value)

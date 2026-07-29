@@ -22,7 +22,7 @@ export function KeyboardShortcutsDialog({ open, onOpenChange, keyBindings }: Key
     { keys: ['o', 'Enter'], label: t('shortcuts.open') },
     { keys: [keyBindings.openExternal, 'v'], label: t('shortcuts.openExternal') },
     { keys: [keyBindings.bookmark, 's'], label: t('shortcuts.bookmark') },
-    { keys: ['m'], label: t('shortcuts.toggleRead') },
+    { keys: [keyBindings.toggleRead], label: t('shortcuts.toggleRead') },
     { keys: ['Shift', 'A'], label: t('shortcuts.markAllRead') },
     { keys: ['Esc'], label: t('shortcuts.close') },
     { keys: ['?'], label: t('shortcuts.showHelp') },

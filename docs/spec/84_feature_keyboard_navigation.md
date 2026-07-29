@@ -90,23 +90,23 @@ In overlay mode, `Enter` is not used. Articles are automatically displayed in th
 |---|---|
 | `b` (default, customizable) | Read Later (toggle bookmark: add if not bookmarked, remove if bookmarked) |
 | `;` (default, customizable) | Open the original article in a new browser tab (`window.open(url, '_blank')`) |
+| `m` (default, customizable) | Toggle read/unread status of the focused (list) or current (detail/overlay) article |
 
 #### Feedly-Style Fixed Keys
 
-In addition to the four customizable bindings above, a set of fixed (non-customizable) keys mirrors Feedly's default shortcuts. These are always active alongside whatever the user has configured for next/prev/bookmark/openExternal:
+In addition to the customizable bindings above, a set of fixed (non-customizable) keys mirrors Feedly's default shortcuts. These are always active regardless of what the user has configured for next/prev/bookmark/openExternal/toggleRead:
 
 | Shortcut | Action |
 |---|---|
 | `o` | Open the focused article — same as `Enter` (list view only; no-op in the detail/overlay reader) |
 | `v` | Open the original article in a new tab — fixed alias for the open-external binding |
 | `s` | Toggle Read Later — fixed alias for the bookmark binding |
-| `m` | Toggle read/unread status of the focused (list) or current (detail/overlay) article |
 | `Shift + A` | Mark all articles currently loaded in this list view as read (shows a confirmation dialog first) |
 | `?` | Show the keyboard shortcuts help dialog (works globally, including on the article detail page) |
 
-`o`, `v`, and `s` are implemented in `use-keyboard-navigation.ts` as additional key checks that reuse the same `onEnter` / `onOpenExternal` / `onBookmarkToggle` callbacks as the configurable bindings, so no extra wiring is needed at call sites. `m` and `Shift+A` have their own callbacks (`onToggleRead`, `onMarkAllRead`). `?` is handled by a separate hook (`use-keyboard-shortcuts-help.ts`) mounted at the top of the app so it works on every page, including the standalone article detail route which has no `PageLayout`/sidebar.
+`o`, `v`, and `s` are implemented in `use-keyboard-navigation.ts` as additional key checks that reuse the same `onEnter` / `onOpenExternal` / `onBookmarkToggle` callbacks as the configurable bindings, so no extra wiring is needed at call sites. `Shift+A` has its own callback (`onMarkAllRead`). `?` is handled by a separate hook (`use-keyboard-shortcuts-help.ts`) mounted at the top of the app so it works on every page, including the standalone article detail route which has no `PageLayout`/sidebar.
 
-Toggling read/unread (`m`) uses the existing `PATCH /api/articles/:id/seen` endpoint (`{ seen: boolean }`), which already supports un-marking an article as read (`seen_at` is cleared). No new server endpoint was needed.
+Read/unread toggling (`toggleRead`, default `m`) is a full customizable binding like next/prev/bookmark/openExternal, not a fixed key — it went through this migration after initially shipping as a hardcoded `m` check. It uses the existing `PATCH /api/articles/:id/seen` endpoint (`{ seen: boolean }`), which already supports un-marking an article as read (`seen_at` is cleared). No new server endpoint was needed.
 
 ### Prev/Next Edge Arrows
 
@@ -125,16 +125,17 @@ Pressing `?` opens `KeyboardShortcutsDialog` (`src/components/ui/keyboard-shortc
 
 ### Custom Key Bindings
 
-Users can reassign the four navigation/action keys via Settings → Reading → Key Bindings (visible only when keyboard navigation is enabled).
+Users can reassign the five navigation/action keys via Settings → Reading → Key Bindings (visible only when keyboard navigation is enabled). Below the editable bindings, the same section also lists the fixed (non-configurable) shortcuts — `o`/`Enter`, `s`, `v`, `Shift+A`, `?`, `Esc` — as read-only chips, so all shortcuts are discoverable from Settings, not just the `?` help dialog.
 
 #### KeyBindings Interface
 
 ```typescript
 interface KeyBindings {
-  next: string       // default: 'j'
-  prev: string       // default: 'k'
-  bookmark: string   // default: 'b'
+  next: string         // default: 'j'
+  prev: string         // default: 'k'
+  bookmark: string     // default: 'b'
   openExternal: string // default: ';'
+  toggleRead: string   // default: 'm'
 }
 ```
 
@@ -151,12 +152,14 @@ interface KeyBindings {
 
 The `useKeybindingsSetting` hook manages local state and localStorage persistence. Server sync follows the same dual-storage pattern as other settings (see [ADR-001](../adr/001-settings-dual-storage.md)).
 
+`toggleRead` was added after `next`/`prev`/`bookmark`/`openExternal` shipped, so values stored before that point only have the original 4 fields. Both the client (`use-keybindings-setting.ts`) and the server (`server/routes/settings.ts`) treat `toggleRead` as optional on read/validation: a stored 4-field value is still considered valid and is backfilled with the `toggleRead` default (`'m'`) rather than being discarded as invalid. Anything written going forward (via the Settings UI) always includes all 5 fields.
+
 #### Server Validation
 
 `PATCH /api/settings/preferences` validates `reading.keybindings`:
 
 - Must be valid JSON
-- Must contain exactly 4 keys: `next`, `prev`, `bookmark`, `openExternal`
+- Must contain the 4 required keys `next`, `prev`, `bookmark`, `openExternal`, and may optionally include `toggleRead`; no other keys are allowed
 - Each value must be a single character string
 
 Returns `400` with a descriptive error if validation fails.

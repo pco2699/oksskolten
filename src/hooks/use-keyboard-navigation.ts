@@ -5,6 +5,7 @@ export interface KeyBindings {
   prev: string
   bookmark: string
   openExternal: string
+  toggleRead: string
 }
 
 export const DEFAULT_KEY_BINDINGS: KeyBindings = {
@@ -12,6 +13,7 @@ export const DEFAULT_KEY_BINDINGS: KeyBindings = {
   prev: 'k',
   bookmark: 'b',
   openExternal: ';',
+  toggleRead: 'm',
 }
 
 /** Number of items from the end at which onNearEnd fires */
@@ -25,7 +27,7 @@ interface UseKeyboardNavigationOptions {
   onEscape?: () => void
   onBookmarkToggle?: (id: string) => void
   onOpenExternal?: (id: string) => void
-  /** 'm' — toggle read/unread state of the focused/current article */
+  /** bindings.toggleRead (default 'm') — toggle read/unread state of the focused/current article */
   onToggleRead?: (id: string) => void
   /** Shift+A — mark all articles in the current list view as read */
   onMarkAllRead?: () => void
@@ -124,7 +126,7 @@ export function useKeyboardNavigation(options: UseKeyboardNavigationOptions) {
         return
       }
 
-      if (key === 'm' && focusedItemId && onToggleRead) {
+      if (key === bindings.toggleRead && focusedItemId && onToggleRead) {
         onToggleRead(focusedItemId)
         return
       }

@@ -425,6 +425,16 @@ function KeybindingsEditor({
     { key: 'prev', label: t('settings.keybindingsPrev') },
     { key: 'bookmark', label: t('settings.keybindingsBookmark') },
     { key: 'openExternal', label: t('settings.keybindingsOpenExternal') },
+    { key: 'toggleRead', label: t('shortcuts.toggleRead') },
+  ]
+
+  const fixedShortcuts: Array<{ keys: string[]; label: string }> = [
+    { keys: ['o', 'Enter'], label: t('shortcuts.open') },
+    { keys: ['s'], label: t('shortcuts.bookmark') },
+    { keys: ['v'], label: t('shortcuts.openExternal') },
+    { keys: ['Shift', 'A'], label: t('shortcuts.markAllRead') },
+    { keys: ['?'], label: t('shortcuts.showHelp') },
+    { keys: ['Esc'], label: t('shortcuts.close') },
   ]
 
   const values = Object.values(draft)
@@ -465,6 +475,28 @@ function KeybindingsEditor({
       {hasDuplicate && (
         <p className="text-xs text-error mt-2">{t('settings.keybindingsDuplicate')}</p>
       )}
+
+      <div className="mt-5">
+        <p className="text-sm text-text mb-1">{t('settings.keybindingsFixedTitle')}</p>
+        <p className="text-xs text-muted mb-3">{t('settings.keybindingsFixedDesc')}</p>
+        <div className="space-y-2">
+          {fixedShortcuts.map(({ keys, label }, i) => (
+            <div key={i} className="flex items-center justify-between gap-3 max-w-xs">
+              <span className="text-sm text-muted">{label}</span>
+              <span className="flex items-center gap-1 shrink-0">
+                {keys.map((key, j) => (
+                  <kbd
+                    key={j}
+                    className="min-w-[1.5rem] px-1.5 py-0.5 text-center text-xs font-mono rounded border border-border bg-bg-card text-muted"
+                  >
+                    {key}
+                  </kbd>
+                ))}
+              </span>
+            </div>
+          ))}
+        </div>
+      </div>
     </div>
   )
 }

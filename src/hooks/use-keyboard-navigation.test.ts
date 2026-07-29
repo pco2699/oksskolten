@@ -371,7 +371,7 @@ describe('useKeyboardNavigation', () => {
         focusedItemId: 'a',
         onFocusChange,
         enabled: true,
-        keyBindings: { next: 'n', prev: 'p', bookmark: 'm', openExternal: 'o' },
+        keyBindings: { next: 'n', prev: 'p', bookmark: 'm', openExternal: 'o', toggleRead: 't' },
       }))
 
       fireKey('n')
@@ -385,7 +385,7 @@ describe('useKeyboardNavigation', () => {
         focusedItemId: 'a',
         onFocusChange,
         enabled: true,
-        keyBindings: { next: 'n', prev: 'p', bookmark: 'm', openExternal: 'o' },
+        keyBindings: { next: 'n', prev: 'p', bookmark: 'm', openExternal: 'o', toggleRead: 't' },
       }))
 
       fireKey('j')
@@ -399,7 +399,7 @@ describe('useKeyboardNavigation', () => {
         focusedItemId: 'b',
         onFocusChange,
         enabled: true,
-        keyBindings: { next: 'n', prev: 'p', bookmark: 'm', openExternal: 'o' },
+        keyBindings: { next: 'n', prev: 'p', bookmark: 'm', openExternal: 'o', toggleRead: 't' },
       }))
 
       fireKey('p')
@@ -414,7 +414,7 @@ describe('useKeyboardNavigation', () => {
         onFocusChange: vi.fn(),
         onBookmarkToggle,
         enabled: true,
-        keyBindings: { next: 'n', prev: 'p', bookmark: 'm', openExternal: 'o' },
+        keyBindings: { next: 'n', prev: 'p', bookmark: 'm', openExternal: 'o', toggleRead: 't' },
       }))
 
       fireKey('m')
@@ -429,11 +429,41 @@ describe('useKeyboardNavigation', () => {
         onFocusChange: vi.fn(),
         onOpenExternal,
         enabled: true,
-        keyBindings: { next: 'n', prev: 'p', bookmark: 'm', openExternal: 'o' },
+        keyBindings: { next: 'n', prev: 'p', bookmark: 'm', openExternal: 'o', toggleRead: 't' },
       }))
 
       fireKey('o')
       expect(onOpenExternal).toHaveBeenCalledWith('a')
+    })
+
+    it('uses custom toggleRead key', () => {
+      const onToggleRead = vi.fn()
+      renderHook(() => useKeyboardNavigation({
+        items: ['a', 'b'],
+        focusedItemId: 'a',
+        onFocusChange: vi.fn(),
+        onToggleRead,
+        enabled: true,
+        keyBindings: { next: 'n', prev: 'p', bookmark: 'm', openExternal: 'o', toggleRead: 't' },
+      }))
+
+      fireKey('t')
+      expect(onToggleRead).toHaveBeenCalledWith('a')
+    })
+
+    it('does not respond to default m when custom toggleRead key is set', () => {
+      const onToggleRead = vi.fn()
+      renderHook(() => useKeyboardNavigation({
+        items: ['a', 'b'],
+        focusedItemId: 'a',
+        onFocusChange: vi.fn(),
+        onToggleRead,
+        enabled: true,
+        keyBindings: { next: 'n', prev: 'p', bookmark: 'b', openExternal: 'o', toggleRead: 't' },
+      }))
+
+      fireKey('m')
+      expect(onToggleRead).not.toHaveBeenCalled()
     })
 
     it('falls back to defaults when keyBindings is not provided', () => {
@@ -571,7 +601,7 @@ describe('useKeyboardNavigation', () => {
         onFocusChange: vi.fn(),
         onBookmarkToggle,
         enabled: true,
-        keyBindings: { next: 'n', prev: 'p', bookmark: 'm', openExternal: 'o' },
+        keyBindings: { next: 'n', prev: 'p', bookmark: 'm', openExternal: 'o', toggleRead: 't' },
       }))
 
       fireKey('m')

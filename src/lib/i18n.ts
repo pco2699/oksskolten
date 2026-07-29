@@ -343,6 +343,8 @@ const dict = {
   'settings.keybindingsBookmark': { ja: 'ブックマーク', en: 'Bookmark', zh: '书签'},
   'settings.keybindingsOpenExternal': { ja: '元記事を開く', en: 'Open original', zh: '打开原文'},
   'settings.keybindingsDuplicate': { ja: '同じキーが複数のアクションに割り当てられています', en: 'Duplicate key assignment detected', zh: '检测到重复的快捷键分配'},
+  'settings.keybindingsFixedTitle': { ja: '固定ショートカット', en: 'Fixed shortcuts', zh: '固定快捷键'},
+  'settings.keybindingsFixedDesc': { ja: 'これらのキーは変更できません', en: 'These keys cannot be customized', zh: '这些快捷键无法自定义'},
   'feeds.inactive': { ja: 'inactive', en: 'inactive', zh: '未活跃'},
   'metrics.articles': { ja: '記事', en: 'articles', zh: '篇文章'},
   'metrics.perWeek': { ja: '/週', en: '/wk', zh: '/周'},
