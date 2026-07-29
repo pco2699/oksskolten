@@ -34,10 +34,6 @@ vi.mock('../fetcher.js', async () => {
   }
 })
 
-vi.mock('../anthropic.js', () => ({
-  anthropic: { messages: { stream: vi.fn(), create: vi.fn() } },
-}))
-
 vi.mock('../fetcher/article-images.js', () => ({
   archiveArticleImages: (...args: unknown[]) => mockArchiveArticleImages(...args),
   isImageArchivingEnabled: (...args: unknown[]) => mockIsImageArchivingEnabled(...args),

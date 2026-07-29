@@ -17,7 +17,7 @@ vi.mock('../db.js', () => ({
 
 vi.mock('../providers/llm/index.js', () => ({
   getProvider: () => ({
-    name: 'anthropic',
+    name: 'openrouter',
     requireKey: mockRequireKey,
     createMessage: mockCreateMessage,
     streamMessage: mockStreamMessage,
@@ -32,9 +32,20 @@ import {
   streamTranslateArticle,
 } from './ai.js'
 
+const DEFAULT_MODEL = 'anthropic/claude-haiku-4.5'
+
+/** Settings stub: a model is configured, everything else falls back to defaults */
+function settings(overrides: Record<string, string> = {}) {
+  return (key: string) => {
+    if (key in overrides) return overrides[key]
+    if (key === 'summary.model' || key === 'translate.model') return DEFAULT_MODEL
+    return null
+  }
+}
+
 beforeEach(() => {
   vi.clearAllMocks()
-  mockGetSetting.mockReturnValue(null) // use defaults
+  mockGetSetting.mockImplementation(settings())
 })
 
 // ---------------------------------------------------------------------------
@@ -97,7 +108,7 @@ describe('summarizeArticle', () => {
     expect(result.summary).toBe('要約テキスト')
     expect(result.inputTokens).toBe(100)
     expect(result.outputTokens).toBe(50)
-    expect(result.billingMode).toBe('anthropic')
+    expect(result.billingMode).toBe('openrouter')
     expect(result.model).toBeDefined()
   })
 
@@ -131,10 +142,7 @@ describe('summarizeArticle', () => {
   })
 
   it('uses summary.max_tokens override from settings', async () => {
-    mockGetSetting.mockImplementation((key: string) => {
-      if (key === 'summary.max_tokens') return '512'
-      return null
-    })
+    mockGetSetting.mockImplementation(settings({ 'summary.max_tokens': '512' }))
     mockCreateMessage.mockResolvedValue({ text: 'ok', inputTokens: 0, outputTokens: 0 })
     await summarizeArticle('text')
 
@@ -143,10 +151,7 @@ describe('summarizeArticle', () => {
   })
 
   it('falls back to default when summary.max_tokens is not a positive integer', async () => {
-    mockGetSetting.mockImplementation((key: string) => {
-      if (key === 'summary.max_tokens') return 'not-a-number'
-      return null
-    })
+    mockGetSetting.mockImplementation(settings({ 'summary.max_tokens': 'not-a-number' }))
     mockCreateMessage.mockResolvedValue({ text: 'ok', inputTokens: 0, outputTokens: 0 })
     await summarizeArticle('text')
 
@@ -155,13 +160,16 @@ describe('summarizeArticle', () => {
   })
 
   it('uses custom model from settings', async () => {
-    mockGetSetting.mockImplementation((key: string) => {
-      if (key === 'summary.model') return 'claude-sonnet-4-6'
-      return null
-    })
+    mockGetSetting.mockImplementation(settings({ 'summary.model': 'deepseek/deepseek-v4-flash' }))
     mockCreateMessage.mockResolvedValue({ text: 'ok', inputTokens: 0, outputTokens: 0 })
     const result = await summarizeArticle('text')
-    expect(result.model).toBe('claude-sonnet-4-6')
+    expect(result.model).toBe('deepseek/deepseek-v4-flash')
+  })
+
+  it('throws MODEL_NOT_SET when no model is configured', async () => {
+    mockGetSetting.mockReturnValue(null)
+    await expect(summarizeArticle('text')).rejects.toThrow('MODEL_NOT_SET')
+    expect(mockCreateMessage).not.toHaveBeenCalled()
   })
 
   it('propagates provider errors', async () => {
@@ -171,9 +179,9 @@ describe('summarizeArticle', () => {
 
   it('propagates requireKey errors', async () => {
     mockRequireKey.mockImplementation(() => {
-      throw new Error('ANTHROPIC_KEY_NOT_SET')
+      throw new Error('OPENROUTER_KEY_NOT_SET')
     })
-    await expect(summarizeArticle('text')).rejects.toThrow('ANTHROPIC_KEY_NOT_SET')
+    await expect(summarizeArticle('text')).rejects.toThrow('OPENROUTER_KEY_NOT_SET')
     mockRequireKey.mockReset()
   })
 })
@@ -215,7 +223,7 @@ describe('translateArticle', () => {
     expect(result.fullTextTranslated).toBe('翻訳されたテキスト')
     expect(result.inputTokens).toBe(200)
     expect(result.outputTokens).toBe(180)
-    expect(result.billingMode).toBe('anthropic')
+    expect(result.billingMode).toBe('openrouter')
   })
 
   it('passes article text in translate prompt', async () => {
@@ -236,10 +244,7 @@ describe('translateArticle', () => {
   })
 
   it('uses translate.max_tokens override from settings', async () => {
-    mockGetSetting.mockImplementation((key: string) => {
-      if (key === 'translate.max_tokens') return '4096'
-      return null
-    })
+    mockGetSetting.mockImplementation(settings({ 'translate.max_tokens': '4096' }))
     mockCreateMessage.mockResolvedValue({ text: 'ok', inputTokens: 0, outputTokens: 0 })
     await translateArticle('text')
 
@@ -248,10 +253,7 @@ describe('translateArticle', () => {
   })
 
   it('uses translate-specific settings keys', async () => {
-    mockGetSetting.mockImplementation((key: string) => {
-      if (key === 'translate.model') return 'gpt-4.1'
-      return null
-    })
+    mockGetSetting.mockImplementation(settings({ 'translate.model': 'gpt-4.1' }))
     mockCreateMessage.mockResolvedValue({ text: 'ok', inputTokens: 0, outputTokens: 0 })
     const result = await translateArticle('text')
     expect(result.model).toBe('gpt-4.1')

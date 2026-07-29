@@ -14,51 +14,45 @@ A core feature of Oksskolten. Enables natural-language interaction with the arti
 
 ### Architecture
 
-Tools are centralized in an MCP server, and four backend types share a common toolset.
+Chat runs against OpenRouter through one adapter. The same tool definitions back both the web chat and the standalone MCP server.
 
 ```
 ┌──────────────────────────────────────────────────────────────────┐
 │  Docker Container                                                │
 │                                                                  │
 │  ┌──────────┐    ┌──────────────┐    ┌───────────────────┐      │
-│  │ Fastify  │───▶│ ChatService  │───▶│    MCP Server     │      │
-│  │ API      │    │ (adapter)    │    │ (shared tool layer)│      │
+│  │ Fastify  │───▶│ ChatService  │───▶│  Tool layer       │      │
+│  │ API      │    │ (adapter)    │    │  (server/chat)    │      │
 │  └──────────┘    └──────┬───────┘    └─────────┬─────────┘      │
 │                         │                      │                 │
-│         ┌───────────────┼───────────────┐      │                 │
-│         ▼               ▼               ▼      ▼                 │
-│  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌────────┐          │
-│  │Anthropic │  │  Gemini  │  │  OpenAI  │  │ SQLite │          │
-│  │ Adapter  │  │ Adapter  │  │ Adapter  │  │        │          │
-│  └────┬─────┘  └────┬─────┘  └────┬─────┘  └────────┘          │
-│       │              │              │                             │
-│  ┌────────────────┐  │              │                             │
-│  │ ClaudeCodeAdpt │  │              │                             │
-│  └───────┬────────┘  │              │                             │
-│          │           │              │                             │
-└──────────┼───────────┼──────────────┼─────────────────────────────┘
-           ▼           ▼              ▼
-   Anthropic API   Google AI API   OpenAI API
+│                         ▼                      ▼                 │
+│                 ┌──────────────┐         ┌────────┐             │
+│                 │  OpenRouter  │         │ SQLite │             │
+│                 │   Adapter    │         │        │             │
+│                 └──────┬───────┘         └────────┘             │
+│                        │                                         │
+│  ┌───────────────┐     │                                         │
+│  │  MCP Server   │─────┘  (stdio, for Claude Code)               │
+│  └───────────────┘                                               │
+└────────────────────────┼─────────────────────────────────────────┘
+                         ▼
+                  OpenRouter API
 ```
 
-| Backend | Communication Path | Notes |
+| Path | Communication | Notes |
 |---|---|---|
-| **Anthropic API** (default) | Fastify → Anthropic API (MCP tools converted to tool_use) | SSE delivery via `anthropic.messages.stream()` |
-| **Google Gemini** | Fastify → Google GenAI API (MCP tools converted to function calling) | Supports Gemini 2.5 Flash / Pro |
-| **OpenAI** | Fastify → OpenAI API (MCP tools converted to tool calling) | Supports GPT-5.2 / GPT-4.1 etc. |
-| **Claude Code** | Fastify → `claude -p` subprocess (MCP server connected via stdio) | Tool logs restored from temporary JSONL file |
+| **Web chat** | Fastify → OpenRouter (`/chat/completions`, tools as function calling) | SSE streaming, up to 10 tool rounds |
+| **MCP server** | `server/chat/mcp-server.ts` over stdio | Exposes the same tools to Claude Code against the local DB |
 
-Backend selection can be switched from the settings UI (stored in DB as `ai.chat_provider`).
+The model is set in the settings UI (`chat.model`); there is no backend to choose.
 
 ### File Structure
 
 ```
 server/chat/
-├── adapter.ts                 # Router: backend selection + runChatTurn()
-├── adapter-anthropic.ts       # Anthropic API adapter
-├── adapter-gemini.ts          # Google Gemini API adapter
-├── adapter-openai.ts          # OpenAI API adapter
-├── adapter-claude-code.ts     # Claude Code adapter
+├── adapter.ts                 # Entry point: runChatTurn()
+├── adapter-openrouter.ts      # OpenRouter (OpenAI-compatible) adapter
+├── tool-loop.ts               # Shared tool execution loop
 ├── history.ts                 # Conversation history normalization/repair
 ├── mcp-server.ts              # MCP server (stdio transport)
 └── tools.ts                   # Tool definitions (ToolDef neutral format)
@@ -66,7 +60,7 @@ server/chat/
 
 ### MCP Tools
 
-Tool definitions are managed in a neutral `ToolDef` format in `server/chat/tools.ts` and converted to each provider's specific format via `toAnthropicTools()`, `toOpenAITools()`, and `toGeminiTools()`.
+Tool definitions are managed in a neutral `ToolDef` format in `server/chat/tools.ts` and converted to the chat-completions function format via `toOpenAITools()`.
 
 | Tool Name | Description | Input |
 |---|---|---|
@@ -173,22 +167,15 @@ claude mcp add --scope user --transport stdio oksskolten \
 
 Requires SSH key authentication (password prompts break stdio).
 
-### Anthropic API Adapter
+### OpenRouter Adapter
 
-`server/chat/adapter-anthropic.ts`. Streams via `anthropic.messages.stream()` and executes up to 10 rounds of tool loops.
+`server/chat/adapter-openrouter.ts`. Streams via `chat.completions.create({ stream: true })` on the OpenRouter client and executes up to 10 rounds of tool loops.
 
+- Throws `OPENROUTER_KEY_NOT_SET` when no API key is stored; `POST /api/chat` returns 400 `MODEL_NOT_SET` when no model is configured
+- Streamed tool-call deltas are accumulated per index before execution
 - Collects tool results and loops back
 - SSE events: `text_delta`, `tool_use_start`, `tool_use_end`, `done`, `error`
-- Messages are saved to DB in Anthropic `MessageParam` format
-
-### Claude Code Adapter
-
-`server/chat/adapter-claude-code.ts`. Launches `claude -p` as a subprocess and receives output via `--output-format stream-json`.
-
-- Conversation history is built as a text prompt (`buildPrompt()`)
-- MCP server is connected via stdio (MCP config passed as JSON in CLI arguments)
-- Tool execution logs are read from a temporary JSONL file and restored as `tool_use` / `tool_result` blocks
-- 90-second timeout (SIGKILL on expiry)
+- Tool support depends on the chosen model — models without tool calling simply answer without invoking tools
 
 ### Search Architecture
 
@@ -221,7 +208,7 @@ User: "What was that Cloudflare article I read last week?"
 
 See [10_schema.md](./10_schema.md) for the `conversations` / `chat_messages` schema.
 
-The `content` column stores Anthropic API `messages` format as-is in JSON (including text, `tool_use`, and `tool_result`). Messages read from DB can be passed directly to the Anthropic API to resume a conversation.
+The `content` column stores neutral content blocks as JSON (text, `tool_use`, `tool_result`). The adapter converts them to the chat-completions message shape when resuming a conversation.
 
 | Case | `article_id` | `title` |
 |---|---|---|
@@ -282,21 +269,17 @@ Get suggestions to start a conversation. Dynamically generated based on time of 
 
 `key` is an i18n key. The frontend converts it to display text via `t()`.
 
-#### `GET /api/chat/claude-code-status`
-
-Check Claude Code login status. Returns `{ loggedIn, email?, plan? }`.
-
 #### `GET /api/settings/api-keys/:provider`
 
-Check API key configuration status for a provider (`anthropic`, `gemini`, `openai`, `google-translate`). Returns `{ configured: boolean }`.
+Check API key configuration status. `provider` must be `openrouter`. Returns `{ configured: boolean }`.
 
 #### `POST /api/settings/api-keys/:provider`
 
-Save or delete a provider's API key. `{ apiKey?: string }` (empty to delete).
+Save or delete the OpenRouter API key. `{ apiKey?: string }` (empty to delete).
 
-#### `GET /api/settings/google-translate/usage`
+#### `GET /api/settings/openrouter/models`
 
-Return monthly character usage for Google Translate. `{ month: "2026-03", chars: 12345 }`.
+Return the cached OpenRouter model catalog (id, label, vendor, pricing).
 
 ### Frontend
 
@@ -349,12 +332,11 @@ The `ChatFab` component displays a floating button at the bottom-right of the ar
 AI and translation settings section (`/settings/integration` tab):
 
 **Per-task settings**:
-- **Chat**: Select provider (Anthropic / Gemini / OpenAI / Claude Code) and model
-- **Summary**: Provider/model can be selected independently from chat
-- **Translation**: Switch between LLM provider and translation service (Google Translate) modes. Model selection is hidden when Google Translate is selected
+- **Chat / Summary / Translation**: Each takes an OpenRouter model id, typed as free text or picked from the vendor-grouped catalog. The three are independent
+- **Max output tokens**: Summary and translation each accept an override
 
 **API key management**:
-- LLM providers: Set/delete keys for Anthropic / Gemini / OpenAI + configuration status indicator
-- Translation service: Google Translate key settings + notes on v2/v3 differences and free tier + monthly character usage display
+- OpenRouter: set/delete the key, configuration status indicator, and a "Test Connection" button that verifies the key against `GET /key`
+- Translation target language selector
 
-Settings are persisted in DB as `chat.provider`, `chat.model`, `summary.provider`, `summary.model`, `translate.provider`, `translate.model`. API keys are stored as `api_key.anthropic`, `api_key.gemini`, `api_key.openai`, `api_key.google_translate`.
+Settings are persisted in DB as `chat.model`, `summary.model`, `translate.model`. The API key is stored as `api_key.openrouter`.

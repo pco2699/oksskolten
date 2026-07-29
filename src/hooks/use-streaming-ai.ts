@@ -51,7 +51,6 @@ export function useStreamingAI(
           outputTokens: usage.output_tokens,
           billingMode: usage.billing_mode,
           model: usage.model,
-          ...(usage.monthly_chars != null ? { monthlyChars: usage.monthly_chars } : {}),
         })
       }
     } catch (err) {

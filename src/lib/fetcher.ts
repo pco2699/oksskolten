@@ -29,7 +29,7 @@ export const apiDelete = (url: string) => request(url, 'DELETE')
 export async function streamPost(
   url: string,
   onDelta: (text: string) => void,
-): Promise<{ usage: { input_tokens: number; output_tokens: number; billing_mode?: 'anthropic' | 'gemini' | 'openai' | 'claude-code' | 'google-translate'; model?: string; monthly_chars?: number } }> {
+): Promise<{ usage: { input_tokens: number; output_tokens: number; billing_mode?: 'openrouter'; model?: string } }> {
   const res = await fetch(url, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...authHeaders() },
@@ -48,7 +48,7 @@ export async function streamPost(
 
   // SSE streaming response
   type StreamPayload = { type: string; text?: string; error?: string; usage?: typeof usage }
-  let usage: { input_tokens: number; output_tokens: number; billing_mode?: 'anthropic' | 'gemini' | 'openai' | 'claude-code' | 'google-translate'; model?: string; monthly_chars?: number } = { input_tokens: 0, output_tokens: 0 }
+  let usage: { input_tokens: number; output_tokens: number; billing_mode?: 'openrouter'; model?: string } = { input_tokens: 0, output_tokens: 0 }
 
   await parseSSEStream<StreamPayload>(res, (payload) => {
     if (payload.type === 'delta') {

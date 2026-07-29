@@ -135,13 +135,10 @@ export async function demoFetcher(url: string): Promise<unknown> {
   if (path === '/api/settings/preferences') {
     return {
       'reading.auto_mark_read': 'on',
-      'chat.provider': 'anthropic',
-      'chat.model': 'claude-haiku-4-5-20251001',
-      'summary.provider': 'anthropic',
-      'summary.model': 'claude-haiku-4-5-20251001',
+      'chat.model': 'anthropic/claude-haiku-4.5',
+      'summary.model': 'anthropic/claude-haiku-4.5',
       'summary.max_tokens': null,
-      'translate.provider': 'deepl',
-      'translate.model': '',
+      'translate.model': 'anthropic/claude-sonnet-4.5',
       'translate.max_tokens': null,
       'translate.target_lang': null,
     }
@@ -172,25 +169,21 @@ export async function demoFetcher(url: string): Promise<unknown> {
     return { password: true, passkey: false, github: false }
   }
 
-  // API key status: Anthropic and DeepL are "configured" in demo
-  const apiKeyMatch = path.match(/^\/api\/settings\/api-keys\/(.+)$/)
-  if (apiKeyMatch) {
-    const provider = apiKeyMatch[1]
-    const configured = provider !== 'claude-code'
-    return { configured }
+  // API key status: OpenRouter is "configured" in demo
+  if (/^\/api\/settings\/api-keys\/(.+)$/.test(path)) {
+    return { configured: true }
   }
 
-  // Claude Code status: not installed in demo
-  if (path === '/api/chat/claude-code-status') {
-    return { loggedIn: false, error: 'not found' }
-  }
-
-  // Translation service usage stats
-  if (path === '/api/settings/deepl/usage') {
-    return { monthlyChars: 128400, freeTierRemaining: 371600 }
-  }
-  if (path === '/api/settings/google-translate/usage') {
-    return { monthlyChars: 0, freeTierRemaining: 500000 }
+  // Model catalog: a small stand-in for the live OpenRouter catalog
+  if (path === '/api/settings/openrouter/models') {
+    return {
+      models: [
+        { name: 'anthropic/claude-haiku-4.5', label: 'Anthropic: Claude Haiku 4.5', vendor: 'anthropic', pricing: [1, 5] },
+        { name: 'anthropic/claude-sonnet-4.5', label: 'Anthropic: Claude Sonnet 4.5', vendor: 'anthropic', pricing: [3, 15] },
+        { name: 'deepseek/deepseek-v4-flash', label: 'DeepSeek: V4 Flash', vendor: 'deepseek', pricing: [0.2, 0.8] },
+        { name: 'openai/gpt-5-mini', label: 'OpenAI: GPT-5 Mini', vendor: 'openai', pricing: [0.25, 2] },
+      ],
+    }
   }
 
   if (path.startsWith('/api/settings')) {
@@ -339,7 +332,7 @@ export async function demoApiDelete(url: string): Promise<unknown> {
 export async function demoStreamPost(
   url: string,
   onDelta: (text: string) => void,
-): Promise<{ usage: { input_tokens: number; output_tokens: number; billing_mode?: 'anthropic' | 'gemini' | 'openai' | 'claude-code' | 'google-translate'; model?: string } }> {
+): Promise<{ usage: { input_tokens: number; output_tokens: number; billing_mode?: 'openrouter'; model?: string } }> {
   let text: string
   let inputTokens: number
   if (url.includes('summarize')) {
@@ -355,10 +348,10 @@ export async function demoStreamPost(
     // Simulate translation API latency (0.5–1.5s) then return all at once
     await new Promise(resolve => setTimeout(resolve, 500 + Math.random() * 1000))
     onDelta(text)
-    return { usage: { input_tokens: inputTokens, output_tokens: text.length, billing_mode: 'anthropic', model: 'demo' } }
+    return { usage: { input_tokens: inputTokens, output_tokens: text.length, billing_mode: 'openrouter', model: 'demo' } }
   }
   await streamText(text, onDelta)
-  return { usage: { input_tokens: inputTokens, output_tokens: text.length, billing_mode: 'anthropic', model: 'demo' } }
+  return { usage: { input_tokens: inputTokens, output_tokens: text.length, billing_mode: 'openrouter', model: 'demo' } }
 }
 
 // --- streamPostChat stub ---

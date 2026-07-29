@@ -8,7 +8,7 @@ const mockCreateMessage = vi.fn()
 
 vi.mock('./providers/llm/index.js', () => ({
   getProvider: () => ({
-    name: 'anthropic',
+    name: 'openrouter',
     requireKey: vi.fn(),
     createMessage: mockCreateMessage,
     streamMessage: vi.fn(),
@@ -118,37 +118,35 @@ describe('queryRssBridge', () => {
 // ============================================================
 
 describe('getAvailableProvider', () => {
-  it('returns anthropic provider when anthropic key is set', () => {
-    upsertSetting('api_key.anthropic', 'sk-test')
+  it('returns the OpenRouter provider with the chat model', () => {
+    upsertSetting('api_key.openrouter', 'sk-or-v1-test')
+    upsertSetting('chat.model', 'deepseek/deepseek-v4-flash')
 
     const result = getAvailableProvider()
     expect(result).not.toBeNull()
-    expect(result!.provider.name).toBe('anthropic')
-    expect(result!.model).toBe('claude-haiku-4-5-20251001')
+    expect(result!.provider.name).toBe('openrouter')
+    expect(result!.model).toBe('deepseek/deepseek-v4-flash')
   })
 
-  it('returns gemini provider when only gemini key is set', () => {
-    upsertSetting('api_key.gemini', 'gemini-key')
+  it('falls back to the summary model when no chat model is set', () => {
+    upsertSetting('api_key.openrouter', 'sk-or-v1-test')
+    upsertSetting('summary.model', 'anthropic/claude-haiku-4.5')
 
     const result = getAvailableProvider()
     expect(result).not.toBeNull()
-    expect(result!.provider.name).toBe('anthropic') // mock always returns 'anthropic' name
-    expect(result!.model).toBeDefined()
+    expect(result!.model).toBe('anthropic/claude-haiku-4.5')
   })
 
-  it('returns null when no API keys are set', () => {
+  it('returns null when no API key is set', () => {
+    upsertSetting('chat.model', 'deepseek/deepseek-v4-flash')
     const result = getAvailableProvider()
     expect(result).toBeNull()
   })
 
-  it('prefers anthropic over gemini when both are set', () => {
-    upsertSetting('api_key.anthropic', 'sk-test')
-    upsertSetting('api_key.gemini', 'gemini-key')
-
+  it('returns null when no model is configured', () => {
+    upsertSetting('api_key.openrouter', 'sk-or-v1-test')
     const result = getAvailableProvider()
-    expect(result).not.toBeNull()
-    // model should be the anthropic default since anthropic has priority
-    expect(result!.model).toBe('claude-haiku-4-5-20251001')
+    expect(result).toBeNull()
   })
 })
 
@@ -203,7 +201,8 @@ describe('inferCssSelectorBridge', () => {
     </feed>`
 
   function setupHappyPath() {
-    upsertSetting('api_key.anthropic', 'sk-test')
+    upsertSetting('api_key.openrouter', 'sk-or-v1-test')
+    upsertSetting('chat.model', 'deepseek/deepseek-v4-flash')
 
     // fetchHtml returns blog HTML
     mockFetchHtml.mockResolvedValueOnce({
@@ -254,7 +253,8 @@ describe('inferCssSelectorBridge', () => {
   })
 
   it('replaces ^= with *= in selectors', async () => {
-    upsertSetting('api_key.anthropic', 'sk-test')
+    upsertSetting('api_key.openrouter', 'sk-or-v1-test')
+    upsertSetting('chat.model', 'deepseek/deepseek-v4-flash')
 
     mockFetchHtml.mockResolvedValueOnce({
       html: blogHtml,
@@ -287,7 +287,8 @@ describe('inferCssSelectorBridge', () => {
   })
 
   it('returns null when page fetch fails', async () => {
-    upsertSetting('api_key.anthropic', 'sk-test')
+    upsertSetting('api_key.openrouter', 'sk-or-v1-test')
+    upsertSetting('chat.model', 'deepseek/deepseek-v4-flash')
     mockFetchHtml.mockRejectedValueOnce(new Error('HTTP 403'))
 
     const result = await inferCssSelectorBridge('https://example.com')
@@ -295,7 +296,8 @@ describe('inferCssSelectorBridge', () => {
   })
 
   it('returns null when page has no anchor elements', async () => {
-    upsertSetting('api_key.anthropic', 'sk-test')
+    upsertSetting('api_key.openrouter', 'sk-or-v1-test')
+    upsertSetting('chat.model', 'deepseek/deepseek-v4-flash')
     mockFetchHtml.mockResolvedValueOnce({
       html: '<html><body><p>No links here</p></body></html>',
       contentType: 'text/html',
@@ -308,7 +310,8 @@ describe('inferCssSelectorBridge', () => {
   })
 
   it('returns null when LLM returns null selector', async () => {
-    upsertSetting('api_key.anthropic', 'sk-test')
+    upsertSetting('api_key.openrouter', 'sk-or-v1-test')
+    upsertSetting('chat.model', 'deepseek/deepseek-v4-flash')
 
     mockFetchHtml.mockResolvedValueOnce({
       html: blogHtml,
@@ -327,7 +330,8 @@ describe('inferCssSelectorBridge', () => {
   })
 
   it('returns null when LLM returns invalid JSON', async () => {
-    upsertSetting('api_key.anthropic', 'sk-test')
+    upsertSetting('api_key.openrouter', 'sk-or-v1-test')
+    upsertSetting('chat.model', 'deepseek/deepseek-v4-flash')
 
     mockFetchHtml.mockResolvedValueOnce({
       html: blogHtml,
@@ -346,7 +350,8 @@ describe('inferCssSelectorBridge', () => {
   })
 
   it('returns null when bridge validation fails', async () => {
-    upsertSetting('api_key.anthropic', 'sk-test')
+    upsertSetting('api_key.openrouter', 'sk-or-v1-test')
+    upsertSetting('chat.model', 'deepseek/deepseek-v4-flash')
 
     mockFetchHtml.mockResolvedValueOnce({
       html: blogHtml,
@@ -368,7 +373,8 @@ describe('inferCssSelectorBridge', () => {
   })
 
   it('returns bridge URL when validation is unreachable (trusts LLM)', async () => {
-    upsertSetting('api_key.anthropic', 'sk-test')
+    upsertSetting('api_key.openrouter', 'sk-or-v1-test')
+    upsertSetting('chat.model', 'deepseek/deepseek-v4-flash')
 
     mockFetchHtml.mockResolvedValueOnce({
       html: blogHtml,
@@ -391,7 +397,8 @@ describe('inferCssSelectorBridge', () => {
   })
 
   it('returns null when validation feed has no matching domain entries', async () => {
-    upsertSetting('api_key.anthropic', 'sk-test')
+    upsertSetting('api_key.openrouter', 'sk-or-v1-test')
+    upsertSetting('chat.model', 'deepseek/deepseek-v4-flash')
 
     mockFetchHtml.mockResolvedValueOnce({
       html: blogHtml,
@@ -419,7 +426,8 @@ describe('inferCssSelectorBridge', () => {
   })
 
   it('filters out trivial links (javascript:, mailto:, #)', async () => {
-    upsertSetting('api_key.anthropic', 'sk-test')
+    upsertSetting('api_key.openrouter', 'sk-or-v1-test')
+    upsertSetting('chat.model', 'deepseek/deepseek-v4-flash')
 
     const htmlWithTrivial = `
       <html><body>
@@ -459,7 +467,8 @@ describe('inferCssSelectorBridge', () => {
   })
 
   it('strips script/style/svg/noscript from parsed HTML', async () => {
-    upsertSetting('api_key.anthropic', 'sk-test')
+    upsertSetting('api_key.openrouter', 'sk-or-v1-test')
+    upsertSetting('chat.model', 'deepseek/deepseek-v4-flash')
 
     const htmlWithNoise = `
       <html><body>

@@ -6,6 +6,7 @@ import {
   insertArticle,
   createConversation,
   upsertSetting,
+  deleteSetting,
   getDb,
   getConversationById,
   getChatMessages,
@@ -38,10 +39,6 @@ vi.mock('./fetcher.js', () => ({
   getFeedState: vi.fn(),
 }))
 
-vi.mock('./anthropic.js', () => ({
-  anthropic: { messages: { stream: vi.fn(), create: vi.fn() } },
-}))
-
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
@@ -61,7 +58,7 @@ function getToken(): string {
 }
 
 function defaultChatMock() {
-  mockRunChatTurn.mockImplementation(async (_backend: string, { messages, onEvent }: any) => {
+  mockRunChatTurn.mockImplementation(async ({ messages, onEvent }: any) => {
     onEvent({ type: 'text_delta', text: 'Response' })
     onEvent({ type: 'done', usage: { input_tokens: 10, output_tokens: 5 } })
     return {
@@ -86,6 +83,8 @@ beforeEach(async () => {
   app = await buildApp()
   vi.clearAllMocks()
   defaultChatMock()
+  // Chat requires a configured model; OpenRouter has no default
+  upsertSetting('chat.model', 'anthropic/claude-haiku-4.5')
   savedAuthDisabled = process.env.AUTH_DISABLED
   delete process.env.AUTH_DISABLED
 })
@@ -139,7 +138,7 @@ describe('POST /api/chat with article_id', () => {
     expect(res.statusCode).toBe(200)
 
     // Verify article context was passed to the adapter
-    const callArgs = mockRunChatTurn.mock.calls[0][1]
+    const callArgs = mockRunChatTurn.mock.calls[0][0]
     expect(callArgs.system).toContain('Test Article')
     expect(callArgs.system).toContain('This is the article body.')
   })
@@ -164,7 +163,7 @@ describe('POST /api/chat with article_id', () => {
       payload: { message: 'test', article_id: articleId },
     })
 
-    const callArgs = mockRunChatTurn.mock.calls[0][1]
+    const callArgs = mockRunChatTurn.mock.calls[0][0]
     expect(callArgs.system).toContain('(truncated)')
     // Should not contain the full 5000 chars
     expect(callArgs.system.length).toBeLessThan(longText.length)
@@ -260,13 +259,13 @@ describe('POST /api/chat — error handling', () => {
 })
 
 // ---------------------------------------------------------------------------
-// POST /api/chat — provider/model settings
+// POST /api/chat — model settings
 // ---------------------------------------------------------------------------
 describe('POST /api/chat — settings', () => {
-  it('uses custom chat provider from settings', async () => {
+  it('uses the chat model from settings', async () => {
     seedUser()
     const token = getToken()
-    upsertSetting('chat.provider', 'gemini')
+    upsertSetting('chat.model', 'deepseek/deepseek-v4-flash')
 
     await app.inject({
       method: 'POST',
@@ -275,23 +274,25 @@ describe('POST /api/chat — settings', () => {
       payload: { message: 'test' },
     })
 
-    expect(mockRunChatTurn).toHaveBeenCalledWith('gemini', expect.anything())
+    const callArgs = mockRunChatTurn.mock.calls[0][0]
+    expect(callArgs.model).toBe('deepseek/deepseek-v4-flash')
   })
 
-  it('uses custom chat model from settings', async () => {
+  it('returns 400 when no chat model is configured', async () => {
     seedUser()
     const token = getToken()
-    upsertSetting('chat.model', 'gpt-4.1')
+    deleteSetting('chat.model')
 
-    await app.inject({
+    const res = await app.inject({
       method: 'POST',
       url: '/api/chat',
       headers: { ...json, authorization: `Bearer ${token}` },
       payload: { message: 'test' },
     })
 
-    const callArgs = mockRunChatTurn.mock.calls[0][1]
-    expect(callArgs.model).toBe('gpt-4.1')
+    expect(res.statusCode).toBe(400)
+    expect(res.json().error).toBe('MODEL_NOT_SET')
+    expect(mockRunChatTurn).not.toHaveBeenCalled()
   })
 })
 

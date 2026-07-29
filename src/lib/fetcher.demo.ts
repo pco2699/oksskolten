@@ -30,7 +30,7 @@ export async function fetchOpmlBlob(): Promise<Blob> {
 export async function streamPost(
   url: string,
   onDelta: (text: string) => void,
-): Promise<{ usage: { input_tokens: number; output_tokens: number; billing_mode?: 'anthropic' | 'gemini' | 'openai' | 'claude-code' | 'google-translate'; model?: string; monthly_chars?: number } }> {
+): Promise<{ usage: { input_tokens: number; output_tokens: number; billing_mode?: 'openrouter'; model?: string } }> {
   return demoStreamPost(url, onDelta)
 }
 

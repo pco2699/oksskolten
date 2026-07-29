@@ -57,7 +57,7 @@ Because Oksskolten always has the complete text, AI summarization and translatio
 ## Features
 
 - **Full-Text Extraction** — Every article is fetched from its source and processed through Readability + 500 noise-removal patterns. You read complete articles inside Oksskolten, never needing to click through to the original site
-- **AI Summarization & Translation** — On-demand article processing via Anthropic, Gemini, OpenAI, or OpenRouter with SSE streaming. Works on full article text, not RSS excerpts
+- **AI Summarization & Translation** — On-demand article processing through OpenRouter with SSE streaming: one API key, any model from any vendor. Works on full article text, not RSS excerpts
 - **Interactive Chat** — Multi-turn AI conversations with MCP tooling; search articles, get stats, and ask questions about your feeds
 - **Full-Text Search** — Meilisearch-powered search across your entire article archive
 - **Smart Fetching** — Adaptive per-feed scheduling, conditional HTTP requests (ETag/Last-Modified), content-hash deduplication, exponential backoff, and tracking parameter removal
@@ -75,7 +75,7 @@ Because Oksskolten always has the complete text, AI summarization and translatio
 | Backend | [Node.js 22](https://nodejs.org/) + [Fastify](https://fastify.dev/) |
 | Frontend | [React 19](https://react.dev/) + [Vite](https://vite.dev/) + [Tailwind CSS](https://tailwindcss.com/) + [shadcn/ui](https://ui.shadcn.com/) |
 | Database | [SQLite](https://sqlite.org/) via [libsql](https://github.com/tursodatabase/libsql) (WAL mode) |
-| AI | [Anthropic](https://docs.anthropic.com/) / [Gemini](https://ai.google.dev/) / [OpenAI](https://platform.openai.com/) / [OpenRouter](https://openrouter.ai/) |
+| AI | [OpenRouter](https://openrouter.ai/) (models from Anthropic, OpenAI, Google, DeepSeek, Meta, …) |
 | Search | [Meilisearch](https://www.meilisearch.com/) |
 | Auth | JWT + [Passkey / WebAuthn](https://webauthn.io/) + GitHub OAuth |
 | Deployment | Docker Compose + [Cloudflare Tunnel](https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/) |
@@ -91,7 +91,7 @@ graph TD
             sqlite["SQLite<br/>(WAL mode)"]
             cron["node-cron<br/>Feed fetch every 5 min"]
             fetcher["Fetcher Pipeline<br/>RSS parse → Readability<br/>→ HTML cleaner → Markdown"]
-            ai["AI Provider<br/>Anthropic / Gemini<br/>/ OpenAI / OpenRouter"]
+            ai["AI Provider<br/>OpenRouter"]
             chat["Chat Service<br/>MCP Server + 4 Adapters"]
 
             fastify --> sqlite
@@ -115,7 +115,7 @@ graph TD
     cron -- "HTTP fetch" --> rss(("RSS Feeds"))
     fetcher --> bridge
     fetcher --> flare
-    ai -- "API" --> llm_api(("Anthropic / Gemini<br/>/ OpenAI / OpenRouter API"))
+    ai -- "API" --> llm_api(("OpenRouter API"))
 ```
 
 Everything runs in a single long-lived process — SQLite needs local disk, and node-cron needs a process that stays alive. This rules out serverless/edge runtimes but keeps the stack simple: one container, no external queues or coordination. For cloud deployment, a small VM or [Fly.io + Turso](docs/guides/deploying-to-fly-io.md) works well.
@@ -154,8 +154,8 @@ The feed fetcher minimizes bandwidth and adapts to each feed's behavior, inspire
 | **Extraction engine** | Readability.js + 500 patterns | Go Readability (~390 lines, ~60 rules) | Manual CSS selectors | Proprietary |
 | **JS-rendered sites** | FlareSolverr | — | — | Enterprise only |
 | **Sites without RSS** | Auto-discovery → RSS Bridge → LLM inference | — | — | Pro+ (25) / Enterprise (100) |
-| **AI summarization** | Built-in (Anthropic/Gemini/OpenAI) | — | — | Pro+ only (Leo) |
-| **AI translation** | Built-in (+ Google Translate, DeepL) | — | — | Enterprise only |
+| **AI summarization** | Built-in (any OpenRouter model) | — | — | Pro+ only (Leo) |
+| **AI translation** | Built-in (any OpenRouter model) | — | — | Enterprise only |
 | **AI chat** | MCP-powered, searches archive | — | — | — |
 | **Search** | Meilisearch (typo-tolerant) | PostgreSQL full-text | SQL LIKE | Pro+ (Power Search) |
 | **Database** | SQLite (embedded, WAL) | PostgreSQL (external) | MySQL/PG/SQLite | SaaS |
@@ -181,7 +181,7 @@ npm run build               # Production build
 
 On first startup with an empty database, sample feeds and articles are automatically loaded from the demo seed data (`src/lib/demo/seed/*.json`). This gives you a populated UI to work with immediately. The seed is idempotent — it only runs when no RSS feeds exist in the database. To start with an empty database instead, set `NO_SEED=1`.
 
-See [`.env.example`](.env.example) for available environment variables. AI provider keys are configured through the Settings UI.
+See [`.env.example`](.env.example) for available environment variables. The OpenRouter API key and the model used for each feature are configured through the Settings UI.
 
 ## Deployment
 

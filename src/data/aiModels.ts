@@ -1,6 +1,5 @@
 export {
-  ANTHROPIC_MODELS, GEMINI_MODELS, OPENAI_MODELS,
-  DEFAULT_MODELS, PROVIDER_LABELS,
-  LLM_API_PROVIDERS, TRANSLATE_SERVICE_PROVIDERS, LLM_TASK_PROVIDERS,
-  type ModelDef, type ModelGroup,
+  LLM_PROVIDER, PROVIDER_LABELS, TASK_DEFAULTS,
+  getModelLabel, getModelPricing,
+  type CatalogModel, type ModelPricing,
 } from '../../shared/models'

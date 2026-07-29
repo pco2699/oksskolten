@@ -1,4 +1,4 @@
-import { SUB_AGENT_MODELS } from '../../shared/models.js'
+import { LLM_PROVIDER } from '../../shared/models.js'
 import { getProvider } from '../providers/llm/index.js'
 import { updateConversation } from '../db.js'
 
@@ -6,19 +6,18 @@ const TITLE_MAX_LENGTH = 50
 const TITLE_MIN_LENGTH = 4
 
 /**
- * Generate a conversation title using the sub-agent (cheapest) model for the current provider.
+ * Generate a conversation title with the same model the conversation runs on.
  * This is fire-and-forget — failures are silently ignored and the fallback title remains.
  */
 export async function generateConversationTitle(
   conversationId: string,
   userMessage: string,
   assistantResponse: string,
-  providerName: string,
+  model: string,
 ): Promise<void> {
-  const model = SUB_AGENT_MODELS[providerName]
   if (!model) return
 
-  const provider = getProvider(providerName)
+  const provider = getProvider(LLM_PROVIDER)
 
   const result = await provider.createMessage({
     model,

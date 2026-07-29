@@ -137,8 +137,6 @@ const dict = {
   'article.readMore': { ja: '続きを読む', en: 'Read more', zh: '阅读更多'},
   'article.showLess': { ja: '閉じる', en: 'Show less', zh: '收起'},
   'article.translate': { ja: '翻訳', en: 'Translate', zh: '翻译'},
-  'article.claudeCodeUsage': { ja: 'Claude Code の利用枠を消費', en: 'Consumed Claude Code usage', zh: '已消耗 Claude Code 用量'},
-  'article.freeTier': { ja: '無料枠', en: 'Free tier', zh: '免费额度'},
   'article.notFound': { ja: '記事が見つかりませんでした', en: 'Article not found', zh: '文章未找到'},
   'article.rawMarkdown': { ja: 'マークダウン表示', en: 'Raw Markdown', zh: 'Markdown 原文'},
   'article.similarAlreadyRead': { ja: 'この記事は ${feedNames} にもあり、既に読んでいます', en: 'You already read this story from ${feedNames}', zh: '您已经从 ${feedNames} 读过这篇文章'},
@@ -498,52 +496,17 @@ const dict = {
   'settings.integration': { ja: 'AI・翻訳', en: 'AI & Translation', zh: 'AI 与翻译'},
   'integration.providerConfig': { ja: 'プロバイダー設定', en: 'Provider Configuration', zh: '提供商配置'},
   'integration.providerConfigDesc': { ja: 'APIキーや認証情報を管理します', en: 'Manage API keys and authentication', zh: '管理 API 密钥和认证'},
-  'integration.llmProviderConfig': { ja: 'LLM プロバイダー', en: 'LLM Providers', zh: 'LLM 提供商'},
-  'integration.llmProviderConfigDesc': { ja: 'チャット・記事の要約・記事の翻訳に使用します。1つ以上の API キーが設定されていないとこれらの機能は利用できません', en: 'Used for chat, article summarization, and article translation. At least one API key must be configured to use these features', zh: '用于聊天、文章摘要和文章翻译。至少需要配置一个 API 密钥才能使用这些功能' },
-  'integration.translateServiceConfig': { ja: '翻訳サービス', en: 'Translation Services', zh: '翻译服务'},
-  'integration.translateServiceConfigDesc': { ja: '記事の翻訳に使用します。LLM プロバイダーまたはこちらのいずれかが設定されていないと翻訳は利用できません', en: 'Used for article translation. Either an LLM provider or one of these services must be configured to use translation', zh: '用于文章翻译。需要配置 LLM 提供商或以下翻译服务之一' },
-  'integration.taskSettings': { ja: '機能ごとのプロバイダー', en: 'Provider per Feature', zh: '按功能选择提供商'},
-  'integration.taskSettingsDesc': { ja: '要約・翻訳・チャットそれぞれでどのプロバイダーとモデルを使うかを設定します', en: 'Choose which provider and model to use for summarization, translation, and chat', zh: '选择用于摘要、翻译和聊天的提供商和模型' },
-  'integration.taskSettingsNoKeys': { ja: 'API キーが設定されていないため変更できません。上のセクションで API キーを設定してください', en: 'Cannot change settings because no API keys are configured. Please set up an API key in the section above', zh: '无法更改设置，因为未配置 API 密钥。请在上方配置 API 密钥' },
-  'integration.selectProviderFirst': { ja: 'プロバイダーを選択してください', en: 'Select a provider first', zh: '请先选择提供商'},
+  'integration.llmProviderConfig': { ja: 'LLM プロバイダー', en: 'LLM Provider', zh: 'LLM 提供商'},
+  'integration.llmProviderConfigDesc': { ja: 'チャット・記事の要約・記事の翻訳に使用します。API キーが設定されていないとこれらの機能は利用できません', en: 'Used for chat, article summarization, and article translation. An API key must be configured to use these features', zh: '用于聊天、文章摘要和文章翻译。需要配置 API 密钥才能使用这些功能' },
+  'integration.taskSettings': { ja: '機能ごとのモデル', en: 'Model per Feature', zh: '按功能选择模型'},
+  'integration.taskSettingsDesc': { ja: '要約・翻訳・チャットそれぞれでどのモデルを使うかを設定します', en: 'Choose which model to use for summarization, translation, and chat', zh: '选择用于摘要、翻译和聊天的模型' },
+  'integration.taskSettingsNoKeys': { ja: 'API キーが設定されていないため変更できません。上のセクションで OpenRouter API キーを設定してください', en: 'Cannot change settings because no API key is configured. Please set up your OpenRouter API key in the section above', zh: '无法更改设置，因为未配置 API 密钥。请在上方配置 OpenRouter API 密钥' },
   'integration.selectModel': { ja: 'モデルを選択', en: 'Select a model', zh: '选择模型'},
   'integration.task.chat': { ja: 'チャット', en: 'Chat', zh: '聊天'},
   'integration.task.summary': { ja: '要約', en: 'Summary', zh: '摘要'},
   'integration.task.translate': { ja: '翻訳', en: 'Translation', zh: '翻译'},
   'integration.maxTokens': { ja: '最大出力トークン数', en: 'Max output tokens', zh: '最大输出 token 数'},
   'integration.maxTokensDesc': { ja: '空欄でデフォルト値を使用。コンテキスト長が短いローカルLLMでは小さくしてください', en: 'Empty uses the default. Lower this for local LLMs with small context windows', zh: '留空使用默认值。上下文窗口较小的本地 LLM 请调低此值'},
-  'integration.modeLLM': { ja: 'LLM', en: 'LLM', zh: 'LLM'},
-  'integration.modeTranslateService': { ja: '翻訳サービス', en: 'Translation Service', zh: '翻译服务'},
-  'integration.googleTranslateNote': {
-    ja: 'Google Cloud Translation API v2 (Basic) を使用します。NMT（ニューラル機械翻訳）による高速な翻訳で、LLMより低品質ですが即座に結果が返ります。v3 (Advanced) の LLM 翻訳には未対応です。',
-    en: 'Uses Google Cloud Translation API v2 (Basic). NMT-based fast translation — lower quality than LLM but returns results instantly. v3 (Advanced) LLM translation is not supported.',
-    zh: '使用 Google Cloud Translation API v2（基础版）。基于 NMT 的快速翻译 — 质量低于 LLM 但即时返回结果。不支持 v3（高级版）LLM 翻译。'
-  },
-  'integration.googleTranslateFreeTier': {
-    ja: '料金: 月50万文字まで無料、以降 $20 / 100万文字',
-    en: 'Pricing: Free up to 500K chars/month, then $20 / 1M chars',
-    zh: '定价：每月 50 万字符免费，之后 $20 / 百万字符'
-  },
-  'integration.googleTranslateUsage': {
-    ja: '今月の使用量: ${used} / ${limit}',
-    en: 'This month: ${used} / ${limit}',
-    zh: '本月：${used} / ${limit}'
-  },
-  'integration.deeplNote': {
-    ja: 'DeepL API v2 を使用します。高品質なニューラル機械翻訳で、特に日欧言語間の翻訳精度が高く評価されています。Free プランと Pro プランに対応しています。',
-    en: 'Uses DeepL API v2. High-quality neural machine translation, especially well-regarded for European-Japanese translation accuracy. Supports both Free and Pro plans.',
-    zh: '使用 DeepL API v2。高质量神经机器翻译，尤以欧洲语言与日语之间的翻译精度著称。支持免费版和专业版。'
-  },
-  'integration.deeplFreeTier': {
-    ja: '料金: API Free は月50万文字まで無料、API Pro は月額¥630 + ¥2,500 / 100万文字',
-    en: 'Pricing: API Free up to 500K chars/month, API Pro ¥630/mo + ¥2,500 / 1M chars',
-    zh: '定价：API 免费版每月 50 万字符，API 专业版 ¥630/月 + ¥2,500/百万字符'
-  },
-  'integration.deeplUsage': {
-    ja: '今月の使用量: ${used} / ${limit}',
-    en: 'This month: ${used} / ${limit}',
-    zh: '本月：${used} / ${limit}'
-  },
 
   // Settings — security
   'settings.security': { ja: 'セキュリティ', en: 'Security', zh: '安全'},
@@ -709,43 +672,7 @@ const dict = {
   'translate.modelDesc': { ja: '翻訳で使用するAIモデル', en: 'AI model used for translation', zh: '用于翻译的 AI 模型'},
   'translate.provider': { ja: '翻訳プロバイダー', en: 'Translation provider', zh: '翻译提供商'},
   'translate.providerDesc': { ja: '翻訳で使用するプロバイダー', en: 'Provider used for translation', zh: '用于翻译的提供商'},
-  'provider.anthropic': { ja: 'Anthropic API', en: 'Anthropic API', zh: 'Anthropic API'},
-  'provider.gemini': { ja: 'Gemini API', en: 'Gemini API', zh: 'Gemini API'},
-  'provider.openai': { ja: 'OpenAI API', en: 'OpenAI API', zh: 'OpenAI API'},
-  'provider.claudeCode': { ja: 'Claude Code', en: 'Claude Code', zh: 'Claude Code'},
-  'provider.ollama': { ja: 'Ollama', en: 'Ollama', zh: 'Ollama'},
-  'provider.vllm': { ja: 'vLLM', en: 'vLLM', zh: 'vLLM'},
   'provider.openrouter': { ja: 'OpenRouter', en: 'OpenRouter', zh: 'OpenRouter'},
-  'provider.googleTranslate': { ja: 'Google Translate', en: 'Google Translate', zh: 'Google 翻译'},
-  'provider.deepl': { ja: 'DeepL', en: 'DeepL', zh: 'DeepL'},
-  'ollama.baseUrl': { ja: 'Ollama サーバー URL', en: 'Ollama Server URL', zh: 'Ollama 服务器 URL'},
-  'ollama.baseUrlDesc': { ja: 'Ollama サーバーのアドレスを設定', en: 'Set the Ollama server address', zh: '设置 Ollama 服务器地址'},
-  'ollama.baseUrlPlaceholder': { ja: 'http://localhost:11434', en: 'http://localhost:11434', zh: 'http://localhost:11434'},
-  'ollama.baseUrlSaved': { ja: 'Ollama サーバー URL を保存しました', en: 'Ollama server URL saved', zh: 'Ollama 服务器 URL 已保存'},
-  'ollama.testConnection': { ja: '接続テスト', en: 'Test Connection', zh: '测试连接'},
-  'ollama.testing': { ja: 'テスト中...', en: 'Testing...', zh: '测试中...'},
-  'ollama.connected': { ja: '接続成功', en: 'Connected', zh: '已连接'},
-  'ollama.connectionFailed': { ja: '接続失敗', en: 'Connection failed', zh: '连接失败'},
-  'ollama.noModels': { ja: 'Ollama に接続できません', en: 'Cannot connect to Ollama', zh: '无法连接 Ollama'},
-  'ollama.customHeaders': { ja: 'カスタムヘッダー', en: 'Custom Headers', zh: '自定义请求头'},
-  'ollama.customHeadersDesc': { ja: 'リバースプロキシの認証ヘッダーなど', en: 'e.g. reverse proxy authentication headers', zh: '例如反向代理认证头'},
-  'ollama.headerKey': { ja: 'ヘッダー名', en: 'Header name', zh: '请求头名称'},
-  'ollama.headerValue': { ja: '値', en: 'Value', zh: '值'},
-  'ollama.addHeader': { ja: '追加', en: 'Add', zh: '添加'},
-  'ollama.headersSaved': { ja: 'カスタムヘッダーを保存しました', en: 'Custom headers saved', zh: '自定义请求头已保存'},
-
-  // vLLM
-  'vllm.baseUrl': { ja: 'vLLM サーバー URL', en: 'vLLM Server URL', zh: 'vLLM 服务器 URL'},
-  'vllm.baseUrlDesc': { ja: 'vLLM サーバーのアドレスを設定', en: 'Set the vLLM server address', zh: '设置 vLLM 服务器地址'},
-  'vllm.baseUrlPlaceholder': { ja: 'http://localhost:8000', en: 'http://localhost:8000', zh: 'http://localhost:8000'},
-  'vllm.baseUrlSaved': { ja: 'vLLM サーバー URL を保存しました', en: 'vLLM server URL saved', zh: 'vLLM 服务器 URL 已保存'},
-  'vllm.testConnection': { ja: '接続テスト', en: 'Test Connection', zh: '测试连接'},
-  'vllm.testing': { ja: 'テスト中...', en: 'Testing...', zh: '测试中...'},
-  'vllm.connected': { ja: '接続成功', en: 'Connected', zh: '已连接'},
-  'vllm.connectionFailed': { ja: '接続失敗', en: 'Connection failed', zh: '连接失败'},
-  'vllm.noModels': { ja: 'vLLM に接続できません', en: 'Cannot connect to vLLM', zh: '无法连接 vLLM'},
-  'vllm.apiKeySaved': { ja: 'vLLM API キーを保存しました', en: 'vLLM API key saved', zh: 'vLLM API 密钥已保存'},
-  'vllm.apiKeyDeleted': { ja: 'vLLM API キーを削除しました', en: 'vLLM API key deleted', zh: 'vLLM API 密钥已删除'},
 
   // OpenRouter
   'openrouter.apiKeyDesc': { ja: '1 つの API キーで各社のモデルを利用', en: 'Use models from many vendors with a single API key', zh: '用一个 API 密钥使用多家厂商的模型'},
@@ -760,32 +687,6 @@ const dict = {
   'openrouter.pickFromCatalog': { ja: '一覧から選択', en: 'Pick from catalog', zh: '从列表中选择'},
   'openrouter.apiKeySaved': { ja: 'OpenRouter API キーを保存しました', en: 'OpenRouter API key saved', zh: 'OpenRouter API 密钥已保存'},
   'openrouter.apiKeyDeleted': { ja: 'OpenRouter API キーを削除しました', en: 'OpenRouter API key deleted', zh: 'OpenRouter API 密钥已删除'},
-  'googleTranslate.apiKeySaved': { ja: 'Google Translate API キーを保存しました', en: 'Google Translate API key saved', zh: 'Google 翻译 API 密钥已保存'},
-  'googleTranslate.apiKeyDeleted': { ja: 'Google Translate API キーを削除しました', en: 'Google Translate API key deleted', zh: 'Google 翻译 API 密钥已删除'},
-  'deepl.apiKeySaved': { ja: 'DeepL API キーを保存しました', en: 'DeepL API key saved', zh: 'DeepL API 密钥已保存'},
-  'deepl.apiKeyDeleted': { ja: 'DeepL API キーを削除しました', en: 'DeepL API key deleted', zh: 'DeepL API 密钥已删除'},
-  'openai.apiKey': { ja: 'OpenAI API キー', en: 'OpenAI API Key', zh: 'OpenAI API 密钥'},
-  'openai.apiKeyDesc': { ja: 'OpenAI API キーを設定', en: 'Set your OpenAI API key', zh: '设置 OpenAI API 密钥'},
-  'openai.apiKeySaved': { ja: 'OpenAI API キーを保存しました', en: 'OpenAI API key saved', zh: 'OpenAI API 密钥已保存'},
-  'openai.apiKeyDeleted': { ja: 'OpenAI API キーを削除しました', en: 'OpenAI API key deleted', zh: 'OpenAI API 密钥已删除'},
-  'gemini.apiKey': { ja: 'Gemini API キー', en: 'Gemini API Key', zh: 'Gemini API 密钥'},
-  'gemini.apiKeyDesc': { ja: 'Google AI Gemini API キーを設定', en: 'Set your Google AI Gemini API key', zh: '设置 Google AI Gemini API 密钥'},
-  'gemini.apiKeySaved': { ja: 'Gemini API キーを保存しました', en: 'Gemini API key saved', zh: 'Gemini API 密钥已保存'},
-  'gemini.apiKeyDeleted': { ja: 'Gemini API キーを削除しました', en: 'Gemini API key deleted', zh: 'Gemini API 密钥已删除'},
-  'chat.authConnected': { ja: '認証済み', en: 'Connected', zh: '已连接'},
-  'chat.authNotConnected': { ja: '未認証', en: 'Not connected', zh: '未连接'},
-  'chat.authNotInstalled': { ja: 'Claude Code がインストールされていません', en: 'Claude Code is not installed', zh: '未安装 Claude Code'},
-  'chat.authRunLogin': { ja: 'サーバーで claude auth login を実行してください', en: 'Run claude auth login on the server', zh: '在服务器上运行 claude auth login'},
-  'chat.authNote': {
-    ja: 'Claude Code の認証はブラウザでの OAuth フローが必要なため、この画面からは設定できません。サーバーのターミナルで直接コマンドを実行してください。',
-    en: 'Claude Code authentication requires a browser-based OAuth flow, so it cannot be configured from this screen. Run the commands directly in the server terminal.',
-    zh: 'Claude Code 认证需要基于浏览器的 OAuth 流程，因此无法从此界面配置。请在服务器终端中直接运行命令。'
-  },
-  'chat.authNoteIssue': { ja: '関連: ', en: 'Related: ', zh: '相关：'},
-  'chat.authHowToLogin': { ja: 'ログイン: claude auth login', en: 'Login: claude auth login', zh: '登录：claude auth login'},
-  'chat.authHowToLoginLabel': { ja: 'ログイン:', en: 'Login:', zh: '登录：'},
-  'chat.authHowToLogout': { ja: 'ログアウト: claude auth logout', en: 'Logout: claude auth logout', zh: '登出：claude auth logout'},
-  'chat.authHowToLogoutLabel': { ja: 'ログアウト:', en: 'Logout:', zh: '登出：'},
   'chat.expand': { ja: '拡大', en: 'Expand', zh: '展开'},
   'chat.collapse': { ja: '縮小', en: 'Collapse', zh: '收起'},
   'chat.apiKey': { ja: 'API キー', en: 'API Key', zh: 'API 密钥'},
@@ -795,30 +696,15 @@ const dict = {
   'chat.apiKeySaved': { ja: 'API キーを保存しました', en: 'API key saved', zh: 'API 密钥已保存'},
   'chat.apiKeyDeleted': { ja: 'API キーを削除しました', en: 'API key deleted', zh: 'API 密钥已删除'},
   'chat.apiKeyDelete': { ja: '削除', en: 'Delete', zh: '删除'},
-  'error.anthropicKeyNotSet': {
-    ja: 'Anthropic API キーが設定されていません。',
-    en: 'Anthropic API key is not configured.',
-    zh: 'Anthropic API 密钥未配置。'
+  'error.openrouterKeyNotSet': {
+    ja: 'OpenRouter API キーが設定されていません。',
+    en: 'OpenRouter API key is not configured.',
+    zh: 'OpenRouter API 密钥未配置。'
   },
-  'error.geminiKeyNotSet': {
-    ja: 'Gemini API キーが設定されていません。',
-    en: 'Gemini API key is not configured.',
-    zh: 'Gemini API 密钥未配置。'
-  },
-  'error.openaiKeyNotSet': {
-    ja: 'OpenAI API キーが設定されていません。',
-    en: 'OpenAI API key is not configured.',
-    zh: 'OpenAI API 密钥未配置。'
-  },
-  'error.googleTranslateKeyNotSet': {
-    ja: 'Google Translate API キーが設定されていません。',
-    en: 'Google Translate API key is not configured.',
-    zh: 'Google 翻译 API 密钥未配置。'
-  },
-  'error.deeplKeyNotSet': {
-    ja: 'DeepL API キーが設定されていません。',
-    en: 'DeepL API key is not configured.',
-    zh: 'DeepL API 密钥未配置。'
+  'error.modelNotSet': {
+    ja: 'モデルが設定されていません。設定画面でモデル ID を指定してください。',
+    en: 'No model is configured. Set a model ID in Settings.',
+    zh: '未配置模型。请在设置中指定模型 ID。'
   },
   'error.summarizationFailed': {
     ja: '要約に失敗しました。しばらくしてから再度お試しください。',
@@ -873,11 +759,8 @@ const dict = {
 type MessageKey = keyof typeof dict
 
 const errorCodeMap: Record<string, MessageKey> = {
-  ANTHROPIC_KEY_NOT_SET: 'error.anthropicKeyNotSet',
-  GEMINI_KEY_NOT_SET: 'error.geminiKeyNotSet',
-  OPENAI_KEY_NOT_SET: 'error.openaiKeyNotSet',
-  GOOGLE_TRANSLATE_KEY_NOT_SET: 'error.googleTranslateKeyNotSet',
-  DEEPL_KEY_NOT_SET: 'error.deeplKeyNotSet',
+  OPENROUTER_KEY_NOT_SET: 'error.openrouterKeyNotSet',
+  MODEL_NOT_SET: 'error.modelNotSet',
   SUMMARIZATION_FAILED: 'error.summarizationFailed',
   TRANSLATION_FAILED: 'error.translationFailed',
 }

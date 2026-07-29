@@ -34,7 +34,7 @@ function clampLimit(value: number | undefined, fallback: number, max: number): n
   return Math.max(1, Math.min(Math.floor(value), max))
 }
 
-// --- Neutral tool definition (MCP / Anthropic compatible) ---
+// --- Neutral tool definition ---
 
 export interface ToolContext {
   timeZone?: string
@@ -597,33 +597,13 @@ export const TOOLS: ToolDef[] = [
   translateArticleTool,
 ]
 
-// --- Anthropic API conversion ---
-
-export function toAnthropicTools(): Array<{ name: string; description: string; input_schema: { type: 'object'; properties: Record<string, unknown>; required?: string[] } }> {
-  return TOOLS.map(t => ({
-    name: t.name,
-    description: t.description,
-    input_schema: t.inputSchema,
-  }))
-}
-
-// --- OpenAI API conversion ---
+// --- OpenAI-compatible API conversion ---
 
 export function toOpenAITools() {
   return TOOLS.map(t => ({
     type: 'function' as const,
     function: { name: t.name, description: t.description, parameters: t.inputSchema },
   }))
-}
-
-// --- Gemini API conversion ---
-
-export function toGeminiTools() {
-  return [{ functionDeclarations: TOOLS.map(t => ({
-    name: t.name,
-    description: t.description,
-    parametersJsonSchema: t.inputSchema,
-  })) }]
 }
 
 // --- Dispatch ---

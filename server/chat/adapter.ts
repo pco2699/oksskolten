@@ -1,5 +1,4 @@
 import type { Message } from './types.js'
-import { runAnthropicTurn } from './adapter-anthropic.js'
 
 export type ChatSSEEvent =
   | { type: 'text_delta'; text: string }
@@ -23,33 +22,7 @@ export interface ChatTurnParams {
   onEvent: (event: ChatSSEEvent) => void
 }
 
-export async function runChatTurn(provider: string, params: ChatTurnParams): Promise<RunChatTurnResult> {
-  if (provider === 'claude-code') {
-    const { runClaudeCodeTurn } = await import('./adapter-claude-code.js')
-    return runClaudeCodeTurn(params)
-  }
-  if (provider === 'ollama') {
-    const { runOpenAITurn } = await import('./adapter-openai.js')
-    const { getOllamaClient } = await import('../providers/llm/ollama.js')
-    return runOpenAITurn(params, getOllamaClient())
-  }
-  if (provider === 'vllm') {
-    const { runOpenAITurn } = await import('./adapter-openai.js')
-    const { getVllmClient } = await import('../providers/llm/vllm.js')
-    return runOpenAITurn(params, getVllmClient())
-  }
-  if (provider === 'openrouter') {
-    const { runOpenAITurn } = await import('./adapter-openai.js')
-    const { getOpenRouterClient } = await import('../providers/llm/openrouter.js')
-    return runOpenAITurn(params, getOpenRouterClient())
-  }
-  if (provider === 'openai') {
-    const { runOpenAITurn } = await import('./adapter-openai.js')
-    return runOpenAITurn(params)
-  }
-  if (provider === 'gemini') {
-    const { runGeminiTurn } = await import('./adapter-gemini.js')
-    return runGeminiTurn(params)
-  }
-  return runAnthropicTurn(params)
+export async function runChatTurn(params: ChatTurnParams): Promise<RunChatTurnResult> {
+  const { runOpenRouterTurn } = await import('./adapter-openrouter.js')
+  return runOpenRouterTurn(params)
 }

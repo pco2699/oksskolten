@@ -25,36 +25,25 @@ function createMockStream(chunks: Record<string, unknown>[]) {
 
 const mockCreate = vi.fn()
 
-vi.mock('../providers/llm/openai.js', () => ({
-  getOpenAIClient: () => ({
-    chat: {
-      completions: {
-        create: (...args: unknown[]) => mockCreate(...args),
+vi.mock('../providers/llm/openrouter.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../providers/llm/openrouter.js')>()
+  return {
+    ...actual,
+    getOpenRouterClient: () => ({
+      chat: {
+        completions: {
+          create: (...args: unknown[]) => mockCreate(...args),
+        },
       },
-    },
-  }),
-  openaiProvider: {
-    name: 'openai',
-    requireKey: () => {},
-    createMessage: vi.fn(),
-    streamMessage: vi.fn(),
-  },
-}))
-
-vi.mock('../providers/llm/anthropic.js', () => ({
-  anthropicProvider: { name: 'anthropic', requireKey: () => {}, createMessage: vi.fn(), streamMessage: vi.fn() },
-  getAnthropicClient: vi.fn(),
-}))
-vi.mock('../providers/llm/gemini.js', () => ({
-  geminiProvider: { name: 'gemini', requireKey: () => {}, createMessage: vi.fn(), streamMessage: vi.fn() },
-  getGeminiClient: vi.fn(),
-}))
+    }),
+  }
+})
 
 // ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
 
-describe('runOpenAITurn', () => {
+describe('runOpenRouterTurn', () => {
   beforeEach(() => {
     setupTestDb()
     mockCreate.mockReset()
@@ -62,21 +51,21 @@ describe('runOpenAITurn', () => {
   })
 
   async function loadModule() {
-    return import('./adapter-openai.js')
+    return import('./adapter-openrouter.js')
   }
 
-  it('throws when OpenAI API key is not set', async () => {
-    const { runOpenAITurn } = await loadModule()
-    await expect(runOpenAITurn({
+  it('throws when the OpenRouter API key is not set', async () => {
+    const { runOpenRouterTurn } = await loadModule()
+    await expect(runOpenRouterTurn({
       messages: [{ role: 'user', content: 'hi' }],
       system: 'You are helpful.',
       model: 'gpt-4o',
       onEvent: vi.fn(),
-    })).rejects.toThrow('OPENAI_KEY_NOT_SET')
+    })).rejects.toThrow('OPENROUTER_KEY_NOT_SET')
   })
 
   it('handles simple text response', async () => {
-    upsertSetting('api_key.openai', 'test-key')
+    upsertSetting('api_key.openrouter', 'test-key')
 
     mockCreate.mockResolvedValue(createMockStream([
       { choices: [{ delta: { content: 'Hello ' }, finish_reason: null }], usage: null },
@@ -84,8 +73,8 @@ describe('runOpenAITurn', () => {
     ]))
 
     const events: ChatSSEEvent[] = []
-    const { runOpenAITurn } = await loadModule()
-    const result = await runOpenAITurn({
+    const { runOpenRouterTurn } = await loadModule()
+    const result = await runOpenRouterTurn({
       messages: [{ role: 'user', content: 'hi' }],
       system: 'You are helpful.',
       model: 'gpt-4o',
@@ -99,7 +88,7 @@ describe('runOpenAITurn', () => {
   })
 
   it('handles tool use loop with streaming tool call deltas', async () => {
-    upsertSetting('api_key.openai', 'test-key')
+    upsertSetting('api_key.openrouter', 'test-key')
 
     // Round 1: model calls a tool via streaming deltas
     mockCreate.mockResolvedValueOnce(createMockStream([
@@ -142,8 +131,8 @@ describe('runOpenAITurn', () => {
     ]))
 
     const events: ChatSSEEvent[] = []
-    const { runOpenAITurn } = await loadModule()
-    const result = await runOpenAITurn({
+    const { runOpenRouterTurn } = await loadModule()
+    const result = await runOpenRouterTurn({
       messages: [{ role: 'user', content: 'search for test' }],
       system: 'You are helpful.',
       model: 'gpt-4o',
@@ -159,7 +148,7 @@ describe('runOpenAITurn', () => {
   })
 
   it('handles tool execution error', async () => {
-    upsertSetting('api_key.openai', 'test-key')
+    upsertSetting('api_key.openrouter', 'test-key')
 
     mockCreate.mockResolvedValueOnce(createMockStream([
       {
@@ -186,8 +175,8 @@ describe('runOpenAITurn', () => {
     ]))
 
     const events: ChatSSEEvent[] = []
-    const { runOpenAITurn } = await loadModule()
-    const result = await runOpenAITurn({
+    const { runOpenRouterTurn } = await loadModule()
+    const result = await runOpenRouterTurn({
       messages: [{ role: 'user', content: 'search' }],
       system: 'sys',
       model: 'gpt-4o',
@@ -205,7 +194,7 @@ describe('runOpenAITurn', () => {
   })
 
   it('emits error on max rounds exceeded', async () => {
-    upsertSetting('api_key.openai', 'test-key')
+    upsertSetting('api_key.openrouter', 'test-key')
 
     // Always return tool calls
     mockCreate.mockResolvedValue(createMockStream([
@@ -228,8 +217,8 @@ describe('runOpenAITurn', () => {
     mockExecuteTool.mockResolvedValue('{}')
 
     const events: ChatSSEEvent[] = []
-    const { runOpenAITurn } = await loadModule()
-    await runOpenAITurn({
+    const { runOpenRouterTurn } = await loadModule()
+    await runOpenRouterTurn({
       messages: [{ role: 'user', content: 'loop' }],
       system: 'sys',
       model: 'gpt-4o',
@@ -241,7 +230,7 @@ describe('runOpenAITurn', () => {
   })
 
   it('accumulates tool call arguments across multiple deltas', async () => {
-    upsertSetting('api_key.openai', 'test-key')
+    upsertSetting('api_key.openrouter', 'test-key')
 
     // Arguments split across 3 chunks
     mockCreate.mockResolvedValueOnce(createMockStream([
@@ -276,8 +265,8 @@ describe('runOpenAITurn', () => {
       { choices: [{ delta: { content: 'done' }, finish_reason: 'stop' }], usage: null },
     ]))
 
-    const { runOpenAITurn } = await loadModule()
-    await runOpenAITurn({
+    const { runOpenRouterTurn } = await loadModule()
+    await runOpenRouterTurn({
       messages: [{ role: 'user', content: 'search hello' }],
       system: 'sys',
       model: 'gpt-4o',
@@ -288,7 +277,7 @@ describe('runOpenAITurn', () => {
   })
 
   it('handles multiple concurrent tool calls', async () => {
-    upsertSetting('api_key.openai', 'test-key')
+    upsertSetting('api_key.openrouter', 'test-key')
 
     mockCreate.mockResolvedValueOnce(createMockStream([
       {
@@ -314,8 +303,8 @@ describe('runOpenAITurn', () => {
     ]))
 
     const events: ChatSSEEvent[] = []
-    const { runOpenAITurn } = await loadModule()
-    await runOpenAITurn({
+    const { runOpenRouterTurn } = await loadModule()
+    await runOpenRouterTurn({
       messages: [{ role: 'user', content: 'search' }],
       system: 'sys',
       model: 'gpt-4o',
@@ -332,16 +321,16 @@ describe('runOpenAITurn', () => {
 // Tests — convertMessagesToOpenAI (tested indirectly)
 // ---------------------------------------------------------------------------
 
-describe('OpenAI message conversion (via runOpenAITurn)', () => {
+describe('chat-completions message conversion (via runOpenRouterTurn)', () => {
   beforeEach(() => {
     setupTestDb()
-    upsertSetting('api_key.openai', 'test-key')
+    upsertSetting('api_key.openrouter', 'test-key')
     mockCreate.mockReset()
     mockExecuteTool.mockReset()
   })
 
   async function loadModule() {
-    return import('./adapter-openai.js')
+    return import('./adapter-openrouter.js')
   }
 
   it('prepends system message', async () => {
@@ -349,8 +338,8 @@ describe('OpenAI message conversion (via runOpenAITurn)', () => {
       { choices: [{ delta: { content: 'ok' }, finish_reason: 'stop' }], usage: null },
     ]))
 
-    const { runOpenAITurn } = await loadModule()
-    await runOpenAITurn({
+    const { runOpenRouterTurn } = await loadModule()
+    await runOpenRouterTurn({
       messages: [{ role: 'user', content: 'hi' }],
       system: 'You are a test assistant.',
       model: 'gpt-4o',
@@ -367,8 +356,8 @@ describe('OpenAI message conversion (via runOpenAITurn)', () => {
       { choices: [{ delta: { content: 'ok' }, finish_reason: 'stop' }], usage: null },
     ]))
 
-    const { runOpenAITurn } = await loadModule()
-    await runOpenAITurn({
+    const { runOpenRouterTurn } = await loadModule()
+    await runOpenRouterTurn({
       messages: [
         { role: 'user', content: 'search' },
         {
@@ -407,8 +396,8 @@ describe('OpenAI message conversion (via runOpenAITurn)', () => {
       { choices: [{ delta: { content: 'ok' }, finish_reason: 'stop' }], usage: null },
     ]))
 
-    const { runOpenAITurn } = await loadModule()
-    await runOpenAITurn({
+    const { runOpenRouterTurn } = await loadModule()
+    await runOpenRouterTurn({
       messages: [
         { role: 'user', content: 'search' },
         {
@@ -440,25 +429,25 @@ describe('OpenAI message conversion (via runOpenAITurn)', () => {
 // Tests — convertResponseToAnthropic (tested indirectly)
 // ---------------------------------------------------------------------------
 
-describe('OpenAI response to Anthropic format', () => {
+describe('chat-completions response to neutral blocks', () => {
   beforeEach(() => {
     setupTestDb()
-    upsertSetting('api_key.openai', 'test-key')
+    upsertSetting('api_key.openrouter', 'test-key')
     mockCreate.mockReset()
     mockExecuteTool.mockReset()
   })
 
   async function loadModule() {
-    return import('./adapter-openai.js')
+    return import('./adapter-openrouter.js')
   }
 
-  it('converts text response to Anthropic text block', async () => {
+  it('converts text response to a neutral text block', async () => {
     mockCreate.mockResolvedValue(createMockStream([
       { choices: [{ delta: { content: 'Hello!' }, finish_reason: 'stop' }], usage: null },
     ]))
 
-    const { runOpenAITurn } = await loadModule()
-    const result = await runOpenAITurn({
+    const { runOpenRouterTurn } = await loadModule()
+    const result = await runOpenRouterTurn({
       messages: [{ role: 'user', content: 'hi' }],
       system: 'sys',
       model: 'gpt-4o',
@@ -497,8 +486,8 @@ describe('OpenAI response to Anthropic format', () => {
       { choices: [{ delta: { content: 'ok' }, finish_reason: 'stop' }], usage: null },
     ]))
 
-    const { runOpenAITurn } = await loadModule()
-    const result = await runOpenAITurn({
+    const { runOpenRouterTurn } = await loadModule()
+    const result = await runOpenRouterTurn({
       messages: [{ role: 'user', content: 'search' }],
       system: 'sys',
       model: 'gpt-4o',

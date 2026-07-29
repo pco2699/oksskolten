@@ -9,11 +9,8 @@ import {
   getDb,
 } from '../db.js'
 import { requireJson, getAuthUser } from '../auth.js'
-import { getAllModelValues, getModelValues } from '../../shared/models.js'
 import { assertSafeUrl } from '../fetcher/ssrf.js'
 import { extractByDotPath } from '../fetcher/article-images.js'
-import { getMonthlyUsage } from '../providers/translate/google-translate.js'
-import { getDeeplMonthlyUsage } from '../providers/translate/deepl.js'
 import { parseOrBadRequest } from '../lib/validation.js'
 
 const ProfileBody = z.object({
@@ -42,18 +39,12 @@ const PREF_KEYS = [
   'appearance.highlight_theme',
   'appearance.font_family',
   'appearance.list_layout',
-  'chat.provider',
   'chat.model',
-  'summary.provider',
   'summary.model',
   'summary.max_tokens',
-  'translate.provider',
   'translate.model',
   'translate.max_tokens',
   'translate.target_lang',
-  'ollama.base_url',
-  'ollama.custom_headers',
-  'vllm.base_url',
   'custom_themes',
   'retention.enabled',
   'retention.read_days',
@@ -78,48 +69,17 @@ const PREF_ALLOWED: Record<PrefKey, string[] | null> = {
   'appearance.highlight_theme': null,
   'appearance.font_family': null,
   'appearance.list_layout': ['list', 'card', 'magazine', 'compact'],
-  'chat.provider': ['anthropic', 'gemini', 'openai', 'claude-code', 'ollama', 'vllm', 'openrouter'],
-  'chat.model': getAllModelValues(),
-  'summary.provider': ['anthropic', 'gemini', 'openai', 'claude-code', 'ollama', 'vllm', 'openrouter'],
-  'summary.model': getAllModelValues(),
+  // Model ids are OpenRouter catalog entries, which change constantly — any string is allowed
+  'chat.model': null,
+  'summary.model': null,
   'summary.max_tokens': null,
-  'translate.provider': ['anthropic', 'gemini', 'openai', 'claude-code', 'ollama', 'vllm', 'openrouter', 'google-translate', 'deepl'],
-  'translate.model': getAllModelValues(),
+  'translate.model': null,
   'translate.max_tokens': null,
   'translate.target_lang': ['ja', 'en', 'zh'],
-  'ollama.base_url': null,
-  'ollama.custom_headers': null,
-  'vllm.base_url': null,
   'custom_themes': null,
   'retention.enabled': ['on', 'off'],
   'retention.read_days': null,
   'retention.unread_days': null,
-}
-
-/** Providers whose model list is fetched at runtime, so the static model list cannot validate it */
-const DYNAMIC_MODEL_PROVIDERS: readonly string[] = ['ollama', 'vllm', 'openrouter']
-
-const PROVIDER_MODEL_PAIRS: Array<{ providerKey: PrefKey; modelKey: PrefKey }> = [
-  { providerKey: 'chat.provider', modelKey: 'chat.model' },
-  { providerKey: 'summary.provider', modelKey: 'summary.model' },
-  { providerKey: 'translate.provider', modelKey: 'translate.model' },
-]
-
-function validateProviderModel(body: Record<string, unknown>): string | null {
-  for (const { providerKey, modelKey } of PROVIDER_MODEL_PAIRS) {
-    const model = body[modelKey] !== undefined ? String(body[modelKey]) : getSetting(modelKey)
-    const provider = body[providerKey] !== undefined ? String(body[providerKey]) : getSetting(providerKey)
-    if (!model || !provider) continue
-    // google-translate and deepl take no model; ollama, vllm, and openrouter have no static model list
-    if (provider === 'google-translate' || provider === 'deepl' || DYNAMIC_MODEL_PROVIDERS.includes(provider)) continue
-    // claude-code uses anthropic model IDs
-    const effectiveProvider = provider === 'claude-code' ? 'anthropic' : provider
-    const allowedModels = getModelValues(effectiveProvider)
-    if (allowedModels.length > 0 && !allowedModels.includes(model)) {
-      return `Model ${model} is not valid for provider ${provider}`
-    }
-  }
-  return null
 }
 
 export async function settingsRoutes(api: FastifyInstance): Promise<void> {
@@ -180,12 +140,6 @@ export async function settingsRoutes(api: FastifyInstance): Promise<void> {
     const body = request.body as Record<string, unknown> // dynamic keys, validated per-field below
 
     // Validate provider-model consistency before saving
-    const validationError = validateProviderModel(body)
-    if (validationError) {
-      reply.status(400).send({ error: validationError })
-      return
-    }
-
     let updated = false
     for (const key of PREF_KEYS) {
       if (body[key] === undefined) continue
@@ -225,19 +179,6 @@ export async function settingsRoutes(api: FastifyInstance): Promise<void> {
       }
       const allowed = PREF_ALLOWED[key]
       if (allowed && !allowed.includes(value)) {
-        // Skip static model list check for providers with dynamic model lists
-        const modelKeyPair = PROVIDER_MODEL_PAIRS.find(p => p.modelKey === key)
-        if (modelKeyPair) {
-          const provider = body[modelKeyPair.providerKey] !== undefined
-            ? String(body[modelKeyPair.providerKey])
-            : getSetting(modelKeyPair.providerKey) || ''
-          if (DYNAMIC_MODEL_PROVIDERS.includes(provider)) {
-            upsertSetting(key, value)
-            updated = true
-            continue
-          }
-        }
-
         reply.status(400).send({ error: `Invalid value for ${key}` })
         return
       }
@@ -570,13 +511,7 @@ export async function settingsRoutes(api: FastifyInstance): Promise<void> {
   // --- Provider API key management ---
 
   const PROVIDER_KEY_MAP: Record<string, string> = {
-    anthropic: 'api_key.anthropic',
-    gemini: 'api_key.gemini',
-    openai: 'api_key.openai',
-    vllm: 'api_key.vllm',
     openrouter: 'api_key.openrouter',
-    'google-translate': 'api_key.google_translate',
-    deepl: 'api_key.deepl',
   }
 
   api.get('/api/settings/api-keys/:provider', async (request, reply) => {
@@ -606,170 +541,30 @@ export async function settingsRoutes(api: FastifyInstance): Promise<void> {
     }
   })
 
-  // --- Translation provider usage ---
-
-  api.get('/api/settings/google-translate/usage', async (_request, reply) => {
-    reply.send(getMonthlyUsage())
-  })
-
-  api.get('/api/settings/deepl/usage', async (_request, reply) => {
-    reply.send(getDeeplMonthlyUsage())
-  })
-
-  // --- Ollama endpoints ---
-
-  async function ollamaFetch(path: string): Promise<Response> {
-    const { getOllamaBaseUrl, getOllamaCustomHeaders } = await import('../providers/llm/ollama.js')
-    const baseUrl = getOllamaBaseUrl().replace(/\/+$/, '')
-    const headers = getOllamaCustomHeaders()
-    return fetch(`${baseUrl}${path}`, { headers, signal: AbortSignal.timeout(5_000) })
-  }
-
-  api.get('/api/settings/ollama/models', async (_request, reply) => {
-    try {
-      const res = await ollamaFetch('/api/tags')
-      if (!res.ok) {
-        reply.send({ models: [] })
-        return
-      }
-      const data = await res.json() as { models?: Array<{ name: string; size: number; details?: { parameter_size?: string } }> }
-      const models = (data.models || []).map(m => ({
-        name: m.name,
-        size: m.size,
-        parameter_size: m.details?.parameter_size || '',
-      }))
-      reply.send({ models })
-    } catch {
-      reply.send({ models: [] })
-    }
-  })
-
-  api.get('/api/settings/ollama/status', async (_request, reply) => {
-    try {
-      const [versionRes, tagsRes] = await Promise.all([
-        ollamaFetch('/api/version'),
-        ollamaFetch('/api/tags'),
-      ])
-      if (!versionRes.ok || !tagsRes.ok) {
-        reply.send({ ok: false, error: `HTTP ${versionRes.status}` })
-        return
-      }
-      const versionData = await versionRes.json() as { version?: string }
-      const tagsData = await tagsRes.json() as { models?: unknown[] }
-      reply.send({
-        ok: true,
-        version: versionData.version || 'unknown',
-        model_count: tagsData.models?.length || 0,
-      })
-    } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'Connection failed'
-      reply.send({ ok: false, error: message })
-    }
-  })
-
-  // --- vLLM endpoints ---
-
-  async function vllmFetch(path: string): Promise<Response> {
-    const { getVllmBaseUrl, getVllmApiKey } = await import('../providers/llm/vllm.js')
-    const baseUrl = getVllmBaseUrl().replace(/\/+$/, '')
-    const apiKey = getVllmApiKey()
-    const headers: Record<string, string> = {}
-    if (apiKey) headers['Authorization'] = `Bearer ${apiKey}`
-    return fetch(`${baseUrl}${path}`, { headers, signal: AbortSignal.timeout(5_000) })
-  }
-
-  api.get('/api/settings/vllm/models', async (_request, reply) => {
-    try {
-      const res = await vllmFetch('/v1/models')
-      if (!res.ok) {
-        reply.send({ models: [] })
-        return
-      }
-      const data = await res.json() as { data?: Array<{ id: string }> }
-      const models = (data.data || []).map(m => ({
-        name: m.id,
-      }))
-      reply.send({ models })
-    } catch {
-      reply.send({ models: [] })
-    }
-  })
-
-  api.get('/api/settings/vllm/status', async (_request, reply) => {
-    try {
-      const res = await vllmFetch('/v1/models')
-      if (!res.ok) {
-        reply.send({ ok: false, error: `HTTP ${res.status}` })
-        return
-      }
-      const data = await res.json() as { data?: unknown[] }
-      reply.send({
-        ok: true,
-        model_count: data.data?.length || 0,
-      })
-    } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'Connection failed'
-      reply.send({ ok: false, error: message })
-    }
-  })
-
   // --- OpenRouter endpoints ---
 
-  async function openrouterFetch(path: string): Promise<Response> {
-    const { getOpenRouterBaseUrl, getOpenRouterApiKey } = await import('../providers/llm/openrouter.js')
-    const apiKey = getOpenRouterApiKey()
-    const headers: Record<string, string> = {}
-    if (apiKey) headers['Authorization'] = `Bearer ${apiKey}`
-    return fetch(`${getOpenRouterBaseUrl()}${path}`, { headers, signal: AbortSignal.timeout(10_000) })
-  }
-
-  interface OpenRouterModel {
-    id: string
-    name?: string
-    pricing?: { prompt?: string; completion?: string }
-  }
-
-  api.get('/api/settings/openrouter/models', async (_request, reply) => {
-    try {
-      const res = await openrouterFetch('/models')
-      if (!res.ok) {
-        reply.send({ models: [] })
-        return
-      }
-      const data = await res.json() as { data?: OpenRouterModel[] }
-      // OpenRouter returns hundreds of models; the vendor prefix of the id
-      // (e.g. "anthropic" in "anthropic/claude-sonnet-4.5") groups them in the UI.
-      const models = (data.data || [])
-        .map(m => ({
-          name: m.id,
-          label: m.name || m.id,
-          vendor: m.id.includes('/') ? m.id.split('/')[0] : 'other',
-        }))
-        .sort((a, b) => a.name.localeCompare(b.name))
-      reply.send({ models })
-    } catch {
-      reply.send({ models: [] })
-    }
+  api.get('/api/settings/openrouter/models', async (request, reply) => {
+    const refresh = (request.query as { refresh?: string }).refresh === '1'
+    const { getOpenRouterCatalog } = await import('../providers/llm/openrouter.js')
+    reply.send({ models: await getOpenRouterCatalog(refresh) })
   })
 
   api.get('/api/settings/openrouter/status', async (_request, reply) => {
     try {
+      const { openrouterFetch, getOpenRouterCatalog } = await import('../providers/llm/openrouter.js')
       // /models is public, so /key is what actually verifies the stored API key.
-      const [keyRes, modelsRes] = await Promise.all([
+      const [keyRes, models] = await Promise.all([
         openrouterFetch('/key'),
-        openrouterFetch('/models'),
+        getOpenRouterCatalog(true),
       ])
       if (!keyRes.ok) {
         reply.send({ ok: false, error: `HTTP ${keyRes.status}` })
         return
       }
       const keyData = await keyRes.json() as { data?: { label?: string; limit_remaining?: number | null } }
-      const modelsData = modelsRes.ok
-        ? await modelsRes.json() as { data?: unknown[] }
-        : { data: [] }
       reply.send({
         ok: true,
-        model_count: modelsData.data?.length || 0,
+        model_count: models.length,
         label: keyData.data?.label || '',
         limit_remaining: keyData.data?.limit_remaining ?? null,
       })

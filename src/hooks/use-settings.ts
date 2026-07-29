@@ -41,12 +41,9 @@ interface Prefs {
   'appearance.mascot': string | null
   'reading.keyboard_navigation': string | null
   'reading.keybindings': string | null
-  'chat.provider': string | null
   'chat.model': string | null
-  'summary.provider': string | null
   'summary.model': string | null
   'summary.max_tokens': string | null
-  'translate.provider': string | null
   'translate.model': string | null
   'translate.max_tokens': string | null
   'translate.target_lang': string | null
@@ -79,11 +76,8 @@ export function useSettings() {
   const { mascot, setMascot } = useMascot()
   const { keyboardNavigation, setKeyboardNavigation } = useKeyboardNavSetting()
   const { keybindings, setKeybindings } = useKeybindingsSetting()
-  const [chatProvider, setChatProviderState] = useState<string | null>(null)
   const [chatModel, setChatModelState] = useState<string | null>(null)
-  const [summaryProvider, setSummaryProviderState] = useState<string | null>(null)
   const [summaryModel, setSummaryModelState] = useState<string | null>(null)
-  const [translateProvider, setTranslateProviderState] = useState<string | null>(null)
   const [translateModel, setTranslateModelState] = useState<string | null>(null)
   const [translateTargetLang, setTranslateTargetLangState] = useState<string | null>(null)
   const [summaryMaxTokens, setSummaryMaxTokensState] = useState<string | null>(null)
@@ -172,11 +166,8 @@ export function useSettings() {
       } },
       { key: 'appearance.highlight_theme', setter: setHighlightTheme },
       { key: 'appearance.font_family', setter: setArticleFont },
-      { key: 'chat.provider', setter: setChatProviderState },
       { key: 'chat.model', setter: setChatModelState },
-      { key: 'summary.provider', setter: setSummaryProviderState },
       { key: 'summary.model', setter: setSummaryModelState },
-      { key: 'translate.provider', setter: setTranslateProviderState },
       { key: 'translate.model', setter: setTranslateModelState },
       { key: 'translate.target_lang', setter: setTranslateTargetLangState },
       { key: 'summary.max_tokens', setter: setSummaryMaxTokensState },
@@ -315,11 +306,8 @@ export function useSettings() {
     syncedSetMascot,
     syncedSetKeyboardNavigation,
     syncedSetKeybindings,
-    syncedSetChatProvider,
     syncedSetChatModel,
-    syncedSetSummaryProvider,
     syncedSetSummaryModel,
-    syncedSetTranslateProvider,
     syncedSetTranslateModel,
     syncedSetTranslateTargetLang,
     syncedSetSummaryMaxTokens,
@@ -352,11 +340,8 @@ export function useSettings() {
         pendingRef.current['reading.keybindings'] = JSON.stringify(value)
         scheduleSaveRef.current()
       },
-      syncedSetChatProvider: make<string>('chat.provider', setChatProviderState),
       syncedSetChatModel: make<string>('chat.model', setChatModelState),
-      syncedSetSummaryProvider: make<string>('summary.provider', setSummaryProviderState),
       syncedSetSummaryModel: make<string>('summary.model', setSummaryModelState),
-      syncedSetTranslateProvider: make<string>('translate.provider', setTranslateProviderState),
       syncedSetTranslateModel: make<string>('translate.model', setTranslateModelState),
       syncedSetTranslateTargetLang: make<string>('translate.target_lang', setTranslateTargetLangState),
       syncedSetSummaryMaxTokens: make<string>('summary.max_tokens', setSummaryMaxTokensState),
@@ -435,16 +420,10 @@ export function useSettings() {
     indicatorStyle,
     customThemes,
     setCustomThemes,
-    chatProvider,
-    setChatProvider: syncedSetChatProvider,
     chatModel,
     setChatModel: syncedSetChatModel,
-    summaryProvider,
-    setSummaryProvider: syncedSetSummaryProvider,
     summaryModel,
     setSummaryModel: syncedSetSummaryModel,
-    translateProvider,
-    setTranslateProvider: syncedSetTranslateProvider,
     translateModel,
     setTranslateModel: syncedSetTranslateModel,
     translateTargetLang,

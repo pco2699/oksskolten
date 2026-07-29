@@ -28,10 +28,6 @@ vi.mock('../fetcher.js', () => ({
   getFeedState: (...args: unknown[]) => mockGetFeedState(...args),
 }))
 
-vi.mock('../anthropic.js', () => ({
-  anthropic: { messages: { stream: vi.fn(), create: vi.fn() } },
-}))
-
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------

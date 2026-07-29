@@ -4,7 +4,7 @@ import { fetchHtml } from './fetcher/http.js'
 import { fetchViaFlareSolverr } from './fetcher/flaresolverr.js'
 import { getSetting } from './db.js'
 import { getProvider } from './providers/llm/index.js'
-import { DEFAULT_MODELS } from '../shared/models.js'
+import { LLM_PROVIDER } from '../shared/models.js'
 import type { LLMProvider } from './providers/llm/provider.js'
 import { logger } from './logger.js'
 
@@ -35,22 +35,15 @@ export async function queryRssBridge(url: string): Promise<string | null> {
   }
 }
 
-const API_KEY_SETTINGS: Record<string, string> = {
-  anthropic: 'api_key.anthropic',
-  gemini: 'api_key.gemini',
-  openai: 'api_key.openai',
-}
-
-const PROVIDER_PRIORITY = ['anthropic', 'gemini', 'openai'] as const
-
+/**
+ * Feed inference borrows whichever model chat is configured with, falling back to
+ * the summarize model. Returns null when OpenRouter has no key or no model yet.
+ */
 export function getAvailableProvider(): { provider: LLMProvider; model: string } | null {
-  for (const name of PROVIDER_PRIORITY) {
-    const settingKey = API_KEY_SETTINGS[name]
-    if (getSetting(settingKey)) {
-      return { provider: getProvider(name), model: DEFAULT_MODELS[name] }
-    }
-  }
-  return null
+  if (!getSetting('api_key.openrouter')) return null
+  const model = getSetting('chat.model') || getSetting('summary.model')
+  if (!model) return null
+  return { provider: getProvider(LLM_PROVIDER), model }
 }
 
 export function buildCssSelectorBridgeUrl(
