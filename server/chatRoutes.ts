@@ -34,7 +34,6 @@ import {
 } from './db.js'
 import { runChatTurn } from './chat/adapter.js'
 import { repairStoredConversation } from './chat/history.js'
-import { TASK_DEFAULTS } from '../shared/models.js'
 import { buildSystemPrompt, appendArticleContext } from './chat/system-prompt.js'
 import { generateConversationTitle } from './chat/title-generator.js'
 import { generateSuggestions } from './chat/suggestions.js'
@@ -50,7 +49,11 @@ export function registerChatApi(app: FastifyInstance): void {
       const body = parseOrBadRequest(ChatBody, request.body, reply)
       if (!body) return
 
-      const model = getSetting('chat.model') || TASK_DEFAULTS.chat.model
+      const model = getSetting('chat.model')
+      if (!model) {
+        reply.status(400).send({ error: 'MODEL_NOT_SET' })
+        return
+      }
 
       // Get or create conversation
       let conversationId = body.conversation_id
@@ -68,9 +71,8 @@ export function registerChatApi(app: FastifyInstance): void {
         }
       }
 
-      // Restore and repair previous messages so both backends see a valid history.
+      // Restore and repair previous messages so the model sees a valid history.
       const dbMessages = getChatMessages(conversationId)
-      const backend = getSetting('chat.provider') || TASK_DEFAULTS.chat.provider
       const repairedHistory = repairStoredConversation(dbMessages)
       if (repairedHistory.changed) {
         replaceChatMessages(
@@ -107,7 +109,7 @@ export function registerChatApi(app: FastifyInstance): void {
       const startTime = Date.now()
 
       try {
-        const result = await runChatTurn(backend, {
+        const result = await runChatTurn({
           messages: normalizedMessages,
           system: systemPrompt,
           model,
@@ -149,7 +151,7 @@ export function registerChatApi(app: FastifyInstance): void {
             .map(b => b.text)
             .join('')
           if (assistantText) {
-            generateConversationTitle(conversationId, body.message, assistantText, backend)
+            generateConversationTitle(conversationId, body.message, assistantText, model)
               .catch(() => {/* fallback title already set */})
           }
         }
@@ -162,26 +164,6 @@ export function registerChatApi(app: FastifyInstance): void {
       sse.end()
     })
 
-    // --- GET /api/chat/claude-code-status ---
-    api.get('/api/chat/claude-code-status', async (_req, reply) => {
-      try {
-        const { execFile } = await import('node:child_process')
-        const { promisify } = await import('node:util')
-        const execFileAsync = promisify(execFile)
-        const { stdout } = await execFileAsync('claude', ['auth', 'status', '--json'], {
-          timeout: 5000,
-          env: { ...process.env, CLAUDECODE: '' },
-        })
-        reply.send(JSON.parse(stdout))
-      } catch (err) {
-        const message = err instanceof Error ? err.message : String(err)
-        if (message.includes('ENOENT') || message.includes('not found')) {
-          reply.send({ loggedIn: false, error: 'claude CLI not found' })
-        } else {
-          reply.send({ loggedIn: false, error: message })
-        }
-      }
-    })
 
     // --- GET /api/chat/suggestions ---
     api.get('/api/chat/suggestions', async (_request, reply) => {

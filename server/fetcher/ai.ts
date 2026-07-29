@@ -1,18 +1,15 @@
 import { getSetting } from '../db.js'
 import { getProvider } from '../providers/llm/index.js'
-import { googleTranslate } from '../providers/translate/google-translate.js'
-import { deeplTranslate } from '../providers/translate/deepl.js'
-import { TASK_DEFAULTS } from '../../shared/models.js'
+import { LLM_PROVIDER } from '../../shared/models.js'
 import { DEFAULT_LANGUAGE, languageName } from '../../shared/lang.js'
 
-export type AiBillingMode = 'anthropic' | 'gemini' | 'openai' | 'openrouter' | 'claude-code' | 'ollama' | 'vllm' | 'google-translate' | 'deepl'
+export type AiBillingMode = typeof LLM_PROVIDER
 
 export interface AiTextResult {
   inputTokens: number
   outputTokens: number
   billingMode: AiBillingMode
   model: string
-  monthlyChars?: number
 }
 
 export function detectLanguage(fullText: string): string {
@@ -55,9 +52,7 @@ ${fullText}`
 }
 
 interface AiTaskConfig {
-  providerKey: string
   modelKey: string
-  defaultModel: string
   maxTokensKey: string
   defaultMaxTokens: number
   buildPrompt: (text: string) => string
@@ -66,8 +61,8 @@ interface AiTaskConfig {
 /**
  * Resolve the max output tokens for an AI task. A positive integer stored in
  * settings overrides the built-in default; anything else (unset, empty,
- * malformed) falls back. Lets users with local LLMs (vLLM, Ollama) whose
- * context window is smaller than the defaults lower the completion cap.
+ * malformed) falls back. Lets users of models whose context window is smaller
+ * than the defaults lower the completion cap.
  */
 function resolveMaxTokens(config: AiTaskConfig): number {
   const raw = getSetting(config.maxTokensKey)
@@ -81,9 +76,11 @@ async function runAiTask(
   fullText: string,
   onText?: (delta: string) => void,
 ): Promise<{ text: string } & AiTextResult> {
-  const providerName = getSetting(config.providerKey) || TASK_DEFAULTS.summarize.provider
-  const model = getSetting(config.modelKey) || config.defaultModel
-  const provider = getProvider(providerName)
+  // OpenRouter has no default model — its catalog is paid and changes constantly,
+  // so a model id is only ever what the user configured.
+  const model = getSetting(config.modelKey)
+  if (!model) throw new Error('MODEL_NOT_SET')
+  const provider = getProvider(LLM_PROVIDER)
   provider.requireKey()
   const prompt = config.buildPrompt(fullText)
   const maxTokens = resolveMaxTokens(config)
@@ -101,7 +98,7 @@ async function runAiTask(
     text: result.text,
     inputTokens: result.inputTokens,
     outputTokens: result.outputTokens,
-    billingMode: providerName as AiBillingMode,
+    billingMode: LLM_PROVIDER,
     model,
   }
 }
@@ -110,18 +107,14 @@ const SUMMARIZE_MAX_TOKENS = 2048
 const TRANSLATE_MAX_TOKENS = 16384
 
 const summarizeConfig: AiTaskConfig = {
-  providerKey: 'summary.provider',
   modelKey: 'summary.model',
-  defaultModel: TASK_DEFAULTS.summarize.model,
   maxTokensKey: 'summary.max_tokens',
   defaultMaxTokens: SUMMARIZE_MAX_TOKENS,
   buildPrompt: buildSummarizePrompt,
 }
 
 const translateConfig: AiTaskConfig = {
-  providerKey: 'translate.provider',
   modelKey: 'translate.model',
-  defaultModel: TASK_DEFAULTS.translate.model,
   maxTokensKey: 'translate.max_tokens',
   defaultMaxTokens: TRANSLATE_MAX_TOKENS,
   buildPrompt: buildTranslatePrompt,
@@ -141,13 +134,6 @@ export async function streamSummarizeArticle(
 }
 
 export async function translateArticle(fullText: string): Promise<{ fullTextTranslated: string } & AiTextResult> {
-  const provider = getSetting('translate.provider') || TASK_DEFAULTS.translate.provider
-  if (provider === 'google-translate') {
-    return runGoogleTranslate(fullText)
-  }
-  if (provider === 'deepl') {
-    return runDeepl(fullText)
-  }
   const r = await runAiTask(translateConfig, fullText)
   return { fullTextTranslated: r.text, inputTokens: r.inputTokens, outputTokens: r.outputTokens, billingMode: r.billingMode, model: r.model }
 }
@@ -156,45 +142,6 @@ export async function streamTranslateArticle(
   fullText: string,
   onText: (delta: string) => void,
 ): Promise<{ fullTextTranslated: string } & AiTextResult> {
-  const provider = getSetting('translate.provider') || TASK_DEFAULTS.translate.provider
-  if (provider === 'google-translate') {
-    const result = await runGoogleTranslate(fullText)
-    onText(result.fullTextTranslated)
-    return result
-  }
-  if (provider === 'deepl') {
-    const result = await runDeepl(fullText)
-    onText(result.fullTextTranslated)
-    return result
-  }
   const r = await runAiTask(translateConfig, fullText, onText)
   return { fullTextTranslated: r.text, inputTokens: r.inputTokens, outputTokens: r.outputTokens, billingMode: r.billingMode, model: r.model }
-}
-
-function getTargetLang(): string {
-  return getSetting('translate.target_lang') || getSetting('general.language') || DEFAULT_LANGUAGE
-}
-
-async function runGoogleTranslate(fullText: string): Promise<{ fullTextTranslated: string } & AiTextResult> {
-  const result = await googleTranslate(fullText, getTargetLang())
-  return {
-    fullTextTranslated: result.translatedText,
-    inputTokens: result.characters,
-    outputTokens: result.translatedText.length,
-    billingMode: 'google-translate',
-    model: 'google-translate-v2',
-    monthlyChars: result.monthlyChars,
-  }
-}
-
-async function runDeepl(fullText: string): Promise<{ fullTextTranslated: string } & AiTextResult> {
-  const result = await deeplTranslate(fullText, getTargetLang())
-  return {
-    fullTextTranslated: result.translatedText,
-    inputTokens: result.characters,
-    outputTokens: result.translatedText.length,
-    billingMode: 'deepl',
-    model: 'deepl-v2',
-    monthlyChars: result.monthlyChars,
-  }
 }

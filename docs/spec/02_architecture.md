@@ -13,7 +13,7 @@ graph TD
             sqlite["SQLite<br/>(WAL mode)"]
             cron["node-cron<br/>Feed fetch every 5 min"]
             fetcher["Fetcher Pipeline<br/>RSS parse → Readability<br/>→ HTML cleaner → Markdown"]
-            ai["AI Provider<br/>Anthropic / Gemini / OpenAI"]
+            ai["AI Provider<br/>OpenRouter"]
             chat["Chat Service<br/>MCP Server + 4 Adapters"]
 
             fastify --> sqlite
@@ -37,7 +37,7 @@ graph TD
     cron -- "HTTP fetch" --> rss(("RSS Feeds"))
     fetcher --> bridge
     fetcher --> flare
-    ai -- "API" --> llm_api(("Anthropic / Gemini<br/>/ OpenAI API"))
+    ai -- "API" --> llm_api(("OpenRouter API"))
 ```
 
 ## Data Flow
@@ -64,7 +64,7 @@ graph TD
 2. "Summary" tab → POST /api/articles/:id/summarize (SSE streaming)
    └─ Generate summary via LLM → cache in summary column
 3. "Translation" tab → POST /api/articles/:id/translate (SSE streaming)
-   └─ LLM or Google Translate → cache in full_text_ja column
+   └─ LLM → cache in full_text_ja column
 4. Subsequent requests return from cache (no API calls)
 ```
 

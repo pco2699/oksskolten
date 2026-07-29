@@ -16,7 +16,6 @@ Typical RSS readers only display the title and summary provided by the feed, req
 > - [82_feature_chat.md](./82_feature_chat.md) — Chat
 > - [83_feature_similarity.md](./83_feature_similarity.md) — Similar Article Detection
 > - [84_feature_keyboard_navigation.md](./84_feature_keyboard_navigation.md) — Keyboard Navigation
-> - [85_feature_ollama.md](./85_feature_ollama.md) — Ollama LLM Provider
 > - [86_feature_openrouter.md](./86_feature_openrouter.md) — OpenRouter LLM Provider
 > - [90_perf_retry_backoff.md](./90_perf_retry_backoff.md) — Exponential Backoff for Article Retry
 > - [91_perf_score_recalculation.md](./91_perf_score_recalculation.md) — Score Recalculation Optimization
@@ -34,8 +33,8 @@ Typical RSS readers only display the title and summary provided by the feed, req
 | RSS Parsing | feedsmith (uses fast-xml-parser internally). Supports RSS 2.0 / Atom 1.0 / RSS 1.0 (RDF). Falls back to direct fast-xml-parser only when feedsmith fails |
 | Full-text Extraction | @mozilla/readability + jsdom + turndown + HTML cleaner (defuddle-based, local processing). Runs in piscina Worker Threads (does not block the main event loop) |
 | Language Detection | Local processing (CJK character ratio, no API needed) |
-| Summarization | Selectable from Anthropic / Gemini / OpenAI. Default: Anthropic Haiku (`claude-haiku-4-5-20251001`). On-demand, streaming-capable |
-| Translation | Selectable from Anthropic / Gemini / OpenAI / Google Translate / DeepL. Default: Anthropic Sonnet (`claude-sonnet-4-6`). Non-ja articles only. On-demand, streaming-capable |
+| Summarization | Any model available through OpenRouter (`summary.model`, e.g. `deepseek/deepseek-v4-flash`). No default — the model is user-chosen. On-demand, streaming-capable |
+| Translation | Any model available through OpenRouter (`translate.model`). No default — the model is user-chosen. Non-ja articles only. On-demand, streaming-capable |
 | Authentication | JWT (`@fastify/jwt`) + bcryptjs (password auth) + WebAuthn/Passkey (`@simplewebauthn/server`) + GitHub OAuth (`arctic`) |
 | Rate Limiting | `@fastify/rate-limit` (applied to auth endpoints) |
 | Deployment | `docker compose up -d` (NAS, VPS, cloud VM, etc.) |
@@ -64,7 +63,7 @@ graph LR
     end
 
     app -- "RSS/Atom fetch" --> rss(("RSS Feeds"))
-    app -- "Summary / Translation / Chat" --> llm(("Anthropic / Gemini<br/>/ OpenAI API"))
+    app -- "Summary / Translation / Chat" --> llm(("OpenRouter API"))
     bridge -- "HTML fetch" --> web(("Target Sites"))
     flare -- "Headless fetch" --> web
 ```
@@ -95,21 +94,21 @@ All containers are connected via an `internal` bridge network. No ports are expo
 | `GIT_COMMIT` | Git commit SHA at build time | | Returned in `/api/health`. Defaults to `'dev'` |
 | `GIT_TAG` | Git tag at build time | | Returned in `/api/health`. Defaults to `'dev'` |
 | `BUILD_DATE` | Build date (ISO 8601) | | Returned in `/api/health` |
-| `TOOL_LOG_PATH` | Claude Code MCP tool log output path | | Used by Claude Code adapter. No logging if not set |
+| `OPENROUTER_BASE_URL` | OpenRouter API root | | Default `https://openrouter.ai/api/v1`. Only needed to route through a gateway or proxy |
+| `TOOL_LOG_PATH` | MCP tool log output path | | Used by the standalone MCP server. No logging if not set |
 | `VITE_DEMO_MODE` | `true` for demo mode build | | Generates a static SPA without backend |
 | `VITE_API_PROXY_TARGET` | Vite dev API proxy target | | Default `http://127.0.0.1:3000` |
 | `VITE_PORT` | Vite dev server port | | Default `5173` |
 
-> **Note:** AI provider API keys (Anthropic / Gemini / OpenAI / DeepL) and JWT secret are managed in the DB `settings` table, not as environment variables. API keys can be configured via the settings UI (`/settings/ai`).
+> **Note:** The OpenRouter API key and JWT secret are managed in the DB `settings` table, not as environment variables. The API key is configured via the settings UI (`/settings/ai`).
 
 ### Key Components
 
 | Component | Files | Overview |
 |---|---|---|
 | **Fetcher Pipeline** | `server/fetcher/` | RSS parsing (2.0/Atom/RDF), Readability full-text extraction, HTML cleaner (400+ patterns), Markdown conversion, image archiving. DOM parsing runs in piscina Worker Threads (max 2) to protect the event loop |
-| **AI Providers** | `server/providers/llm/` | Unified `LLMProvider` interface — Anthropic, Gemini, OpenAI, Claude Code |
-| **Translation** | `server/providers/translate/` | Google Cloud Translation API v2 / DeepL (alternative to LLM translation) |
-| **Chat Service** | `server/chat/` | MCP server + tool definitions, 4 backend adapters, conversation persistence |
+| **AI Provider** | `server/providers/llm/` | `LLMProvider` interface, implemented by OpenRouter (OpenAI-compatible API, runtime model catalog) |
+| **Chat Service** | `server/chat/` | Tool definitions, OpenRouter adapter with a tool loop, conversation persistence |
 | **HTML Cleaner** | `server/lib/cleaner/` | 3-phase pipeline: pre-clean → Readability → post-clean (selector-based, scoring-based, normalization) |
 | **Auth** | `server/auth*.ts`, `server/passkey*.ts`, `server/oauth*.ts` | JWT + bcryptjs + WebAuthn/Passkey + GitHub OAuth |
 | **RSS Bridge** | `server/rss-bridge.ts` | LLM-inferred CSS selectors for sites without RSS feeds |

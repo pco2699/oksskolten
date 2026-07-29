@@ -23,7 +23,7 @@ vi.mock('../fetcher.js', () => ({
   }),
 }))
 
-import { TOOLS, toAnthropicTools, executeTool } from './tools.js'
+import { TOOLS, toOpenAITools, executeTool } from './tools.js'
 
 beforeEach(() => {
   setupTestDb()
@@ -58,15 +58,15 @@ describe('TOOLS array', () => {
   })
 })
 
-describe('toAnthropicTools', () => {
-  it('converts to Anthropic format', () => {
-    const tools = toAnthropicTools()
+describe('toOpenAITools', () => {
+  it('converts to the chat-completions function format', () => {
+    const tools = toOpenAITools()
     expect(tools.length).toBeGreaterThan(0)
     for (const tool of tools) {
-      expect(tool).toHaveProperty('name')
-      expect(tool).toHaveProperty('description')
-      expect(tool).toHaveProperty('input_schema')
-      expect(tool.input_schema.type).toBe('object')
+      expect(tool.type).toBe('function')
+      expect(tool.function).toHaveProperty('name')
+      expect(tool.function).toHaveProperty('description')
+      expect(tool.function.parameters.type).toBe('object')
     }
   })
 })

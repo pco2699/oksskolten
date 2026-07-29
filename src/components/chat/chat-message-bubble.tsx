@@ -3,7 +3,9 @@ import { renderMarkdown, walkLinks } from '../../lib/markdown'
 import { sanitizeHtml } from '../../lib/sanitize'
 import { SanitizedHTML } from '../ui/sanitized-html'
 import type { ChatMessage } from '../../hooks/use-chat'
-import { getModelLabel, getModelPricing } from '../../../shared/models'
+import { getModelLabel, getModelPricing } from '../../data/aiModels'
+import { useModelCatalog } from '../../hooks/use-model-catalog'
+import type { CatalogModel } from '../../data/aiModels'
 import { articleUrlToPath } from '../../lib/url'
 
 interface ChatMessageBubbleProps {
@@ -24,16 +26,20 @@ function rewriteLinksToAppPaths(md: string): string {
   })
 }
 
-function formatChatUsage(usage: NonNullable<ChatMessage['usage']>): string {
+function formatChatUsage(usage: NonNullable<ChatMessage['usage']>, catalog: CatalogModel[]): string {
   const modelId = usage.model ?? ''
-  const modelLabel = getModelLabel(modelId) ?? modelId
+  const modelLabel = getModelLabel(modelId, catalog)
   const elapsed = (usage.elapsed_ms / 1000).toFixed(1)
-  const [inputRate, outputRate] = getModelPricing(modelId) ?? [1, 5]
-  const cost = (usage.input_tokens * inputRate + usage.output_tokens * outputRate) / 1_000_000
-  return `${modelLabel} · ${elapsed}s · ${usage.input_tokens.toLocaleString()} in · ${usage.output_tokens.toLocaleString()} out · ~$${cost.toFixed(4)}`
+  const base = `${modelLabel} · ${elapsed}s · ${usage.input_tokens.toLocaleString()} in · ${usage.output_tokens.toLocaleString()} out`
+  // Pricing is only known for models present in the fetched catalog
+  const pricing = getModelPricing(modelId, catalog)
+  if (!pricing) return base
+  const cost = (usage.input_tokens * pricing[0] + usage.output_tokens * pricing[1]) / 1_000_000
+  return `${base} · ~$${cost.toFixed(4)}`
 }
 
 export function ChatMessageBubble({ message, streaming }: ChatMessageBubbleProps) {
+  const { models } = useModelCatalog()
   const html = useMemo(() => {
     if (!message.text) return ''
     return sanitizeHtml(renderMarkdown(message.text, [rewriteLinksToAppPaths]))
@@ -62,7 +68,7 @@ export function ChatMessageBubble({ message, streaming }: ChatMessageBubbleProps
         ) : null}
         {message.usage && !streaming && (
           <p className="text-[11px] text-muted mt-1 select-none">
-            {formatChatUsage(message.usage)}
+            {formatChatUsage(message.usage, models)}
           </p>
         )}
     </div>

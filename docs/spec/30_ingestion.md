@@ -249,17 +249,14 @@ If the ratio of CJK characters (hiragana, katakana, kanji) in the first 1000 cha
 
 ### AI API Calls (On-Demand)
 
-Any of Anthropic / Gemini / OpenAI can be selected from the settings screen. Streaming is supported. Provider and model can be configured independently for summarization and translation (`summary.provider`, `summary.model`, `translate.provider`, `translate.model`).
+All AI calls go through OpenRouter, which fronts models from every major vendor behind one OpenAI-compatible API and one API key. Streaming is supported. The model is configured independently for summarization and translation (`summary.model`, `translate.model`) as an OpenRouter model id such as `deepseek/deepseek-v4-flash`. There is no default: a task with no model configured fails with `MODEL_NOT_SET` rather than silently spending on a model the user did not pick.
 
-The max output tokens for each task can also be overridden (`summary.max_tokens`, default 2048; `translate.max_tokens`, default 16384). This matters for local LLM backends (vLLM, Ollama) whose context window is smaller than the defaults: a request whose completion cap exceeds the backend's capacity fails outright, so lowering the cap makes summarization and translation usable on such models. Unset values fall back to the defaults.
+The max output tokens for each task can also be overridden (`summary.max_tokens`, default 2048; `translate.max_tokens`, default 16384). This matters for models whose context window is smaller than the defaults: a request whose completion cap exceeds the model's capacity fails outright, so lowering the cap makes summarization and translation usable on such models. Unset values fall back to the defaults.
 
-In addition to LLMs, Google Cloud Translation API v2 and DeepL API v2 are also available as translation providers. Google Translate is faster than LLMs (instant response) and offers a free tier of 500K characters per month ($20/1M characters beyond that). DeepL provides high-quality neural machine translation with particularly high accuracy for Japanese-European language pairs. API Free allows up to 500K characters per month for free; API Pro costs EUR 5.49/month + EUR 25/1M characters.
-
-**Summarization (Default: Anthropic Haiku)**
+**Summarization**
 
 ```typescript
-const SUMMARIZE_MODEL = 'claude-haiku-4-5-20251001'
-const DEFAULT_PROVIDER = 'anthropic'
+// Model: `summary.model` setting (OpenRouter model id)
 
 // Prompt summary:
 // - Line 1: Concisely summarize the overall point of the article in 1-2 sentences
@@ -270,10 +267,10 @@ const DEFAULT_PROVIDER = 'anthropic'
 
 Results are saved in `articles.summary` (Markdown format).
 
-**Translation (Default: Anthropic Sonnet)**
+**Translation**
 
 ```typescript
-const TRANSLATE_MODEL = 'claude-sonnet-4-6'
+// Model: `translate.model` setting (OpenRouter model id)
 
 // Prompt summary:
 // - Literal translation without omitting a single word
@@ -282,26 +279,6 @@ const TRANSLATE_MODEL = 'claude-sonnet-4-6'
 ```
 
 Results are saved in `articles.full_text_ja`. The entire full_text is passed as-is (not truncated).
-
-**Google Translate (Alternative Provider for Translation Only)**
-
-When `translate.provider` is set to `google-translate`, translation uses Google Cloud Translation API v2 (NMT) instead of an LLM.
-
-- Endpoint: `https://translation.googleapis.com/language/translate/v2`
-- API v2 has a 30K character limit per request, so long articles are split into chunks by paragraph (`\n\n`) delimiter and translated sequentially
-- Markdown protection: Code blocks, links, images, and URLs are replaced with placeholders before translation and restored afterward
-- Monthly character usage is tracked in the `settings` table (`google_translate.usage_month`, `google_translate.usage_chars`)
-- No streaming needed (responses are instant), no model selection
-
-**DeepL (Alternative Provider for Translation Only)**
-
-When `translate.provider` is set to `deepl`, translation uses DeepL API v2 instead of an LLM.
-
-- Endpoint: Free plan (`*:fx` key) uses `https://api-free.deepl.com/v2/translate`, Pro uses `https://api.deepl.com/v2/translate`
-- Specifies `tag_handling: 'html'` so DeepL handles HTML/Markdown tag protection (no manual masking like Google Translate)
-- Max 50K characters per request; chunks by paragraph delimiter when exceeded
-- Monthly character usage is tracked in the `settings` table (`deepl.usage_month`, `deepl.usage_chars`)
-- No streaming needed (responses are instant), no model selection
 
 Processing flow:
 1. User opens an article and selects the "Summary" tab -> invokes summarization via `POST /api/articles/:id/summarize`

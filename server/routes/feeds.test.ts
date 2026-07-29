@@ -35,10 +35,6 @@ vi.mock('../rss-bridge.js', () => ({
   inferCssSelectorBridge: (...args: unknown[]) => mockInferCssSelectorBridge(...args),
 }))
 
-vi.mock('../anthropic.js', () => ({
-  anthropic: { messages: { stream: vi.fn(), create: vi.fn() } },
-}))
-
 // ---------------------------------------------------------------------------
 // Setup
 // ---------------------------------------------------------------------------

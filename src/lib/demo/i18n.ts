@@ -7,9 +7,9 @@ const dict = {
   'demo.sampleArticle': { ja: 'サンプル記事', en: 'Sample Article', zh: '示例文章' },
   'demo.sampleArticleBody': { ja: 'これはデモ用のサンプル記事です。', en: 'This is a sample article generated for the demo.', zh: '这是为演示生成的示例文章。' },
   'demo.chatReply': {
-    ja: 'こんにちは！これは Oksskolten のデモ版です。\n\nチャット機能では、記事の内容について AI に質問したり、要約を依頼したりできます。セルフホスト版では以下のプロバイダーが利用可能です：\n\n- **Anthropic** (Claude)\n- **Google** (Gemini)\n- **OpenAI** (GPT)\n\n`docker compose up` で簡単にセットアップできます。ぜひお試しください！',
-    en: 'Hi there! This is a demo of Oksskolten.\n\nThe chat feature lets you ask AI questions about articles, request summaries, and explore your reading list conversationally. In the self-hosted version, you can connect:\n\n- **Anthropic** (Claude)\n- **Google** (Gemini)\n- **OpenAI** (GPT)\n\nGet started with `docker compose up`. Give it a try!',
-    zh: '你好！这是 Oksskolten 的演示版。\n\n聊天功能可以让您就文章内容向 AI 提问、请求摘要，并以对话方式探索阅读列表。在自托管版本中，您可以连接：\n\n- **Anthropic** (Claude)\n- **Google** (Gemini)\n- **OpenAI** (GPT)\n\n使用 `docker compose up` 即可快速部署。欢迎试用！',
+    ja: 'こんにちは！これは Oksskolten のデモ版です。\n\nチャット機能では、記事の内容について AI に質問したり、要約を依頼したりできます。セルフホスト版では OpenRouter の API キー 1 つで各社のモデルを利用できます。\n\n`docker compose up` で簡単にセットアップできます。ぜひお試しください！',
+    en: 'Hi there! This is a demo of Oksskolten.\n\nThe chat feature lets you ask AI questions about articles, request summaries, and explore your reading list conversationally. In the self-hosted version, a single OpenRouter API key gives you models from every major vendor.\n\nGet started with `docker compose up`. Give it a try!',
+    zh: '你好！这是 Oksskolten 的演示版。\n\n聊天功能可以让您就文章内容向 AI 提问、请求摘要，并以对话方式探索阅读列表。在自托管版本中，只需一个 OpenRouter API 密钥即可使用各大厂商的模型。\n\n使用 `docker compose up` 即可快速部署。欢迎试用！',
   },
   'demo.chatReply.recommend': {
     ja: '今日のおすすめはこちらです！\n\n1. [Allocation Optimizations in Go](/go.dev/blog/allocation-optimizations) — Go 1.26 のエスケープ解析の改善でヒープ割り当てが大幅に減少。パフォーマンスに興味があるなら必読です\n2. [Streaming AI Inference on Workers](/blog.cloudflare.com/workers-ai-streaming) — Cloudflare Workers で AI 推論をストリーミング実行する方法。エッジコンピューティングの最前線\n3. [What does it take to ship Rust in safety-critical?](/blog.rust-lang.org/2026/01/14/what-does-it-take-to-ship-rust-in-safety-critical/) — 安全性が求められる領域で Rust を使うための課題と取り組み\n\nどれも読み応えがありますよ。気になる記事があればクリックして詳細を見てみてください！',
@@ -37,14 +37,14 @@ const dict = {
     zh: '这是您的每周摘要：\n\n## Go\n- [Go 1.26 发布](/go.dev/blog/go1.26) — 逃逸分析优化和假时间测试功能\n- [实验性 JSON v2 包](/go.dev/blog/jsonv2-exp) 发布\n\n## Cloudflare\n- [欢迎来到 AI 周 2025](/blog.cloudflare.com/welcome-to-ai-week-2025) — Workers 上的流式 AI 推理\n- [Cloudflare 故障：2026 年 2 月 20 日](/blog.cloudflare.com/cloudflare-outage-february-20-2026) — 事后分析已发布\n\n## Kubernetes\n- [Kubernetes v1.35 抢先看](/kubernetes.io/blog/2025/11/26/kubernetes-v1-35-sneak-peek) — 可变 PV 节点亲和性等\n- [Ingress-NGINX 退役计划](/kubernetes.io/blog/2025/11/11/ingress-nginx-retirement) 发布\n\n## Rust\n- [Rust 1.92.0 发布](/blog.rust-lang.org/2025/12/11/Rust-1.92.0)\n- [在安全关键领域使用 Rust 需要什么？](/blog.rust-lang.org/2026/01/14/what-does-it-take-to-ship-rust-in-safety-critical/) 引发关注\n\n## 其他\n- [Deno Deploy 正式发布](/deno.com/blog/deno-deploy-is-ga)\n- [Tailscale Services](/tailscale.com/blog/services-ga) 和 [Peer Relays](/tailscale.com/blog/peer-relays-ga) 均已 GA\n\n忙碌的一周！',
   },
   'demo.summaryReply': {
-    ja: 'これはデモ版のため、実際の AI 要約は生成されません。セルフホスト版では Anthropic / Gemini / OpenAI を使ってワンクリックで記事を要約できます。',
-    en: 'This is a demo, so actual AI summaries are not generated. In the self-hosted version, you can summarize articles with one click using Anthropic, Gemini, or OpenAI.',
-    zh: '这是演示版，不会生成实际的 AI 摘要。在自托管版本中，您可以使用 Anthropic、Gemini 或 OpenAI 一键摘要文章。',
+    ja: 'これはデモ版のため、実際の AI 要約は生成されません。セルフホスト版では OpenRouter 経由の任意のモデルでワンクリックで記事を要約できます。',
+    en: 'This is a demo, so actual AI summaries are not generated. In the self-hosted version, you can summarize articles with one click using any model available through OpenRouter.',
+    zh: '这是演示版，不会生成实际的 AI 摘要。在自托管版本中，您可以通过 OpenRouter 使用任意模型一键摘要文章。',
   },
   'demo.translateReply': {
-    ja: 'これはデモ版のため、実際の AI 翻訳は生成されません。セルフホスト版では 6 つの翻訳エンジン（Anthropic / Gemini / OpenAI / DeepL / Google Translate）から選択できます。',
-    en: 'This is a demo, so actual AI translations are not generated. In the self-hosted version, you can choose from 6 translation engines including Anthropic, Gemini, OpenAI, DeepL, and Google Translate.',
-    zh: '这是演示版，不会生成实际的 AI 翻译。在自托管版本中，您可以从 6 种翻译引擎中选择：Anthropic、Gemini、OpenAI、DeepL 和 Google 翻译。',
+    ja: 'これはデモ版のため、実際の AI 翻訳は生成されません。セルフホスト版では OpenRouter 経由の任意のモデルで翻訳できます。',
+    en: 'This is a demo, so actual AI translations are not generated. In the self-hosted version, you can translate with any model available through OpenRouter.',
+    zh: '这是演示版，不会生成实际的 AI 翻译。在自托管版本中，您可以通过 OpenRouter 使用任意模型进行翻译。',
   },
 } as const
 

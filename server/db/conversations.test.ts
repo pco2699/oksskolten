@@ -217,7 +217,7 @@ describe('ChatMessages', () => {
     expect(updated!.updated_at).toBeDefined()
   })
 
-  it('stores Anthropic messages format with tool_use', () => {
+  it('stores content blocks with tool_use', () => {
     createConversation({ id: 'conv-1' })
 
     // Simulate a full turn
@@ -253,7 +253,7 @@ describe('ChatMessages', () => {
     const messages = getChatMessages('conv-1')
     expect(messages).toHaveLength(4)
 
-    // Verify messages can be reconstructed for Anthropic API
+    // Verify messages can be reconstructed for the chat adapter
     const apiMessages = messages.map(m => ({
       role: m.role,
       content: JSON.parse(m.content),

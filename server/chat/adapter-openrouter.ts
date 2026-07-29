@@ -1,14 +1,13 @@
 import type OpenAI from 'openai'
 import type { Message, ContentBlock, TextBlock, ToolUseBlock, ToolResultBlock } from './types.js'
-import { getOpenAIClient } from '../providers/llm/openai.js'
-import { getSetting } from '../db.js'
+import { getOpenRouterClient, getOpenRouterApiKey } from '../providers/llm/openrouter.js'
 import { toOpenAITools } from './tools.js'
 import type { ChatTurnParams, RunChatTurnResult } from './adapter.js'
 import { runToolLoop, CHAT_MAX_TOKENS } from './tool-loop.js'
 
 // --- Neutral → OpenAI message conversion ---
 
-function convertMessagesToOpenAI(
+function convertMessagesToChatCompletions(
   messages: Message[],
   system: string,
 ): OpenAI.ChatCompletionMessageParam[] {
@@ -86,17 +85,17 @@ function convertResponseToNeutral(
   return content
 }
 
-export async function runOpenAITurn(params: ChatTurnParams, externalClient?: OpenAI): Promise<RunChatTurnResult> {
-  if (!externalClient && !getSetting('api_key.openai')) {
-    throw new Error('OPENAI_KEY_NOT_SET')
+export async function runOpenRouterTurn(params: ChatTurnParams, externalClient?: OpenAI): Promise<RunChatTurnResult> {
+  if (!externalClient && !getOpenRouterApiKey()) {
+    throw new Error('OPENROUTER_KEY_NOT_SET')
   }
 
   const { system, model } = params
-  const client = externalClient ?? getOpenAIClient()
+  const client = externalClient ?? getOpenRouterClient()
   const tools = toOpenAITools()
 
   return runToolLoop(params, async (allMessages, onEvent) => {
-    const openaiMessages = convertMessagesToOpenAI(allMessages, system)
+    const openaiMessages = convertMessagesToChatCompletions(allMessages, system)
 
     const stream = await client.chat.completions.create({
       model,

@@ -23,10 +23,6 @@ vi.mock('../fetcher.js', async () => {
   }
 })
 
-vi.mock('../anthropic.js', () => ({
-  anthropic: { messages: { stream: vi.fn(), create: vi.fn() } },
-}))
-
 // ---------------------------------------------------------------------------
 // Setup
 // ---------------------------------------------------------------------------
@@ -40,250 +36,42 @@ beforeEach(async () => {
 })
 
 // =========================================================================
-// Provider-model consistency validation
+// Model preferences
 // =========================================================================
 
-describe('PATCH /api/settings/preferences — provider-model validation', () => {
-  it('accepts valid anthropic provider and model', async () => {
-    const res = await app.inject({
-      method: 'PATCH',
-      url: '/api/settings/preferences',
-      headers: json,
-      payload: {
-        'chat.provider': 'anthropic',
-        'chat.model': 'claude-haiku-4-5-20251001',
-      },
-    })
-    expect(res.statusCode).toBe(200)
-    expect(res.json()['chat.provider']).toBe('anthropic')
-    expect(res.json()['chat.model']).toBe('claude-haiku-4-5-20251001')
-  })
-
-  it('accepts valid gemini provider and model', async () => {
-    const res = await app.inject({
-      method: 'PATCH',
-      url: '/api/settings/preferences',
-      headers: json,
-      payload: {
-        'chat.provider': 'gemini',
-        'chat.model': 'gemini-2.5-flash',
-      },
-    })
-    expect(res.statusCode).toBe(200)
-    expect(res.json()['chat.provider']).toBe('gemini')
-  })
-
-  it('accepts valid openai provider and model', async () => {
-    const res = await app.inject({
-      method: 'PATCH',
-      url: '/api/settings/preferences',
-      headers: json,
-      payload: {
-        'summary.provider': 'openai',
-        'summary.model': 'gpt-4.1-mini',
-      },
-    })
-    expect(res.statusCode).toBe(200)
-  })
-
-  it('rejects model that does not belong to provider', async () => {
-    const res = await app.inject({
-      method: 'PATCH',
-      url: '/api/settings/preferences',
-      headers: json,
-      payload: {
-        'chat.provider': 'anthropic',
-        'chat.model': 'gpt-4o',  // OpenAI model, not valid for anthropic
-      },
-    })
-    expect(res.statusCode).toBe(400)
-    expect(res.json().error).toMatch(/not valid for provider/)
-  })
-
-  it('rejects gemini model with anthropic provider', async () => {
-    const res = await app.inject({
-      method: 'PATCH',
-      url: '/api/settings/preferences',
-      headers: json,
-      payload: {
-        'translate.provider': 'anthropic',
-        'translate.model': 'gemini-2.5-flash',
-      },
-    })
-    expect(res.statusCode).toBe(400)
-    expect(res.json().error).toMatch(/not valid for provider/)
-  })
-
-  it('validates against existing provider when only model is sent', async () => {
-    // Set up: anthropic provider already saved
-    upsertSetting('chat.provider', 'anthropic')
-
-    const res = await app.inject({
-      method: 'PATCH',
-      url: '/api/settings/preferences',
-      headers: json,
-      payload: {
-        'chat.model': 'gpt-4o',  // Doesn't match existing provider
-      },
-    })
-    expect(res.statusCode).toBe(400)
-    expect(res.json().error).toMatch(/not valid for provider/)
-  })
-
-  it('validates against existing model when only provider is sent', async () => {
-    // Set up: openai model already saved
-    upsertSetting('chat.model', 'gpt-4o')
-
-    const res = await app.inject({
-      method: 'PATCH',
-      url: '/api/settings/preferences',
-      headers: json,
-      payload: {
-        'chat.provider': 'anthropic',  // Doesn't match existing model
-      },
-    })
-    expect(res.statusCode).toBe(400)
-    expect(res.json().error).toMatch(/not valid for provider/)
-  })
-
-  it('claude-code provider accepts anthropic model IDs', async () => {
-    const res = await app.inject({
-      method: 'PATCH',
-      url: '/api/settings/preferences',
-      headers: json,
-      payload: {
-        'chat.provider': 'claude-code',
-        'chat.model': 'claude-haiku-4-5-20251001',
-      },
-    })
-    expect(res.statusCode).toBe(200)
-    expect(res.json()['chat.provider']).toBe('claude-code')
-  })
-
-  it('claude-code provider rejects non-anthropic model', async () => {
-    const res = await app.inject({
-      method: 'PATCH',
-      url: '/api/settings/preferences',
-      headers: json,
-      payload: {
-        'chat.provider': 'claude-code',
-        'chat.model': 'gpt-4o',
-      },
-    })
-    expect(res.statusCode).toBe(400)
-    expect(res.json().error).toMatch(/not valid for provider/)
-  })
-
-  it('validates all three provider-model pairs independently', async () => {
-    // Valid chat pair, invalid summary pair
-    const res = await app.inject({
-      method: 'PATCH',
-      url: '/api/settings/preferences',
-      headers: json,
-      payload: {
-        'chat.provider': 'anthropic',
-        'chat.model': 'claude-haiku-4-5-20251001',
-        'summary.provider': 'gemini',
-        'summary.model': 'gpt-4o',  // Wrong: openai model with gemini provider
-      },
-    })
-    expect(res.statusCode).toBe(400)
-    expect(res.json().error).toMatch(/not valid for provider/)
-  })
-
-  it('skips validation when provider or model is empty', async () => {
-    // Only set provider without model — should pass (no model to validate against)
-    const res = await app.inject({
-      method: 'PATCH',
-      url: '/api/settings/preferences',
-      headers: json,
-      payload: {
-        'chat.provider': 'gemini',
-      },
-    })
-    expect(res.statusCode).toBe(200)
-  })
-})
-
-// =========================================================================
-// AI provider enum validation
-// =========================================================================
-
-describe('PATCH /api/settings/preferences — AI provider/model enums', () => {
-  it('rejects invalid provider value', async () => {
-    const res = await app.inject({
-      method: 'PATCH',
-      url: '/api/settings/preferences',
-      headers: json,
-      payload: { 'chat.provider': 'llama' },
-    })
-    expect(res.statusCode).toBe(400)
-    expect(res.json().error).toMatch(/chat\.provider/)
-  })
-
-  it('rejects invalid model value when provider is set', async () => {
-    upsertSetting('chat.provider', 'anthropic')
-    const res = await app.inject({
-      method: 'PATCH',
-      url: '/api/settings/preferences',
-      headers: json,
-      payload: { 'chat.model': 'nonexistent-model-9000' },
-    })
-    expect(res.statusCode).toBe(400)
-    expect(res.json().error).toMatch(/not valid for provider/)
-  })
-
-  it('accepts all four valid provider values for chat', async () => {
-    for (const provider of ['anthropic', 'gemini', 'openai', 'claude-code']) {
+describe('PATCH /api/settings/preferences — model keys', () => {
+  it('accepts any OpenRouter model id', async () => {
+    for (const key of ['chat.model', 'summary.model', 'translate.model']) {
       const res = await app.inject({
         method: 'PATCH',
         url: '/api/settings/preferences',
         headers: json,
-        payload: { 'chat.provider': provider },
+        payload: { [key]: 'deepseek/deepseek-v4-flash' },
       })
       expect(res.statusCode).toBe(200)
+      expect(getSetting(key)).toBe('deepseek/deepseek-v4-flash')
     }
   })
 
-  it('accepts translate-only providers (google-translate, deepl) for translate.provider', async () => {
-    for (const provider of ['google-translate', 'deepl']) {
-      const res = await app.inject({
-        method: 'PATCH',
-        url: '/api/settings/preferences',
-        headers: json,
-        payload: { 'translate.provider': provider },
-      })
-      expect(res.statusCode).toBe(200)
-      expect(res.json()['translate.provider']).toBe(provider)
-    }
+  it('accepts a model id that is not in any catalog', async () => {
+    const res = await app.inject({
+      method: 'PATCH',
+      url: '/api/settings/preferences',
+      headers: json,
+      payload: { 'chat.model': 'some-vendor/model-released-tomorrow' },
+    })
+    expect(res.statusCode).toBe(200)
   })
 
-  it('rejects translate-only providers for chat/summary', async () => {
-    for (const provider of ['google-translate', 'deepl']) {
-      const res = await app.inject({
-        method: 'PATCH',
-        url: '/api/settings/preferences',
-        headers: json,
-        payload: { 'chat.provider': provider },
-      })
-      expect(res.statusCode).toBe(400)
-    }
-  })
-
-  it('skips model validation for google-translate and deepl providers', async () => {
-    // Set a model that would fail validation for LLM providers
-    upsertSetting('translate.model', 'gpt-4o')
-
-    for (const provider of ['google-translate', 'deepl']) {
-      const res = await app.inject({
-        method: 'PATCH',
-        url: '/api/settings/preferences',
-        headers: json,
-        payload: { 'translate.provider': provider },
-      })
-      // Should pass because model validation is skipped for these providers
-      expect(res.statusCode).toBe(200)
-    }
+  it('ignores provider keys, which no longer exist', async () => {
+    const res = await app.inject({
+      method: 'PATCH',
+      url: '/api/settings/preferences',
+      headers: json,
+      payload: { 'chat.provider': 'anthropic' },
+    })
+    expect(res.statusCode).toBe(400)
+    expect(getSetting('chat.provider')).toBeUndefined()
   })
 })
 
@@ -303,17 +91,15 @@ describe('POST /api/settings/preferences', () => {
     expect(res.json()['reading.date_mode']).toBe('absolute')
   })
 
-  it('validates provider-model consistency via POST', async () => {
+  it('saves a model id via POST', async () => {
     const res = await app.inject({
       method: 'POST',
       url: '/api/settings/preferences',
       headers: json,
-      payload: {
-        'chat.provider': 'gemini',
-        'chat.model': 'claude-haiku-4-5-20251001',  // Wrong provider
-      },
+      payload: { 'chat.model': 'anthropic/claude-haiku-4.5' },
     })
-    expect(res.statusCode).toBe(400)
+    expect(res.statusCode).toBe(200)
+    expect(res.json()['chat.model']).toBe('anthropic/claude-haiku-4.5')
   })
 })
 
@@ -475,18 +261,18 @@ describe('GET /api/settings/api-keys/:provider', () => {
   it('returns configured=false when no key set', async () => {
     const res = await app.inject({
       method: 'GET',
-      url: '/api/settings/api-keys/anthropic',
+      url: '/api/settings/api-keys/openrouter',
     })
     expect(res.statusCode).toBe(200)
     expect(res.json().configured).toBe(false)
   })
 
   it('returns configured=true when key is set', async () => {
-    upsertSetting('api_key.anthropic', 'sk-test')
+    upsertSetting('api_key.openrouter', 'sk-or-v1-test')
 
     const res = await app.inject({
       method: 'GET',
-      url: '/api/settings/api-keys/anthropic',
+      url: '/api/settings/api-keys/openrouter',
     })
     expect(res.statusCode).toBe(200)
     expect(res.json().configured).toBe(true)
@@ -501,13 +287,13 @@ describe('GET /api/settings/api-keys/:provider', () => {
     expect(res.json().error).toContain('Unknown provider')
   })
 
-  it('works for all known providers', async () => {
-    for (const provider of ['anthropic', 'gemini', 'openai']) {
+  it('returns 400 for providers that were removed', async () => {
+    for (const provider of ['anthropic', 'gemini', 'openai', 'ollama', 'vllm', 'deepl']) {
       const res = await app.inject({
         method: 'GET',
         url: `/api/settings/api-keys/${provider}`,
       })
-      expect(res.statusCode).toBe(200)
+      expect(res.statusCode).toBe(400)
     }
   })
 })
@@ -516,35 +302,35 @@ describe('POST /api/settings/api-keys/:provider', () => {
   it('saves API key', async () => {
     const res = await app.inject({
       method: 'POST',
-      url: '/api/settings/api-keys/anthropic',
+      url: '/api/settings/api-keys/openrouter',
       headers: json,
       payload: { apiKey: 'sk-new-key' },
     })
     expect(res.statusCode).toBe(200)
     expect(res.json().configured).toBe(true)
-    expect(getSetting('api_key.anthropic')).toBe('sk-new-key')
+    expect(getSetting('api_key.openrouter')).toBe('sk-new-key')
   })
 
   it('deletes API key when empty', async () => {
-    upsertSetting('api_key.anthropic', 'sk-old')
+    upsertSetting('api_key.openrouter', 'sk-or-v1-old')
 
     const res = await app.inject({
       method: 'POST',
-      url: '/api/settings/api-keys/anthropic',
+      url: '/api/settings/api-keys/openrouter',
       headers: json,
       payload: { apiKey: '' },
     })
     expect(res.statusCode).toBe(200)
     expect(res.json().configured).toBe(false)
-    expect(getSetting('api_key.anthropic')).toBeUndefined()
+    expect(getSetting('api_key.openrouter')).toBeUndefined()
   })
 
   it('deletes API key when missing', async () => {
-    upsertSetting('api_key.gemini', 'old-key')
+    upsertSetting('api_key.openrouter', 'old-key')
 
     const res = await app.inject({
       method: 'POST',
-      url: '/api/settings/api-keys/gemini',
+      url: '/api/settings/api-keys/openrouter',
       headers: json,
       payload: {},
     })
@@ -555,11 +341,11 @@ describe('POST /api/settings/api-keys/:provider', () => {
   it('trims whitespace from key', async () => {
     await app.inject({
       method: 'POST',
-      url: '/api/settings/api-keys/openai',
+      url: '/api/settings/api-keys/openrouter',
       headers: json,
       payload: { apiKey: '  sk-trimmed  ' },
     })
-    expect(getSetting('api_key.openai')).toBe('sk-trimmed')
+    expect(getSetting('api_key.openrouter')).toBe('sk-trimmed')
   })
 
   it('returns 400 for unknown provider', async () => {
@@ -769,31 +555,30 @@ describe('PATCH /api/settings/preferences — AI max tokens validation', () => {
   })
 })
 
-describe('vLLM endpoints', () => {
-  it('GET /api/settings/vllm/status returns connection failed when unreachable', async () => {
-    const mockFetch = vi.fn().mockRejectedValue(new Error('fetch failed'))
-    vi.stubGlobal('fetch', mockFetch)
+describe('OpenRouter endpoints', () => {
+  it('GET /api/settings/openrouter/status reports failure when OpenRouter is unreachable', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('Connection refused')))
 
     const res = await app.inject({
       method: 'GET',
-      url: '/api/settings/vllm/status',
+      url: '/api/settings/openrouter/status',
     })
     expect(res.statusCode).toBe(200)
     const body = res.json()
     expect(body.ok).toBe(false)
-    expect(body.error).toBe('fetch failed')
+    expect(body.error).toBeTruthy()
+    vi.unstubAllGlobals()
   })
 
-  it('PATCH /api/settings/preferences updates vllm.base_url', async () => {
+  it('GET /api/settings/openrouter/models returns an empty list when unreachable', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('Connection refused')))
+
     const res = await app.inject({
-      method: 'PATCH',
-      url: '/api/settings/preferences',
-      headers: json,
-      payload: { 'vllm.base_url': 'http://vllm:8000' },
+      method: 'GET',
+      url: '/api/settings/openrouter/models',
     })
     expect(res.statusCode).toBe(200)
-    const { getSetting } = await import('../db.js')
-    expect(getSetting('vllm.base_url')).toBe('http://vllm:8000')
+    expect(res.json().models).toEqual([])
+    vi.unstubAllGlobals()
   })
 })
-

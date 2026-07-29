@@ -894,19 +894,16 @@ Unset items are `null`.
 | `appearance.font_family` | Any string (font name). Empty string to delete |
 | `appearance.list_layout` | `"list"` / `"card"` / `"magazine"` / `"compact"` |
 | `appearance.mascot` | `"off"` / `"dream-puff"` / `"sleepy-giant"` |
-| `chat.provider` | `"anthropic"` / `"gemini"` / `"openai"` / `"claude-code"` |
-| `chat.model` | Model ID depending on the provider |
-| `summary.provider` | `"anthropic"` / `"gemini"` / `"openai"` / `"claude-code"` |
-| `summary.model` | Model ID depending on the provider |
+| `chat.model` | OpenRouter model ID (e.g. `"deepseek/deepseek-v4-flash"`). Any string — the catalog is not a fixed list |
+| `summary.model` | OpenRouter model ID |
 | `summary.max_tokens` | Positive integer 1-200000 (max output tokens for summarization; default 2048). Empty string to delete |
-| `translate.provider` | `"anthropic"` / `"gemini"` / `"openai"` / `"claude-code"` / `"google-translate"` / `"deepl"` |
-| `translate.model` | Model ID depending on the provider (not needed for google-translate / deepl) |
+| `translate.model` | OpenRouter model ID |
 | `translate.max_tokens` | Positive integer 1-200000 (max output tokens for translation; default 16384). Empty string to delete |
 
 
 **GET /api/settings/api-keys/:provider** — Check API key configuration status (auth required)
 
-`provider` must be one of `anthropic`, `gemini`, `openai`, `google-translate`, `deepl`.
+`provider` must be `openrouter`, the only provider. Returns `400` for anything else.
 
 ```json
 // Response: 200
@@ -930,18 +927,33 @@ If `apiKey` is an empty string or omitted, the key is deleted.
 ```
 
 
-**GET /api/settings/google-translate/usage** — Google Translate monthly usage (auth required)
+**GET /api/settings/openrouter/models** — OpenRouter model catalog (auth required)
+
+Served from the server's cached copy of `GET {OPENROUTER_BASE_URL}/models` (6-hour TTL). Pass `?refresh=1` to bypass the cache. Returns `{ "models": [] }` when OpenRouter is unreachable.
 
 ```json
 // Response: 200
-{ "monthlyChars": 12345, "freeTierRemaining": 487655 }
+{
+  "models": [
+    {
+      "name": "deepseek/deepseek-v4-flash",
+      "label": "DeepSeek: V4 Flash",
+      "vendor": "deepseek",
+      "pricing": [0.2, 0.8]
+    }
+  ]
+}
 ```
 
-**GET /api/settings/deepl/usage** — DeepL monthly usage (auth required)
+`pricing` is `[input $/M tokens, output $/M tokens]` and is omitted for models the catalog reports no usable price for.
+
+**GET /api/settings/openrouter/status** — Verify the stored OpenRouter API key (auth required)
 
 ```json
 // Response: 200
-{ "monthlyChars": 12345, "freeTierRemaining": 487655 }
+{ "ok": true, "model_count": 327, "label": "My Key", "limit_remaining": 4.21 }
+// or
+{ "ok": false, "error": "HTTP 401" }
 ```
 
 

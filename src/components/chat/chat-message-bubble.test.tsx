@@ -1,7 +1,16 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import { ChatMessageBubble } from './chat-message-bubble'
 import type { ChatMessage } from '../../hooks/use-chat'
+
+vi.mock('../../hooks/use-model-catalog', () => ({
+  useModelCatalog: () => ({
+    models: [
+      { name: 'anthropic/claude-haiku-4.5', label: 'Anthropic: Claude Haiku 4.5', vendor: 'anthropic', pricing: [1, 5] },
+    ],
+    isLoading: false,
+  }),
+}))
 
 describe('ChatMessageBubble', () => {
   it('renders user message as plain text bubble', () => {
@@ -43,12 +52,12 @@ describe('ChatMessageBubble', () => {
         input_tokens: 100,
         output_tokens: 50,
         elapsed_ms: 1500,
-        model: 'claude-haiku-4-5-20251001',
+        model: 'anthropic/claude-haiku-4.5',
       },
     }
     render(<ChatMessageBubble message={message} />)
     const usage = document.querySelector('.text-\\[11px\\]')!
-    expect(usage.textContent).toContain('Haiku 4.5')
+    expect(usage.textContent).toContain('Anthropic: Claude Haiku 4.5')
     expect(usage.textContent).toContain('1.5s')
     expect(usage.textContent).toContain('$')
   })
@@ -57,7 +66,7 @@ describe('ChatMessageBubble', () => {
     const message: ChatMessage = {
       role: 'assistant',
       text: 'Partial...',
-      usage: { input_tokens: 100, output_tokens: 50, elapsed_ms: 1000, model: 'claude-haiku-4-5-20251001' },
+      usage: { input_tokens: 100, output_tokens: 50, elapsed_ms: 1000, model: 'anthropic/claude-haiku-4.5' },
     }
     render(<ChatMessageBubble message={message} streaming />)
     expect(document.querySelector('.text-\\[11px\\]')).toBeNull()

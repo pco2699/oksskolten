@@ -112,11 +112,8 @@ const FilenameParams = z.object({ filename: z.string() })
 // --- Known error codes that the frontend can i18n-translate ---
 
 const KNOWN_ERROR_CODES = new Set([
-  'ANTHROPIC_KEY_NOT_SET',
-  'GEMINI_KEY_NOT_SET',
-  'OPENAI_KEY_NOT_SET',
-  'GOOGLE_TRANSLATE_KEY_NOT_SET',
-  'DEEPL_KEY_NOT_SET',
+  'OPENROUTER_KEY_NOT_SET',
+  'MODEL_NOT_SET',
   'SUMMARIZATION_FAILED',
   'TRANSLATION_FAILED',
 ])
@@ -206,7 +203,6 @@ function formatUsage(result: AiTextResult) {
     output_tokens: result.outputTokens,
     billing_mode: result.billingMode,
     model: result.model,
-    ...(result.monthlyChars != null ? { monthly_chars: result.monthlyChars } : {}),
   }
 }
 

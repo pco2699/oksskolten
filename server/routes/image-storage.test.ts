@@ -27,10 +27,6 @@ vi.mock('../fetcher.js', async () => {
   }
 })
 
-vi.mock('../anthropic.js', () => ({
-  anthropic: { messages: { stream: vi.fn(), create: vi.fn() } },
-}))
-
 vi.mock('../fetcher/ssrf.js', () => ({
   assertSafeUrl: (...args: unknown[]) => mockAssertSafeUrl(...args),
   safeFetch: vi.fn(),

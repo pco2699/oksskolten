@@ -6,11 +6,12 @@ import {
   insertArticle,
   createConversation,
   insertChatMessage,
+  upsertSetting,
 } from './db.js'
 
 // Mock the adapter
 vi.mock('./chat/adapter.js', () => ({
-  runChatTurn: vi.fn().mockImplementation(async (_backend, { messages, onEvent }) => {
+  runChatTurn: vi.fn().mockImplementation(async ({ messages, onEvent }) => {
     onEvent({ type: 'text_delta', text: 'Hello' })
     onEvent({ type: 'text_delta', text: ' there!' })
     onEvent({ type: 'done', usage: { input_tokens: 10, output_tokens: 5 } })
@@ -35,11 +36,6 @@ vi.mock('./fetcher.js', () => ({
   streamTranslateArticle: vi.fn(),
   fetchProgress: { on: vi.fn(), off: vi.fn(), emit: vi.fn() },
   getFeedState: vi.fn(),
-}))
-
-// Mock anthropic (needed by tools.ts)
-vi.mock('./anthropic.js', () => ({
-  anthropic: { messages: { stream: vi.fn(), create: vi.fn() } },
 }))
 
 let app: Awaited<ReturnType<typeof buildApp>>
@@ -68,6 +64,8 @@ async function getAuthToken(): Promise<string> {
 beforeEach(async () => {
   setupTestDb()
   app = await buildApp()
+  // Chat requires a configured model; OpenRouter has no default
+  upsertSetting('chat.model', 'anthropic/claude-haiku-4.5')
 })
 
 describe('Chat API', () => {

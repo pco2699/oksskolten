@@ -24,7 +24,7 @@ describe('generateConversationTitle', () => {
 
     mockCreateMessage.mockResolvedValue({ text: 'Kubernetes記事の推薦', inputTokens: 50, outputTokens: 10 })
 
-    await generateConversationTitle('conv-1', 'おすすめある？', 'Kubernetes関連の記事を...', 'anthropic')
+    await generateConversationTitle('conv-1', 'おすすめある？', 'Kubernetes関連の記事を...', 'anthropic/claude-haiku-4.5')
 
     const conv = getConversationById('conv-1')
     expect(conv?.title).toBe('Kubernetes記事の推薦')
@@ -35,29 +35,29 @@ describe('generateConversationTitle', () => {
 
     mockCreateMessage.mockResolvedValue({ text: 'A'.repeat(100), inputTokens: 50, outputTokens: 10 })
 
-    await generateConversationTitle('conv-2', 'test', 'response', 'anthropic')
+    await generateConversationTitle('conv-2', 'test', 'response', 'anthropic/claude-haiku-4.5')
 
     const conv = getConversationById('conv-2')
     expect(conv?.title).toHaveLength(50)
   })
 
-  it('does nothing for unknown provider', async () => {
+  it('does nothing when no model is configured', async () => {
     createConversation({ id: 'conv-3', article_id: null })
 
-    await generateConversationTitle('conv-3', 'test', 'response', 'unknown-provider')
+    await generateConversationTitle('conv-3', 'test', 'response', '')
 
     expect(mockCreateMessage).not.toHaveBeenCalled()
   })
 
-  it('uses claude-code provider directly for claude-code', async () => {
+  it('titles with the conversation model', async () => {
     createConversation({ id: 'conv-4', article_id: null })
 
     mockCreateMessage.mockResolvedValue({ text: 'タイトル', inputTokens: 50, outputTokens: 10 })
 
-    await generateConversationTitle('conv-4', 'test', 'response', 'claude-code')
+    await generateConversationTitle('conv-4', 'test', 'response', 'deepseek/deepseek-v4-flash')
 
     expect(mockCreateMessage).toHaveBeenCalledWith(
-      expect.objectContaining({ model: 'claude-haiku-4-5-20251001' }),
+      expect.objectContaining({ model: 'deepseek/deepseek-v4-flash' }),
     )
   })
 
@@ -67,7 +67,7 @@ describe('generateConversationTitle', () => {
 
     mockCreateMessage.mockResolvedValue({ text: '   ', inputTokens: 50, outputTokens: 10 })
 
-    await generateConversationTitle('conv-5', 'test', 'response', 'anthropic')
+    await generateConversationTitle('conv-5', 'test', 'response', 'anthropic/claude-haiku-4.5')
 
     const conv = getConversationById('conv-5')
     expect(conv?.title).toBe('original')
@@ -79,7 +79,7 @@ describe('generateConversationTitle', () => {
 
     mockCreateMessage.mockResolvedValue({ text: 'ハー', inputTokens: 50, outputTokens: 10 })
 
-    await generateConversationTitle('conv-6', 'test', 'response', 'anthropic')
+    await generateConversationTitle('conv-6', 'test', 'response', 'anthropic/claude-haiku-4.5')
 
     const conv = getConversationById('conv-6')
     expect(conv?.title).toBe('ハーネスエンジニアリングのブログ出して。')

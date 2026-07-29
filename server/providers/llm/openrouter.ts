@@ -1,5 +1,6 @@
 import OpenAI from 'openai'
 import { getSetting } from '../../db.js'
+import type { CatalogModel } from '../../../shared/models.js'
 import type { LLMProvider, LLMMessageParams, LLMStreamResult } from './provider.js'
 
 const DEFAULT_BASE_URL = 'https://openrouter.ai/api/v1'
@@ -37,6 +38,68 @@ export function getOpenRouterClient(): OpenAI {
     },
   })
   return cachedClient
+}
+
+// --- Model catalog ---
+
+interface OpenRouterCatalogEntry {
+  id: string
+  name?: string
+  pricing?: { prompt?: string; completion?: string }
+}
+
+const CATALOG_TTL_MS = 6 * 60 * 60 * 1000
+
+let cachedCatalog: CatalogModel[] | null = null
+let cachedCatalogAt = 0
+
+/** OpenRouter prices per token as a decimal string; the UI works in $/M tokens. */
+function toPerMillion(raw: string | undefined): number | undefined {
+  if (!raw) return undefined
+  const perToken = Number(raw)
+  if (!Number.isFinite(perToken) || perToken <= 0) return undefined
+  return perToken * 1_000_000
+}
+
+export function openrouterFetch(path: string, timeoutMs = 10_000): Promise<Response> {
+  const apiKey = getOpenRouterApiKey()
+  const headers: Record<string, string> = {}
+  if (apiKey) headers['Authorization'] = `Bearer ${apiKey}`
+  return fetch(`${getOpenRouterBaseUrl()}${path}`, { headers, signal: AbortSignal.timeout(timeoutMs) })
+}
+
+/**
+ * Fetch the OpenRouter model catalog, cached in memory. The catalog is ~400 entries
+ * that change a few times a week, so a stale read is far cheaper than a fetch per view.
+ * Returns an empty list (uncached) when OpenRouter is unreachable.
+ */
+export async function getOpenRouterCatalog(force = false): Promise<CatalogModel[]> {
+  if (!force && cachedCatalog && Date.now() - cachedCatalogAt < CATALOG_TTL_MS) {
+    return cachedCatalog
+  }
+  try {
+    const res = await openrouterFetch('/models')
+    if (!res.ok) return cachedCatalog ?? []
+    const data = await res.json() as { data?: OpenRouterCatalogEntry[] }
+    const models: CatalogModel[] = (data.data || [])
+      .map(m => {
+        const input = toPerMillion(m.pricing?.prompt)
+        const output = toPerMillion(m.pricing?.completion)
+        return {
+          name: m.id,
+          label: m.name || m.id,
+          // The segment before "/" is the vendor, and groups the model picker
+          vendor: m.id.includes('/') ? m.id.split('/')[0] : 'other',
+          ...(input !== undefined && output !== undefined ? { pricing: [input, output] as [number, number] } : {}),
+        }
+      })
+      .sort((a, b) => a.name.localeCompare(b.name))
+    cachedCatalog = models
+    cachedCatalogAt = Date.now()
+    return models
+  } catch {
+    return cachedCatalog ?? []
+  }
 }
 
 function toOpenAIMessages(params: LLMMessageParams): OpenAI.ChatCompletionMessageParam[] {

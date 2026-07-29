@@ -195,7 +195,7 @@ CREATE TABLE chat_messages (
   id              INTEGER PRIMARY KEY AUTOINCREMENT,
   conversation_id TEXT NOT NULL REFERENCES conversations(id) ON DELETE CASCADE,
   role            TEXT NOT NULL CHECK (role IN ('user', 'assistant')),
-  content         TEXT NOT NULL,   -- JSON: stored as-is in Anthropic messages format
+  content         TEXT NOT NULL,   -- JSON: neutral content blocks (text / tool_use / tool_result)
   created_at      TEXT NOT NULL DEFAULT (datetime('now'))
 );
 

@@ -1,6 +1,15 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
 import { renderHook, act } from '@testing-library/react'
 import { useMetrics } from './use-metrics'
+
+const CATALOG = [
+  { name: 'anthropic/claude-haiku-4.5', label: 'Anthropic: Claude Haiku 4.5', vendor: 'anthropic', pricing: [1, 5] as [number, number] },
+  { name: 'deepseek/deepseek-v4-flash', label: 'DeepSeek: V4 Flash', vendor: 'deepseek' },
+]
+
+vi.mock('./use-model-catalog', () => ({
+  useModelCatalog: () => ({ models: CATALOG, isLoading: false }),
+}))
 
 describe('useMetrics', () => {
   it('initializes with null', () => {
@@ -39,120 +48,54 @@ describe('useMetrics', () => {
       expect(result.current.formatMetrics()).toBeNull()
     })
 
-    it('formats Anthropic model with cost', () => {
+    it('labels the model from the catalog and computes cost from its pricing', () => {
       const { result } = renderHook(() => useMetrics())
       act(() => result.current.report({
         time: 2.5,
         inputTokens: 1000,
         outputTokens: 500,
-        billingMode: 'anthropic',
-        model: 'claude-haiku-4-5-20251001',
+        billingMode: 'openrouter',
+        model: 'anthropic/claude-haiku-4.5',
       }))
 
       const text = result.current.formatMetrics()!
-      expect(text).toContain('Haiku 4.5')
+      expect(text).toContain('Anthropic: Claude Haiku 4.5')
       expect(text).toContain('2.5s')
       expect(text).toContain('1,000 input')
       expect(text).toContain('500 output')
-      expect(text).toContain('$')
+      // (1000*1 + 500*5) / 1_000_000
+      expect(text).toContain('$0.0035')
     })
 
-    it('formats claude-code billing mode', () => {
-      const { result } = renderHook(() => useMetrics())
-      act(() => result.current.report({
-        time: 1.0,
-        inputTokens: 100,
-        outputTokens: 50,
-        billingMode: 'claude-code',
-        model: 'claude-haiku-4-5-20251001',
-      }))
-
-      const text = result.current.formatMetrics()!
-      expect(text).toContain('Haiku 4.5')
-      // Should contain the claude-code usage message instead of cost
-      expect(text).not.toContain('$')
-    })
-
-    it('formats google-translate within free tier', () => {
-      const { result } = renderHook(() => useMetrics())
-      act(() => result.current.report({
-        time: 0.5,
-        inputTokens: 200,
-        outputTokens: 0,
-        billingMode: 'google-translate',
-        monthlyChars: 100_000,
-      }))
-
-      const text = result.current.formatMetrics()!
-      expect(text).toContain('Google Translate')
-      expect(text).toContain('0.5s')
-      expect(text).toContain('200 chars')
-      expect(text).toContain('100K / 500K')
-    })
-
-    it('formats google-translate exceeding free tier', () => {
-      const { result } = renderHook(() => useMetrics())
-      act(() => result.current.report({
-        time: 0.8,
-        inputTokens: 5000,
-        outputTokens: 0,
-        billingMode: 'google-translate',
-        monthlyChars: 600_000,
-      }))
-
-      const text = result.current.formatMetrics()!
-      expect(text).toContain('Google Translate')
-      expect(text).toContain('$')
-      expect(text).not.toContain('500K')
-    })
-
-    it('formats deepl within free tier', () => {
-      const { result } = renderHook(() => useMetrics())
-      act(() => result.current.report({
-        time: 0.3,
-        inputTokens: 300,
-        outputTokens: 0,
-        billingMode: 'deepl',
-        monthlyChars: 200_000,
-      }))
-
-      const text = result.current.formatMetrics()!
-      expect(text).toContain('DeepL')
-      expect(text).toContain('300 chars')
-      expect(text).toContain('200K / 500K')
-    })
-
-    it('formats deepl exceeding free tier with yen', () => {
-      const { result } = renderHook(() => useMetrics())
-      act(() => result.current.report({
-        time: 0.4,
-        inputTokens: 1000,
-        outputTokens: 0,
-        billingMode: 'deepl',
-        monthlyChars: 600_000,
-      }))
-
-      const text = result.current.formatMetrics()!
-      expect(text).toContain('DeepL')
-      expect(text).toContain('¥')
-    })
-
-    it('uses fallback pricing for unknown model', () => {
+    it('omits cost for a catalog model without pricing', () => {
       const { result } = renderHook(() => useMetrics())
       act(() => result.current.report({
         time: 1.0,
         inputTokens: 1000,
         outputTokens: 200,
-        model: 'unknown-model-xyz',
+        model: 'deepseek/deepseek-v4-flash',
       }))
 
       const text = result.current.formatMetrics()!
-      // Falls back to [1, 5] pricing: (1000*1 + 200*5) / 1_000_000
-      expect(text).toContain('unknown-model-xyz')
-      expect(text).toContain('$0.0020')
+      expect(text).toContain('DeepSeek: V4 Flash')
+      expect(text).not.toContain('$')
     })
 
-    it('uses empty string model when none provided', () => {
+    it('falls back to the raw id and omits cost for a model not in the catalog', () => {
+      const { result } = renderHook(() => useMetrics())
+      act(() => result.current.report({
+        time: 1.0,
+        inputTokens: 1000,
+        outputTokens: 200,
+        model: 'unknown/model-xyz',
+      }))
+
+      const text = result.current.formatMetrics()!
+      expect(text).toContain('unknown/model-xyz')
+      expect(text).not.toContain('$')
+    })
+
+    it('handles metrics with no model', () => {
       const { result } = renderHook(() => useMetrics())
       act(() => result.current.report({
         time: 1.0,
@@ -162,7 +105,7 @@ describe('useMetrics', () => {
 
       const text = result.current.formatMetrics()!
       expect(text).toContain('1.0s')
-      expect(text).toContain('$')
+      expect(text).toContain('500 input')
     })
   })
 })
