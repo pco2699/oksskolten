@@ -25,6 +25,10 @@ interface UseKeyboardNavigationOptions {
   onEscape?: () => void
   onBookmarkToggle?: (id: string) => void
   onOpenExternal?: (id: string) => void
+  /** 'm' — toggle read/unread state of the focused/current article */
+  onToggleRead?: (id: string) => void
+  /** Shift+A — mark all articles in the current list view as read */
+  onMarkAllRead?: () => void
   onNearEnd?: () => void
   enabled: boolean
   keyBindings?: KeyBindings
@@ -40,7 +44,7 @@ export function useKeyboardNavigation(options: UseKeyboardNavigationOptions) {
     if (!options.enabled) return
 
     function handleKeyDown(e: KeyboardEvent) {
-      const { items, focusedItemId, onFocusChange, onEnter, onEscape, onBookmarkToggle, onOpenExternal, onNearEnd, keyBindings } = optionsRef.current
+      const { items, focusedItemId, onFocusChange, onEnter, onEscape, onBookmarkToggle, onOpenExternal, onToggleRead, onMarkAllRead, onNearEnd, keyBindings } = optionsRef.current
       const bindings = keyBindings ?? DEFAULT_KEY_BINDINGS
 
       const target = e.target as HTMLElement
@@ -93,7 +97,10 @@ export function useKeyboardNavigation(options: UseKeyboardNavigationOptions) {
         return
       }
 
-      if (key === 'Enter' && focusedItemId && onEnter) {
+      // Feedly-style 'o' opens the focused item the same way Enter does (list view).
+      // In views that don't wire up onEnter (e.g. the article detail/overlay reader),
+      // this is a no-op, matching Feedly's toggle-close behavior closely enough.
+      if ((key === 'Enter' || key === 'o') && focusedItemId && onEnter) {
         onEnter(focusedItemId)
         return
       }
@@ -105,13 +112,25 @@ export function useKeyboardNavigation(options: UseKeyboardNavigationOptions) {
         return
       }
 
-      if (key === bindings.bookmark && focusedItemId && onBookmarkToggle) {
+      // 's' is a fixed Feedly-style alias for the configurable bookmark/save binding.
+      if ((key === bindings.bookmark || key === 's') && focusedItemId && onBookmarkToggle) {
         onBookmarkToggle(focusedItemId)
         return
       }
 
-      if (key === bindings.openExternal && focusedItemId && onOpenExternal) {
+      // 'v' is a fixed Feedly-style alias for the configurable open-external binding.
+      if ((key === bindings.openExternal || key === 'v') && focusedItemId && onOpenExternal) {
         onOpenExternal(focusedItemId)
+        return
+      }
+
+      if (key === 'm' && focusedItemId && onToggleRead) {
+        onToggleRead(focusedItemId)
+        return
+      }
+
+      if (key === 'A' && e.shiftKey && onMarkAllRead) {
+        onMarkAllRead()
         return
       }
     }

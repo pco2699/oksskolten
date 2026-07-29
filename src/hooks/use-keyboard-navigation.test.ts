@@ -449,4 +449,133 @@ describe('useKeyboardNavigation', () => {
       expect(onFocusChange).toHaveBeenCalledWith('b')
     })
   })
+
+  describe('Feedly-style fixed keys', () => {
+    it('calls onEnter when o is pressed with a focused item (list-style open)', () => {
+      const onEnter = vi.fn()
+      renderHook(() => useKeyboardNavigation({
+        items: ['a', 'b'],
+        focusedItemId: 'a',
+        onFocusChange: vi.fn(),
+        onEnter,
+        enabled: true,
+      }))
+
+      fireKey('o')
+      expect(onEnter).toHaveBeenCalledWith('a')
+    })
+
+    it('does nothing when o is pressed and onEnter is not provided (detail/overlay no-op)', () => {
+      const onEscape = vi.fn()
+      renderHook(() => useKeyboardNavigation({
+        items: ['a', 'b'],
+        focusedItemId: 'a',
+        onFocusChange: vi.fn(),
+        onEscape,
+        enabled: true,
+      }))
+
+      fireKey('o')
+      expect(onEscape).not.toHaveBeenCalled()
+    })
+
+    it('calls onOpenExternal when v is pressed with a focused item', () => {
+      const onOpenExternal = vi.fn()
+      renderHook(() => useKeyboardNavigation({
+        items: ['a', 'b'],
+        focusedItemId: 'a',
+        onFocusChange: vi.fn(),
+        onOpenExternal,
+        enabled: true,
+      }))
+
+      fireKey('v')
+      expect(onOpenExternal).toHaveBeenCalledWith('a')
+    })
+
+    it('calls onBookmarkToggle when s is pressed with a focused item', () => {
+      const onBookmarkToggle = vi.fn()
+      renderHook(() => useKeyboardNavigation({
+        items: ['a', 'b'],
+        focusedItemId: 'a',
+        onFocusChange: vi.fn(),
+        onBookmarkToggle,
+        enabled: true,
+      }))
+
+      fireKey('s')
+      expect(onBookmarkToggle).toHaveBeenCalledWith('a')
+    })
+
+    it('calls onToggleRead when m is pressed with a focused item', () => {
+      const onToggleRead = vi.fn()
+      renderHook(() => useKeyboardNavigation({
+        items: ['a', 'b'],
+        focusedItemId: 'a',
+        onFocusChange: vi.fn(),
+        onToggleRead,
+        enabled: true,
+      }))
+
+      fireKey('m')
+      expect(onToggleRead).toHaveBeenCalledWith('a')
+    })
+
+    it('does not call onToggleRead when no item is focused', () => {
+      const onToggleRead = vi.fn()
+      renderHook(() => useKeyboardNavigation({
+        items: ['a', 'b'],
+        focusedItemId: null,
+        onFocusChange: vi.fn(),
+        onToggleRead,
+        enabled: true,
+      }))
+
+      fireKey('m')
+      expect(onToggleRead).not.toHaveBeenCalled()
+    })
+
+    it('calls onMarkAllRead when Shift+A is pressed', () => {
+      const onMarkAllRead = vi.fn()
+      renderHook(() => useKeyboardNavigation({
+        items: ['a', 'b'],
+        focusedItemId: null,
+        onFocusChange: vi.fn(),
+        onMarkAllRead,
+        enabled: true,
+      }))
+
+      fireKey('A', { shiftKey: true })
+      expect(onMarkAllRead).toHaveBeenCalledOnce()
+    })
+
+    it('does not call onMarkAllRead for a plain a keypress', () => {
+      const onMarkAllRead = vi.fn()
+      renderHook(() => useKeyboardNavigation({
+        items: ['a', 'b'],
+        focusedItemId: null,
+        onFocusChange: vi.fn(),
+        onMarkAllRead,
+        enabled: true,
+      }))
+
+      fireKey('a')
+      expect(onMarkAllRead).not.toHaveBeenCalled()
+    })
+
+    it('does not break existing custom bookmark binding of m when onToggleRead is absent', () => {
+      const onBookmarkToggle = vi.fn()
+      renderHook(() => useKeyboardNavigation({
+        items: ['a', 'b'],
+        focusedItemId: 'a',
+        onFocusChange: vi.fn(),
+        onBookmarkToggle,
+        enabled: true,
+        keyBindings: { next: 'n', prev: 'p', bookmark: 'm', openExternal: 'o' },
+      }))
+
+      fireKey('m')
+      expect(onBookmarkToggle).toHaveBeenCalledWith('a')
+    })
+  })
 })

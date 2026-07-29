@@ -12,6 +12,7 @@ import { useSwipeDrawer } from './hooks/use-swipe-drawer'
 import { Header } from './components/layout/header'
 import { ArticleList, type ArticleListHandle } from './components/article/article-list'
 import { ArticleDetail } from './components/article/article-detail'
+import { ArticleNavArrows } from './components/article/article-nav-arrows'
 import { ArticleRawPage } from './components/article/article-raw-page'
 import { PageLayout } from './components/layout/page-layout'
 import { KeyboardNavigationProvider, useKeyboardNavigationContext } from './contexts/keyboard-navigation-context'
@@ -24,6 +25,8 @@ import { HintBanner } from './components/ui/hint-banner'
 import { Toaster } from 'sonner'
 import { FetchProgressProvider } from './contexts/fetch-progress-context'
 import { TooltipProvider } from './components/ui/tooltip'
+import { KeyboardShortcutsDialog } from './components/ui/keyboard-shortcuts-dialog'
+import { useKeyboardShortcutsHelp } from './hooks/use-keyboard-shortcuts-help'
 
 export interface AppLayoutContext {
   settings: Settings
@@ -43,6 +46,12 @@ function AppLayout() {
   }, [])
 
   useSwipeDrawer(sidebarOpen, setSidebarOpen)
+
+  const [shortcutsHelpOpen, setShortcutsHelpOpen] = useState(false)
+  useKeyboardShortcutsHelp({
+    enabled: settings.keyboardNavigation === 'on',
+    onShow: () => setShortcutsHelpOpen(true),
+  })
 
   const { data: profile } = useSWR<{ language: string | null }>('/api/settings/profile', fetcher)
 
@@ -94,6 +103,11 @@ function AppLayout() {
               <Outlet context={{ settings, sidebarOpen, setSidebarOpen }} />
             </KeyboardNavigationProvider>
           </FetchProgressProvider>
+          <KeyboardShortcutsDialog
+            open={shortcutsHelpOpen}
+            onOpenChange={setShortcutsHelpOpen}
+            keyBindings={settings.keybindings}
+          />
           <Toaster
             theme="system"
             duration={5000}
@@ -236,6 +250,7 @@ function ArticleDetailPage() {
   return (
     <>
       <Header mode="detail" onBack={() => navigate(lastListUrl || '/inbox')} />
+      <ArticleNavArrows currentArticleUrl={articleUrl} variant="page" />
       <ArticleDetail articleUrl={articleUrl} enableZapNavigation />
     </>
   )

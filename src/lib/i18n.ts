@@ -155,6 +155,21 @@ const dict = {
   'article.removeLike': { ja: 'いいねを解除', en: 'Unlike', zh: '取消点赞'},
   'article.delete': { ja: '削除', en: 'Delete', zh: '删除'},
   'article.deleteConfirm': { ja: 'この記事を削除しますか？', en: 'Delete this article?', zh: '确定删除这篇文章？'},
+  'article.prevArticle': { ja: '前の記事', en: 'Previous article', zh: '上一篇文章'},
+  'article.nextArticle': { ja: '次の記事', en: 'Next article', zh: '下一篇文章'},
+  'articles.markAllReadConfirm': { ja: 'この一覧の記事をすべて既読にしますか？', en: 'Mark all articles in this view as read?', zh: '将此列表中的所有文章标记为已读？'},
+
+  // Keyboard shortcuts help
+  'shortcuts.title': { ja: 'キーボードショートカット', en: 'Keyboard Shortcuts', zh: '键盘快捷键'},
+  'shortcuts.next': { ja: '次の記事', en: 'Next article', zh: '下一篇文章'},
+  'shortcuts.prev': { ja: '前の記事', en: 'Previous article', zh: '上一篇文章'},
+  'shortcuts.open': { ja: '記事を開く', en: 'Open article', zh: '打开文章'},
+  'shortcuts.openExternal': { ja: '元記事を新しいタブで開く', en: 'Open original in new tab', zh: '在新标签页打开原文'},
+  'shortcuts.bookmark': { ja: '後で読むを切替', en: 'Toggle read later', zh: '切换稍后阅读'},
+  'shortcuts.toggleRead': { ja: '既読/未読を切替', en: 'Toggle read/unread', zh: '切换已读/未读'},
+  'shortcuts.markAllRead': { ja: 'すべて既読にする', en: 'Mark all as read', zh: '全部标为已读'},
+  'shortcuts.close': { ja: '閉じる／一覧に戻る', en: 'Close / back to list', zh: '关闭／返回列表'},
+  'shortcuts.showHelp': { ja: 'このヘルプを表示', en: 'Show this help', zh: '显示此帮助'},
 
   // AddModal (unified)
   'modal.addNew': { ja: 'はじめる', en: 'Get Started', zh: '开始使用'},

@@ -10,9 +10,10 @@ interface ArticleZapNavigationProps {
   currentArticleId: string
   onBookmarkToggle?: () => void
   onOpenExternal?: () => void
+  onToggleRead?: () => void
 }
 
-export function ArticleZapNavigation({ currentArticleId, onBookmarkToggle, onOpenExternal }: ArticleZapNavigationProps) {
+export function ArticleZapNavigation({ currentArticleId, onBookmarkToggle, onOpenExternal, onToggleRead }: ArticleZapNavigationProps) {
   const navigate = useNavigate()
   const { articleIds, articleUrls, setFocusedItemId, lastListUrl } = useKeyboardNavigationContext()
   const { settings: { keyboardNavigation, keybindings } } = useAppLayout()
@@ -27,6 +28,7 @@ export function ArticleZapNavigation({ currentArticleId, onBookmarkToggle, onOpe
     },
     onBookmarkToggle: onBookmarkToggle ? () => onBookmarkToggle() : undefined,
     onOpenExternal: onOpenExternal ? () => onOpenExternal() : undefined,
+    onToggleRead: onToggleRead ? () => onToggleRead() : undefined,
     onEscape: () => {
       void navigate(lastListUrl || '/inbox')
     },

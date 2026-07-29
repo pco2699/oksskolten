@@ -10,16 +10,19 @@ export function useArticleActions(article: ArticleDetail | undefined, articleKey
 
   const [optimisticBookmark, setOptimisticBookmark] = useState<boolean | undefined>(undefined)
   const [optimisticLiked, setOptimisticLiked] = useState<string | null | undefined>(undefined)
+  const [optimisticRead, setOptimisticRead] = useState<boolean | undefined>(undefined)
   const [archivingImages, setArchivingImages] = useState(false)
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false)
 
   const isBookmarked = optimisticBookmark !== undefined ? optimisticBookmark : !!article?.bookmarked_at
   const isLiked = optimisticLiked !== undefined ? !!optimisticLiked : !!article?.liked_at
+  const isRead = optimisticRead !== undefined ? optimisticRead : !!article?.seen_at
 
   // Reset optimistic state when article changes
   useEffect(() => {
     setOptimisticBookmark(undefined)
     setOptimisticLiked(undefined)
+    setOptimisticRead(undefined)
   }, [article?.id])
 
   const revalidateLists = useCallback(() => {
@@ -69,6 +72,23 @@ export function useArticleActions(article: ArticleDetail | undefined, articleKey
     }
   }, [article, articleKey, isLiked, globalMutate, revalidateLists])
 
+  const toggleReadState = useCallback(async () => {
+    if (!article) return
+    const next = !isRead
+    setOptimisticRead(next)
+    void globalMutate(articleKey, (current: ArticleDetail | undefined) => (
+      current ? { ...current, seen_at: next ? new Date().toISOString() : null } : current
+    ), false)
+    try {
+      await apiPatch(`/api/articles/${article.id}/seen`, { seen: next })
+      void globalMutate(articleKey)
+      revalidateLists()
+    } catch {
+      setOptimisticRead(undefined)
+      void globalMutate(articleKey)
+    }
+  }, [article, articleKey, isRead, globalMutate, revalidateLists])
+
   const handleArchiveImages = useCallback(async () => {
     if (!article || archivingImages) return
     setArchivingImages(true)
@@ -100,11 +120,13 @@ export function useArticleActions(article: ArticleDetail | undefined, articleKey
   return {
     isBookmarked,
     isLiked,
+    isRead,
     archivingImages,
     deleteConfirmOpen,
     setDeleteConfirmOpen,
     toggleBookmark,
     toggleLike,
+    toggleReadState,
     handleArchiveImages,
     handleDelete,
   }
