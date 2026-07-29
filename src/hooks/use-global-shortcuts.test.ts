@@ -61,7 +61,7 @@ describe('useGlobalShortcuts', () => {
 
   it('Cmd+1-5 navigates to correct routes', () => {
     setup()
-    const routes = ['/inbox', '/bookmarks', '/likes', '/history', '/chat']
+    const routes = ['/all', '/bookmarks', '/likes', '/history', '/chat']
     for (let i = 0; i < 5; i++) {
       mockNavigate.mockClear()
       fireKey(String(i + 1), { metaKey: true })

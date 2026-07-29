@@ -170,7 +170,7 @@ function OutletWrapper() {
   )
 }
 
-function renderArticleList(initialPath = '/inbox') {
+function renderArticleList(initialPath = '/all') {
   return render(
     <MemoryRouter initialEntries={[initialPath]}>
       <LocaleContext.Provider value={{ locale: 'en', setLocale: vi.fn() }}>

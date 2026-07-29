@@ -17,7 +17,7 @@ import { useAppLayout } from '../app'
 import { themes as builtinThemes } from '@/data/themes'
 import { layouts } from '@/data/layouts'
 import {
-  Inbox,
+  LayoutList,
   Bookmark,
   ThumbsUp,
   Clock,
@@ -121,9 +121,9 @@ export function CommandPalette({ open, onOpenChange, onOpenSearch, onOpenAddFeed
 
         {/* Navigation */}
         <CommandGroup heading={t('command.navigation')}>
-          <CommandItem keywords={['inbox', '/inbox', 'unread', 'new']} onSelect={() => runAction(() => navigate('/inbox'))}>
-            <Inbox className="mr-2 h-4 w-4 text-muted" />
-            Inbox
+          <CommandItem keywords={['all', '/all', 'inbox', 'unread', 'new']} onSelect={() => runAction(() => navigate('/all'))}>
+            <LayoutList className="mr-2 h-4 w-4 text-muted" />
+            {t('feeds.all')}
             <CommandShortcut>⌘1</CommandShortcut>
           </CommandItem>
           <CommandItem keywords={['bookmarks', '/bookmarks', 'saved', 'read later']} onSelect={() => runAction(() => navigate('/bookmarks'))}>

@@ -51,7 +51,7 @@ export const ArticleList = forwardRef<ArticleListHandle, object>(function Articl
   const { settings } = useAppLayout()
   const clipFeedId = useClipFeedId()
 
-  const isInbox = location.pathname === '/inbox'
+  const isAll = location.pathname === '/all'
   const isBookmarks = location.pathname === '/bookmarks'
   const isLikes = location.pathname === '/likes'
   const isHistory = location.pathname === '/history'
@@ -63,8 +63,11 @@ export const ArticleList = forwardRef<ArticleListHandle, object>(function Articl
   const currentFeed = feedId && feedsData ? feedsData.feeds.find(f => f.id === feedId) : undefined
   const categoryId = categoryIdParam ? Number(categoryIdParam) : undefined
   const [showReadArticles, setShowReadArticles] = useState(false)
-  const categoryUnreadOnly = !!categoryId && settings.categoryUnreadOnly === 'on'
-  const unreadOnly = isInbox || (categoryUnreadOnly && !showReadArticles)
+  // The "All" view behaves like a category view: it respects the
+  // categoryUnreadOnly setting and the per-view showReadArticles toggle,
+  // rather than being forced to unread-only.
+  const categoryUnreadOnly = (!!categoryId || isAll) && settings.categoryUnreadOnly === 'on'
+  const unreadOnly = categoryUnreadOnly && !showReadArticles
   const bookmarkedOnly = isBookmarks
   const likedOnly = isLikes
   const readOnly = isHistory

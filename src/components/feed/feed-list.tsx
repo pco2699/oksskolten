@@ -4,7 +4,7 @@ import useSWR from 'swr'
 import { fetcher } from '../../lib/fetcher'
 import { useI18n } from '../../lib/i18n'
 import { MD_BREAKPOINT } from '../../lib/breakpoints'
-import { Inbox, Plus, ChevronRight, Bookmark, ThumbsUp, Clock, Paperclip, Search, Command, ArrowBigUp, AlertTriangle, MessagesSquare } from 'lucide-react'
+import { LayoutList, Plus, ChevronRight, Bookmark, ThumbsUp, Clock, Paperclip, Search, Command, ArrowBigUp, AlertTriangle, MessagesSquare } from 'lucide-react'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Input } from '@/components/ui/input'
 import { useFetchProgressContext } from '../../contexts/fetch-progress-context'
@@ -65,7 +65,7 @@ export function FeedList({ isOpen, onClose, onBackdropClose, onCollapse, onMarkA
   const location = useLocation()
   const { feedId, categoryId } = useParams<{ feedId?: string; categoryId?: string }>()
   const { t } = useI18n()
-  const isInbox = location.pathname === '/inbox'
+  const isAll = location.pathname === '/all'
   const isBookmarks = location.pathname === '/bookmarks'
   const isLikes = location.pathname === '/likes'
   const isHistory = location.pathname === '/history'
@@ -183,7 +183,7 @@ export function FeedList({ isOpen, onClose, onBackdropClose, onCollapse, onMarkA
     categorized, mutateFeeds, mutateCategories, startFeedFetch, onMarkAllRead,
     onFetchComplete: handleFetchComplete,
     onDeleted: () => {
-      if (feedId || categoryId) void navigate('/inbox')
+      if (feedId || categoryId) void navigate('/all')
     },
   })
 
@@ -205,7 +205,7 @@ export function FeedList({ isOpen, onClose, onBackdropClose, onCollapse, onMarkA
     onMarkAllRead,
     onFetchComplete: handleFetchComplete,
     onDeleted: (ids) => {
-      if (feedId && ids.includes(Number(feedId))) void navigate('/inbox')
+      if (feedId && ids.includes(Number(feedId))) void navigate('/all')
     },
   })
 
@@ -218,7 +218,7 @@ export function FeedList({ isOpen, onClose, onBackdropClose, onCollapse, onMarkA
     if (id) {
       void navigate(`/feeds/${id}`)
     } else {
-      void navigate('/inbox')
+      void navigate('/all')
     }
     onClose()
   }
@@ -471,7 +471,7 @@ export function FeedList({ isOpen, onClose, onBackdropClose, onCollapse, onMarkA
         <FeedListHeader onClose={onClose} onCollapse={onCollapse} />
 
         <nav className="flex-1 overflow-y-auto overscroll-contain py-2 px-2">
-          <SidebarNavItem icon={Inbox} label={t('feeds.inbox')} selected={isInbox && selectedFeedId === null} onClick={() => { void navigate('/inbox'); onClose() }} badge={totalUnread > 0 ? <UnreadBadge count={totalUnread} /> : undefined} />
+          <SidebarNavItem icon={LayoutList} label={t('feeds.all')} selected={isAll && selectedFeedId === null} onClick={() => { void navigate('/all'); onClose() }} badge={totalUnread > 0 ? <UnreadBadge count={totalUnread} /> : undefined} />
 
           <SidebarNavItem icon={Search} label={t('search.title')} onClick={() => setSearchOpen(true)} className="group/search">
             <kbd className="hidden md:inline-flex text-[11px] text-muted bg-hover px-1.5 py-1 rounded opacity-0 group-hover/search:opacity-100 transition-opacity items-center gap-0"><span className="w-2.5 h-3 inline-flex items-center justify-center"><Command className="w-2.5 h-2.5" /></span><span className="w-3 h-3 inline-flex items-center justify-center"><ArrowBigUp className="w-2.5 h-2.5" /></span><span className="w-3 h-3 inline-flex items-center justify-center leading-none">K</span></kbd>

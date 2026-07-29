@@ -8,7 +8,7 @@ import { CommandPalette } from './command-palette'
 const mockNavigate = vi.fn()
 vi.mock('react-router-dom', () => ({
   useNavigate: () => mockNavigate,
-  useLocation: () => ({ pathname: '/inbox' }),
+  useLocation: () => ({ pathname: '/all' }),
 }))
 
 vi.mock('../lib/fetcher', () => ({
@@ -72,7 +72,7 @@ describe('CommandPalette', () => {
 
   it('renders navigation items', () => {
     render(<CommandPalette {...defaultProps} />)
-    expect(screen.getByText('Inbox')).toBeTruthy()
+    expect(screen.getByText('All')).toBeTruthy()
     expect(screen.getByText('Settings')).toBeTruthy()
   })
 
@@ -86,13 +86,13 @@ describe('CommandPalette', () => {
 
   it('navigates on selecting a navigation item', async () => {
     render(<CommandPalette {...defaultProps} />)
-    await user.click(screen.getByText('Inbox'))
+    await user.click(screen.getByText('All'))
     await waitFor(() => {
       expect(defaultProps.onOpenChange).toHaveBeenCalledWith(false)
     })
     // Navigate is called after setTimeout
     await waitFor(() => {
-      expect(mockNavigate).toHaveBeenCalledWith('/inbox')
+      expect(mockNavigate).toHaveBeenCalledWith('/all')
     }, { timeout: 500 })
   })
 
@@ -173,7 +173,7 @@ describe('CommandPalette', () => {
 
   it('does not render when closed', () => {
     render(<CommandPalette {...defaultProps} open={false} />)
-    expect(screen.queryByText('Inbox')).toBeNull()
+    expect(screen.queryByText('All')).toBeNull()
   })
 
   it('matches items by English keywords (e.g. "chat" finds Chat item)', async () => {

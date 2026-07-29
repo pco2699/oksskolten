@@ -132,7 +132,7 @@ function renderFeedList(
   props: Partial<typeof defaultProps> = {},
   feedsData?: { feeds: FeedWithCounts[]; bookmark_count: number; like_count: number; clip_feed_id: number | null },
   categoriesData?: { categories: Category[] },
-  initialPath = '/inbox',
+  initialPath = '/all',
 ) {
   const swrFallback: Record<string, unknown> = {}
   if (feedsData) swrFallback['/api/feeds'] = feedsData
@@ -162,19 +162,19 @@ describe('FeedList', () => {
     vi.clearAllMocks()
   })
 
-  it('renders nav items: Inbox, Read Later, Liked, Read', () => {
+  it('renders nav items: All, Read Later, Liked, Read', () => {
     renderFeedList(
       {},
       { feeds: [], bookmark_count: 0, like_count: 0, clip_feed_id: null },
       { categories: [] },
     )
-    expect(screen.getByText('Inbox')).toBeTruthy()
+    expect(screen.getByText('All')).toBeTruthy()
     expect(screen.getByText('Read Later')).toBeTruthy()
     expect(screen.getByText('Liked')).toBeTruthy()
     expect(screen.getByText('Read')).toBeTruthy()
   })
 
-  it('shows total unread badge on Inbox', () => {
+  it('shows total unread badge on All', () => {
     const feeds = [
       makeFeed({ id: 1, unread_count: 5 }),
       makeFeed({ id: 2, unread_count: 3 }),
@@ -241,7 +241,7 @@ describe('FeedList', () => {
       { feeds, bookmark_count: 0, like_count: 0, clip_feed_id: null },
       { categories: [] },
     )
-    // 7 appears twice: once on Inbox (total), once on Feed A
+    // 7 appears twice: once on All (total), once on Feed A
     const badges = screen.getAllByText('7')
     expect(badges.length).toBe(2)
   })
@@ -273,16 +273,16 @@ describe('FeedList', () => {
     expect(feedBtn.className).toContain('text-accent')
   })
 
-  it('navigates to inbox on Inbox click', () => {
+  it('navigates to all on All click', () => {
     renderFeedList(
       {},
       { feeds: [], bookmark_count: 0, like_count: 0, clip_feed_id: null },
       { categories: [] },
     )
-    const inboxButtons = screen.getAllByText('Inbox')
+    const allButtons = screen.getAllByText('All')
     // Click the nav button (not the header title)
-    fireEvent.click(inboxButtons[0])
-    expect(mockNavigate).toHaveBeenCalledWith('/inbox')
+    fireEvent.click(allButtons[0])
+    expect(mockNavigate).toHaveBeenCalledWith('/all')
   })
 
   it('navigates to feed on feed click', () => {
@@ -345,7 +345,7 @@ describe('FeedList', () => {
       { feeds, bookmark_count: 0, like_count: 0, clip_feed_id: null },
       { categories: [cat] },
     )
-    // Category badge shows sum = 5, Inbox badge also shows 5
+    // Category badge shows sum = 5, All badge also shows 5
     const fives = screen.getAllByText('5')
     expect(fives.length).toBeGreaterThanOrEqual(2)
   })
@@ -399,10 +399,10 @@ describe('FeedList', () => {
       { feeds, bookmark_count: 0, like_count: 0, clip_feed_id: null },
       { categories: [] },
     )
-    // Inbox badge should show 5 (only the normal feed), not 15
-    const inboxButton = screen.getByText('Inbox').closest('button')!
-    expect(inboxButton.textContent).toContain('5')
-    expect(inboxButton.textContent).not.toContain('15')
+    // All badge should show 5 (only the normal feed), not 15
+    const allButton = screen.getByText('All').closest('button')!
+    expect(allButton.textContent).toContain('5')
+    expect(allButton.textContent).not.toContain('15')
   })
 
   it('navigates to history on Read click', () => {

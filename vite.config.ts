@@ -67,7 +67,7 @@ export default defineConfig(({ mode }) => {
           background_color: '#4D6782',
           display: 'standalone',
           scope: '/',
-          start_url: '/inbox',
+          start_url: '/all',
           icons: [
             {
               src: 'pwa-64x64.png',

@@ -23,7 +23,7 @@ Clipped articles belong to a special singleton feed called the "clip feed." This
 | Count | Multiple | Singleton (only one) |
 | Article addition | Automatic via Cron | Manual by user via `POST /api/articles/from-url` |
 | Cron target | Retrieved by `getEnabledFeeds()` | Excluded (only `type = 'rss'` is retrieved) |
-| Sidebar placement | Feed list section (with categories) | Special section (alongside Inbox, Bookmarks, and Likes) |
+| Sidebar placement | Feed list section (with categories) | Special section (alongside All, Bookmarks, and Likes) |
 | Global unread count | Included | Not included |
 | Category | Can belong to one | Not allowed |
 | Smart Floor | Applied | Not applied (all saved articles always visible) |

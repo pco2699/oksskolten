@@ -389,7 +389,7 @@ In other words, `max(7 days worth, 20 items)` is the base, and if unread article
 `total` and `has_more` are based on the post-floor count. When the floor hides articles, the response includes `total_without_floor` (the unfiltered total count) so the frontend can offer a "show older articles" action. Articles with `published_at IS NULL` are always included regardless of the floor.
 
 The floor is **not applied** in:
-- Inbox (`unread=1`), Bookmarks, Likes, History views
+- All (`unread=1`), Bookmarks, Likes, History views
 - Clip feed views (saved articles should always be visible)
 - When `no_floor=1` query parameter is specified (used by the "show older articles" button)
 
