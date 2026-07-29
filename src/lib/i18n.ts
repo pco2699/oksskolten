@@ -170,6 +170,7 @@ const dict = {
   'article.deleteConfirm': { ja: 'この記事を削除しますか？', en: 'Delete this article?', zh: '确定删除这篇文章？'},
   'article.prevArticle': { ja: '前の記事', en: 'Previous article', zh: '上一篇文章'},
   'article.nextArticle': { ja: '次の記事', en: 'Next article', zh: '下一篇文章'},
+  'article.youtubePlayer': { ja: 'YouTube 動画プレーヤー', en: 'YouTube video player', zh: 'YouTube 视频播放器'},
   'articles.markAllReadConfirm': { ja: 'この一覧の記事をすべて既読にしますか？', en: 'Mark all articles in this view as read?', zh: '将此列表中的所有文章标记为已读？'},
 
   // Keyboard shortcuts help

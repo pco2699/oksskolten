@@ -27,6 +27,8 @@ import { ArticleSummarySection } from './article-summary-section'
 import { ArticleTranslationBanner } from './article-translation-banner'
 import { ArticleContentBody } from './article-content-body'
 import { ArticleSimilarBanner } from './article-similar-banner'
+import { YouTubeEmbed } from './youtube-embed'
+import { extractYouTubeVideoId } from '../../lib/youtube'
 import type { ArticleDetail as ArticleDetailData } from '../../../shared/types'
 
 interface ArticleDetailProps {
@@ -111,6 +113,8 @@ export function ArticleDetail({ articleUrl, enableZapNavigation = false }: Artic
     article?.url || articleUrl,
     internalLinks === 'on',
   )
+
+  const youtubeVideoId = useMemo(() => extractYouTubeVideoId(article?.url), [article?.url])
 
   // Event delegation: single listener on <article> handles all image clicks & errors
   const hasArticle = !!article
@@ -236,6 +240,9 @@ export function ArticleDetail({ articleUrl, enableZapNavigation = false }: Artic
         summarizeError={summarizeError}
         metricsText={metrics.metrics && !translating ? metrics.formatMetrics() : null}
       />
+
+      {/* YouTube embed */}
+      {youtubeVideoId && <YouTubeEmbed videoId={youtubeVideoId} title={article.title} />}
 
       {/* Similar articles */}
       {article.similar_count != null && article.similar_count > 0 && (

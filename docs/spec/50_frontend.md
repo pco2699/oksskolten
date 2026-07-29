@@ -146,6 +146,18 @@ Each preprocessor is a pure function `(md: string) => string`. The pipeline runs
 - `src/lib/markdown.ts` — `renderMarkdown`, `walkLinks`, preprocessors, `markedInstance`
 
 
+### YouTube Video Embed
+
+Some subscribed feeds are RSS proxies over YouTube channels (e.g. `yt.chocolatemoo53.com/watch?v=<id>`), whose articles the fetcher cannot scrape — `full_text` ends up as unusable placeholder text. When the article's original URL identifies a YouTube video, `ArticleDetail` renders an embedded player instead of relying on the scraped content.
+
+- `extractYouTubeVideoId(url)` (`src/lib/youtube.ts`) extracts the 11-character video ID from `article.url`, or returns `null`
+  - Canonical hosts (`youtube.com`, `www.youtube.com`, `m.youtube.com`, `music.youtube.com`, `youtu.be`): recognizes `/watch?v=`, `/shorts/:id`, `/embed/:id`, `/live/:id`
+  - Any other host: only `/watch?v=` is recognized (proxy/invidious-style mirrors), to limit false positives
+- `YouTubeEmbed` (`src/components/article/youtube-embed.tsx`) renders a responsive 16:9 `<iframe>` pointed at `youtube-nocookie.com`, as a real React element — not injected through the Markdown/sanitize pipeline, since `sanitizeHtml` intentionally strips iframes
+- Rendered in `ArticleDetail` right after the summary section, above the scraped `full_text` body (which may still contain a usable description)
+- The server's `Content-Security-Policy` (`server/index.ts`) allows framing via `frame-src https://www.youtube-nocookie.com`
+- Extracting video transcripts for AI features (summarize/chat) is out of scope for this feature
+
 ### Article List Display Layouts
 
 Four layout options are available for the article list. Independent from the theme (color), allowing free combination.

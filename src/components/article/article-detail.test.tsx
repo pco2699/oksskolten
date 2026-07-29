@@ -376,3 +376,97 @@ describe('ArticleDetail stale translation filtering', () => {
     expect(firstArg).toEqual({ id: 1, full_text_translated: null })
   })
 })
+
+describe('ArticleDetail YouTube embed', () => {
+  beforeEach(() => {
+    mockApiPatch.mockReset()
+    mockApiPost.mockReset()
+    mockApiPost.mockResolvedValue(undefined)
+    mockTrackRead.mockReset()
+    mockQueueSeenIds.mockClear()
+    mockUseTranslate.mockClear()
+  })
+
+  it('renders a YouTube iframe when the article url is a proxied YouTube watch link', () => {
+    const articleUrl = 'https://yt.chocolatemoo53.com/watch?v=bjFDAEeywi0'
+    const articleKey = `/api/articles/by-url?url=${encodeURIComponent(articleUrl)}`
+    const article = {
+      id: 1,
+      feed_id: 2,
+      feed_name: 'Example Feed',
+      title: 'Example Video',
+      url: articleUrl,
+      published_at: '2026-03-04T00:00:00.000Z',
+      lang: 'en',
+      summary: null,
+      full_text: 'Please complete the cap challenge...',
+      full_text_translated: null,
+      translated_lang: null,
+      seen_at: '2026-03-04T00:00:00.000Z',
+      read_at: '2026-03-04T00:00:00.000Z',
+      bookmarked_at: null,
+      liked_at: null,
+    }
+
+    const { container } = render(
+      <MemoryRouter>
+        <LocaleContext.Provider value={{ locale: 'en', setLocale: vi.fn() }}>
+          <TooltipProvider>
+            <SWRConfig value={{ provider: () => new Map(), fallback: { [articleKey]: article } }}>
+              <Routes>
+                <Route element={<OutletWrapper />}>
+                  <Route path="*" element={<ArticleDetail articleUrl={articleUrl} />} />
+                </Route>
+              </Routes>
+            </SWRConfig>
+          </TooltipProvider>
+        </LocaleContext.Provider>
+      </MemoryRouter>,
+    )
+
+    const iframe = container.querySelector('iframe')
+    expect(iframe).not.toBeNull()
+    expect(iframe?.getAttribute('src')).toBe('https://www.youtube-nocookie.com/embed/bjFDAEeywi0')
+    expect(iframe?.getAttribute('title')).toBe('Example Video')
+  })
+
+  it('does not render a YouTube iframe for a normal article', () => {
+    const articleUrl = 'https://example.com/posts/1'
+    const articleKey = `/api/articles/by-url?url=${encodeURIComponent(articleUrl)}`
+    const article = {
+      id: 1,
+      feed_id: 2,
+      feed_name: 'Example Feed',
+      title: 'Example Article',
+      url: articleUrl,
+      published_at: '2026-03-04T00:00:00.000Z',
+      lang: 'en',
+      summary: null,
+      full_text: 'Body',
+      full_text_translated: null,
+      translated_lang: null,
+      seen_at: '2026-03-04T00:00:00.000Z',
+      read_at: '2026-03-04T00:00:00.000Z',
+      bookmarked_at: null,
+      liked_at: null,
+    }
+
+    const { container } = render(
+      <MemoryRouter>
+        <LocaleContext.Provider value={{ locale: 'en', setLocale: vi.fn() }}>
+          <TooltipProvider>
+            <SWRConfig value={{ provider: () => new Map(), fallback: { [articleKey]: article } }}>
+              <Routes>
+                <Route element={<OutletWrapper />}>
+                  <Route path="*" element={<ArticleDetail articleUrl={articleUrl} />} />
+                </Route>
+              </Routes>
+            </SWRConfig>
+          </TooltipProvider>
+        </LocaleContext.Provider>
+      </MemoryRouter>,
+    )
+
+    expect(container.querySelector('iframe')).toBeNull()
+  })
+})
