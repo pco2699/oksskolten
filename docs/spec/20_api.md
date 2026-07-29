@@ -20,6 +20,7 @@ All error responses follow this format:
 | 401 | Unauthorized (login required) |
 | 403 | Forbidden (e.g., login attempt when password auth is disabled) |
 | 404 | Resource not found |
+| 405 | Method not allowed (e.g., `GET`/`DELETE /mcp` — stateless mode has no sessions) |
 | 409 | Conflict (duplicate URL) |
 | 415 | Invalid Content-Type (not application/json) |
 | 429 | Rate limit exceeded |
@@ -1123,6 +1124,17 @@ The full `key` is returned **only once** at creation time. The key has a `ok_` p
 
 Returns `404` if the token does not exist.
 
+#### MCP Endpoint (auth required)
+
+**POST /mcp** — [MCP](https://modelcontextprotocol.io) tool calls over the [Streamable HTTP transport](https://modelcontextprotocol.io/specification/2025-06-18/basic/transports), for remote clients (Claude Desktop via [`mcp-remote`](https://www.npmjs.com/package/mcp-remote), or any other Streamable HTTP-capable MCP client). Exposes the same tools as the stdio MCP server (`server/chat/mcp-server.ts`) — see [82_feature_chat.md](./82_feature_chat.md#mcp-tools) for the tool list and the `mcp-remote` config snippet.
+
+- Body: a JSON-RPC 2.0 request/notification (single or batched), per the MCP spec. `initialize` and `tools/list`/`tools/call` are the calls a client needs.
+- `Accept` header must list both `application/json` and `text/event-stream` (required by the MCP spec even though this server always answers with a plain JSON response).
+- Runs in **stateless** mode: a new server + transport is created per request, so no `Mcp-Session-Id` is issued or required.
+- Auth: same bearer token as the rest of `/api/*` (`Authorization: Bearer ok_...`) or an authenticated browser session. A `read`-scoped token can call read-only tools; write-mutating tools (`mark_as_read`, `mark_articles_as_read`, `toggle_like`, `toggle_bookmark`, `summarize_article`, `summarize_articles`, `translate_article`) additionally require `read,write` scope — calling one without it returns a normal MCP tool result with `isError: true`, not an HTTP error.
+- Not subject to the global rate limiter (only `/api/*` paths are rate-limited).
+
+**GET /mcp**, **DELETE /mcp** — Always `405`. Both only have meaning in stateful Streamable HTTP sessions (server-initiated notifications / session termination), which this stateless deployment does not use.
 
 #### Stats Endpoint
 

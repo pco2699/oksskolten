@@ -18,6 +18,7 @@ import { registerChatApi } from './chatRoutes.js'
 import { authRoutes } from './authRoutes.js'
 import { passkeyRoutes } from './passkeyRoutes.js'
 import { oauthRoutes } from './oauthRoutes.js'
+import { mcpRoutes } from './routes/mcp.js'
 import { fetchAllFeeds } from './fetcher.js'
 import { ensureSearchIndex, rebuildSearchIndex, isSearchReady, syncAllScoredArticlesToSearch } from './search/sync.js'
 
@@ -135,6 +136,9 @@ app.register(oauthRoutes)
 // Protected API routes
 registerApi(app)
 registerChatApi(app)
+
+// MCP over Streamable HTTP (bearer token auth, same mechanism as /api/*)
+app.register(mcpRoutes)
 
 // SPA static serving (production)
 const distDir = path.join(projectRoot, 'dist')

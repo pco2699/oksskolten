@@ -6,6 +6,7 @@ import { registerApi } from '../../api.js'
 import { registerChatApi } from '../../chatRoutes.js'
 import { authRoutes } from '../../authRoutes.js'
 import { passkeyRoutes } from '../../passkeyRoutes.js'
+import { mcpRoutes } from '../../routes/mcp.js'
 
 export async function buildApp() {
   const app = Fastify()
@@ -16,5 +17,6 @@ export async function buildApp() {
   await app.register(passkeyRoutes)
   registerApi(app)
   registerChatApi(app)
+  await app.register(mcpRoutes)
   return app
 }
