@@ -12,6 +12,7 @@ import {
   updateFeedError,
   updateFeedRateLimit,
   updateFeedSchedule,
+  updateFeedCacheHeaders,
 } from '../db.js'
 
 beforeEach(() => {
@@ -77,6 +78,36 @@ describe('updateFeed rss_url', () => {
 
     const updated = getFeedById(feed.id)!
     expect(updated.rss_url).toBeNull()
+  })
+
+  it('clears cache headers and error/backoff state when rss_url changes', () => {
+    const feed = seedFeed({ rss_url: 'https://example.com/feed.xml' })
+    updateFeedCacheHeaders(feed.id, 'W/"abc"', 'Wed, 01 Jan 2025 00:00:00 GMT', 'hash123')
+    updateFeedError(feed.id, 'some error')
+    updateFeedError(feed.id, 'another error') // error_count >= 3 territory not needed, just non-zero
+    updateFeedSchedule(feed.id, '2025-01-01T00:00:00Z', 3600)
+
+    updateFeed(feed.id, { rss_url: 'https://example.com/new-feed.xml' })
+
+    const updated = getFeedById(feed.id)!
+    expect(updated.rss_url).toBe('https://example.com/new-feed.xml')
+    expect(updated.etag).toBeNull()
+    expect(updated.last_modified).toBeNull()
+    expect(updated.last_content_hash).toBeNull()
+    expect(updated.last_error).toBeNull()
+    expect(updated.error_count).toBe(0)
+    expect(updated.next_check_at).toBeNull()
+  })
+
+  it('does not touch cache/error state when rss_url is set to the same value', () => {
+    const feed = seedFeed({ rss_url: 'https://example.com/feed.xml' })
+    updateFeedCacheHeaders(feed.id, 'W/"abc"', 'Wed, 01 Jan 2025 00:00:00 GMT', 'hash123')
+
+    updateFeed(feed.id, { rss_url: 'https://example.com/feed.xml' })
+
+    const updated = getFeedById(feed.id)!
+    expect(updated.etag).toBe('W/"abc"')
+    expect(updated.last_content_hash).toBe('hash123')
   })
 })
 
