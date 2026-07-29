@@ -120,7 +120,7 @@ graph TD
 
 Everything runs in a single long-lived process — SQLite needs local disk, and node-cron needs a process that stays alive. This rules out serverless/edge runtimes but keeps the stack simple: one container, no external queues or coordination. For cloud deployment, a small VM or [Fly.io + Turso](docs/guides/deploying-to-fly-io.md) works well.
 
-Oksskolten also exposes an MCP server, so Claude Code or any MCP client can search, summarize, and query your article archive without opening the app.
+Oksskolten also exposes an MCP server, so Claude Code or any MCP client can search, summarize, and query your article archive without opening the app — over stdio for local/SSH use, or over Streamable HTTP (`POST /mcp`, bearer-token authenticated) so Claude Desktop can connect to a deployed instance directly via [`mcp-remote`](https://www.npmjs.com/package/mcp-remote).
 
 > **What's in a name?** Oksskolten is the highest peak in northern Norway — a mountain of knowledge for your feeds.
 

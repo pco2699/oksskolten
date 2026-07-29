@@ -42,7 +42,8 @@ Chat runs against OpenRouter through one adapter. The same tool definitions back
 | Path | Communication | Notes |
 |---|---|---|
 | **Web chat** | Fastify → OpenRouter (`/chat/completions`, tools as function calling) | SSE streaming, up to 10 tool rounds |
-| **MCP server** | `server/chat/mcp-server.ts` over stdio | Exposes the same tools to Claude Code against the local DB |
+| **MCP server (stdio)** | `server/chat/mcp-server.ts` over stdio | Exposes the same tools to Claude Code against the local DB |
+| **MCP server (HTTP)** | `POST /mcp` (Streamable HTTP) | Same tools, for remote clients (Claude Desktop via `mcp-remote`) against the deployed instance |
 
 The model is set in the settings UI (`chat.model`); there is no backend to choose.
 
@@ -54,8 +55,12 @@ server/chat/
 ├── adapter-openrouter.ts      # OpenRouter (OpenAI-compatible) adapter
 ├── tool-loop.ts               # Shared tool execution loop
 ├── history.ts                 # Conversation history normalization/repair
-├── mcp-server.ts              # MCP server (stdio transport)
+├── mcp-factory.ts             # Shared McpServer factory (tool registration, used by both transports below)
+├── mcp-server.ts              # MCP stdio entrypoint (npx tsx server/chat/mcp-server.ts)
 └── tools.ts                   # Tool definitions (ToolDef neutral format)
+
+server/routes/
+└── mcp.ts                     # MCP Streamable HTTP endpoint (POST /mcp)
 ```
 
 ### MCP Tools
@@ -78,7 +83,7 @@ Tool definitions are managed in a neutral `ToolDef` format in `server/chat/tools
 | `summarize_article` | Summarize an article (checks cache before execution) | `{ article_id }` |
 | `translate_article` | Translate an article (checks cache before execution) | `{ article_id }` |
 
-The MCP server (`server/chat/mcp-server.ts`) starts with stdio transport when executed directly, and is connected to by Claude Code.
+The MCP server (`server/chat/mcp-server.ts`) starts with stdio transport when executed directly, and is connected to by Claude Code. Tool registration itself lives in `server/chat/mcp-factory.ts`, shared with the HTTP endpoint (`server/routes/mcp.ts`) — both transports expose the exact same tool set.
 
 ### Using the MCP Server with Claude Code
 
@@ -166,6 +171,31 @@ claude mcp add --scope user --transport stdio oksskolten \
 ```
 
 Requires SSH key authentication (password prompts break stdio).
+
+#### Option 5: Claude Desktop (or any Streamable HTTP client) via `mcp-remote`
+
+`POST /mcp` exposes the same tools over the [MCP Streamable HTTP transport](https://modelcontextprotocol.io/specification/2025-06-18/basic/transports), reachable at the deployed instance's public URL — no SSH or local Node.js checkout required. Since Claude Desktop only speaks stdio, wrap the endpoint with [`mcp-remote`](https://www.npmjs.com/package/mcp-remote):
+
+```json
+// claude_desktop_config.json
+{
+  "mcpServers": {
+    "oksskolten": {
+      "command": "npx",
+      "args": [
+        "mcp-remote",
+        "https://rss.pco2699.xyz/mcp",
+        "--header",
+        "Authorization: Bearer ok_..."
+      ]
+    }
+  }
+}
+```
+
+Create the token from Settings → Security → API Tokens (see [API Token Endpoints](./20_api.md)). A `read`-scoped token can use every read-only tool; write-mutating tools (`mark_as_read`, `mark_articles_as_read`, `toggle_like`, `toggle_bookmark`, `summarize_article`, `summarize_articles`, `translate_article`) additionally require `read,write` scope, matching the same scope model as `/api/*`.
+
+The endpoint runs in **stateless** Streamable HTTP mode: every request gets a fresh `McpServer` + transport (`sessionIdGenerator: undefined`), so there is no server-side session state to manage. `GET`/`DELETE /mcp` (server-initiated notifications / session termination in stateful mode) return `405`, since neither applies without sessions.
 
 ### OpenRouter Adapter
 
