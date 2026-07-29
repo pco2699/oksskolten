@@ -702,13 +702,14 @@ The frontend then presents the user with a choice: "Subscribe to the whole site"
 // Request (all optional, only specified fields are updated)
 {
   "name": "New Name",
+  "rss_url": "https://blog.example.com/rss/",
   "rss_bridge_url": "http://rss-bridge/?...",
   "disabled": 0,
   "category_id": 2
 }
 ```
 
-Updatable fields: `name`, `rss_bridge_url`, `disabled` (`0` or `1`), `category_id`. `url` and `rss_url` cannot be changed (ignored even if included in the request). Setting `disabled: 0` also resets `error_count` to `0` and `last_error` to `NULL`.
+Updatable fields: `name`, `rss_url`, `rss_bridge_url`, `disabled` (`0` or `1`), `category_id`. `url` (the site's homepage, used for re-detection) cannot be changed. `rss_url` must be an `http://` or `https://` URL. Setting `disabled: 0` also resets `error_count` to `0` and `last_error` to `NULL`. Changing `rss_url` to a different value also clears `etag`, `last_modified`, `last_content_hash`, `last_error`, `error_count`, and `next_check_at`, so the next fetch hits the new URL fresh instead of reusing stale conditional-GET headers or an existing error backoff schedule.
 
 ```json
 // Response: 200 (returns all feed fields)

@@ -327,6 +327,92 @@ describe('POST /api/feeds — RSS discovery pipeline', () => {
 })
 
 // ---------------------------------------------------------------------------
+// PATCH /api/feeds/:id
+// ---------------------------------------------------------------------------
+
+describe('PATCH /api/feeds/:id', () => {
+  it('updates name and rss_url', async () => {
+    const feed = seedFeed({ rss_url: 'https://example.com/feed.xml' })
+
+    const res = await app.inject({
+      method: 'PATCH',
+      url: `/api/feeds/${feed.id}`,
+      headers: json,
+      payload: { name: 'Renamed Feed', rss_url: 'https://example.com/new-feed.xml' },
+    })
+
+    expect(res.statusCode).toBe(200)
+    const body = res.json()
+    expect(body.name).toBe('Renamed Feed')
+    expect(body.rss_url).toBe('https://example.com/new-feed.xml')
+  })
+
+  it('rejects an invalid rss_url', async () => {
+    const feed = seedFeed({ rss_url: 'https://example.com/feed.xml' })
+
+    const res = await app.inject({
+      method: 'PATCH',
+      url: `/api/feeds/${feed.id}`,
+      headers: json,
+      payload: { rss_url: 'not-a-url' },
+    })
+
+    expect(res.statusCode).toBe(400)
+  })
+
+  it('clears cache headers and error state when rss_url changes', async () => {
+    const { updateFeedCacheHeaders, updateFeedError } = await import('../db.js')
+    const feed = seedFeed({ rss_url: 'https://example.com/feed.xml' })
+    updateFeedCacheHeaders(feed.id, 'W/"abc"', 'Wed, 01 Jan 2025 00:00:00 GMT', 'hash123')
+    updateFeedError(feed.id, 'boom')
+
+    const res = await app.inject({
+      method: 'PATCH',
+      url: `/api/feeds/${feed.id}`,
+      headers: json,
+      payload: { rss_url: 'https://example.com/new-feed.xml' },
+    })
+
+    expect(res.statusCode).toBe(200)
+    const body = res.json()
+    expect(body.etag).toBeNull()
+    expect(body.last_modified).toBeNull()
+    expect(body.last_content_hash).toBeNull()
+    expect(body.last_error).toBeNull()
+    expect(body.error_count).toBe(0)
+    expect(body.next_check_at).toBeNull()
+  })
+
+  it('does not clear cache headers when rss_url is unchanged', async () => {
+    const { updateFeedCacheHeaders } = await import('../db.js')
+    const feed = seedFeed({ rss_url: 'https://example.com/feed.xml' })
+    updateFeedCacheHeaders(feed.id, 'W/"abc"', 'Wed, 01 Jan 2025 00:00:00 GMT', 'hash123')
+
+    const res = await app.inject({
+      method: 'PATCH',
+      url: `/api/feeds/${feed.id}`,
+      headers: json,
+      payload: { name: 'Same URL', rss_url: 'https://example.com/feed.xml' },
+    })
+
+    expect(res.statusCode).toBe(200)
+    const body = res.json()
+    expect(body.etag).toBe('W/"abc"')
+    expect(body.last_content_hash).toBe('hash123')
+  })
+
+  it('returns 404 for non-existent feed', async () => {
+    const res = await app.inject({
+      method: 'PATCH',
+      url: '/api/feeds/9999',
+      headers: json,
+      payload: { name: 'Nope' },
+    })
+    expect(res.statusCode).toBe(404)
+  })
+})
+
+// ---------------------------------------------------------------------------
 // POST /api/feeds/:id/fetch
 // ---------------------------------------------------------------------------
 

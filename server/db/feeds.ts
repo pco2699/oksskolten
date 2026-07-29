@@ -101,6 +101,13 @@ export function updateFeed(
   if (data.rss_url !== undefined) {
     fields.push('rss_url = @rss_url')
     params.rss_url = data.rss_url
+    // Source URL changed: clear conditional-fetch cache and error/backoff
+    // state so the next fetch hits the new URL fresh instead of sending
+    // stale etag/last-modified headers or waiting out an old backoff.
+    if (data.rss_url !== feed.rss_url) {
+      fields.push('etag = NULL', 'last_modified = NULL', 'last_content_hash = NULL')
+      fields.push('last_error = NULL', 'error_count = 0', 'next_check_at = NULL')
+    }
   }
   if (data.rss_bridge_url !== undefined) {
     fields.push('rss_bridge_url = @rss_bridge_url')
