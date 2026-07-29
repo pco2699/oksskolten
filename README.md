@@ -57,7 +57,7 @@ Because Oksskolten always has the complete text, AI summarization and translatio
 ## Features
 
 - **Full-Text Extraction** — Every article is fetched from its source and processed through Readability + 500 noise-removal patterns. You read complete articles inside Oksskolten, never needing to click through to the original site
-- **AI Summarization & Translation** — On-demand article processing via Anthropic, Gemini, or OpenAI with SSE streaming. Works on full article text, not RSS excerpts
+- **AI Summarization & Translation** — On-demand article processing via Anthropic, Gemini, OpenAI, or OpenRouter with SSE streaming. Works on full article text, not RSS excerpts
 - **Interactive Chat** — Multi-turn AI conversations with MCP tooling; search articles, get stats, and ask questions about your feeds
 - **Full-Text Search** — Meilisearch-powered search across your entire article archive
 - **Smart Fetching** — Adaptive per-feed scheduling, conditional HTTP requests (ETag/Last-Modified), content-hash deduplication, exponential backoff, and tracking parameter removal
@@ -75,7 +75,7 @@ Because Oksskolten always has the complete text, AI summarization and translatio
 | Backend | [Node.js 22](https://nodejs.org/) + [Fastify](https://fastify.dev/) |
 | Frontend | [React 19](https://react.dev/) + [Vite](https://vite.dev/) + [Tailwind CSS](https://tailwindcss.com/) + [shadcn/ui](https://ui.shadcn.com/) |
 | Database | [SQLite](https://sqlite.org/) via [libsql](https://github.com/tursodatabase/libsql) (WAL mode) |
-| AI | [Anthropic](https://docs.anthropic.com/) / [Gemini](https://ai.google.dev/) / [OpenAI](https://platform.openai.com/) |
+| AI | [Anthropic](https://docs.anthropic.com/) / [Gemini](https://ai.google.dev/) / [OpenAI](https://platform.openai.com/) / [OpenRouter](https://openrouter.ai/) |
 | Search | [Meilisearch](https://www.meilisearch.com/) |
 | Auth | JWT + [Passkey / WebAuthn](https://webauthn.io/) + GitHub OAuth |
 | Deployment | Docker Compose + [Cloudflare Tunnel](https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/) |
@@ -91,7 +91,7 @@ graph TD
             sqlite["SQLite<br/>(WAL mode)"]
             cron["node-cron<br/>Feed fetch every 5 min"]
             fetcher["Fetcher Pipeline<br/>RSS parse → Readability<br/>→ HTML cleaner → Markdown"]
-            ai["AI Provider<br/>Anthropic / Gemini / OpenAI"]
+            ai["AI Provider<br/>Anthropic / Gemini<br/>/ OpenAI / OpenRouter"]
             chat["Chat Service<br/>MCP Server + 4 Adapters"]
 
             fastify --> sqlite
@@ -115,7 +115,7 @@ graph TD
     cron -- "HTTP fetch" --> rss(("RSS Feeds"))
     fetcher --> bridge
     fetcher --> flare
-    ai -- "API" --> llm_api(("Anthropic / Gemini<br/>/ OpenAI API"))
+    ai -- "API" --> llm_api(("Anthropic / Gemini<br/>/ OpenAI / OpenRouter API"))
 ```
 
 Everything runs in a single long-lived process — SQLite needs local disk, and node-cron needs a process that stays alive. This rules out serverless/edge runtimes but keeps the stack simple: one container, no external queues or coordination. For cloud deployment, a small VM or [Fly.io + Turso](docs/guides/deploying-to-fly-io.md) works well.

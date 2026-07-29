@@ -17,6 +17,7 @@ Typical RSS readers only display the title and summary provided by the feed, req
 > - [83_feature_similarity.md](./83_feature_similarity.md) — Similar Article Detection
 > - [84_feature_keyboard_navigation.md](./84_feature_keyboard_navigation.md) — Keyboard Navigation
 > - [85_feature_ollama.md](./85_feature_ollama.md) — Ollama LLM Provider
+> - [86_feature_openrouter.md](./86_feature_openrouter.md) — OpenRouter LLM Provider
 > - [90_perf_retry_backoff.md](./90_perf_retry_backoff.md) — Exponential Backoff for Article Retry
 > - [91_perf_score_recalculation.md](./91_perf_score_recalculation.md) — Score Recalculation Optimization
 

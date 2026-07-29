@@ -78,12 +78,12 @@ const PREF_ALLOWED: Record<PrefKey, string[] | null> = {
   'appearance.highlight_theme': null,
   'appearance.font_family': null,
   'appearance.list_layout': ['list', 'card', 'magazine', 'compact'],
-  'chat.provider': ['anthropic', 'gemini', 'openai', 'claude-code', 'ollama', 'vllm'],
+  'chat.provider': ['anthropic', 'gemini', 'openai', 'claude-code', 'ollama', 'vllm', 'openrouter'],
   'chat.model': getAllModelValues(),
-  'summary.provider': ['anthropic', 'gemini', 'openai', 'claude-code', 'ollama', 'vllm'],
+  'summary.provider': ['anthropic', 'gemini', 'openai', 'claude-code', 'ollama', 'vllm', 'openrouter'],
   'summary.model': getAllModelValues(),
   'summary.max_tokens': null,
-  'translate.provider': ['anthropic', 'gemini', 'openai', 'claude-code', 'ollama', 'vllm', 'google-translate', 'deepl'],
+  'translate.provider': ['anthropic', 'gemini', 'openai', 'claude-code', 'ollama', 'vllm', 'openrouter', 'google-translate', 'deepl'],
   'translate.model': getAllModelValues(),
   'translate.max_tokens': null,
   'translate.target_lang': ['ja', 'en', 'zh'],
@@ -96,6 +96,9 @@ const PREF_ALLOWED: Record<PrefKey, string[] | null> = {
   'retention.unread_days': null,
 }
 
+/** Providers whose model list is fetched at runtime, so the static model list cannot validate it */
+const DYNAMIC_MODEL_PROVIDERS: readonly string[] = ['ollama', 'vllm', 'openrouter']
+
 const PROVIDER_MODEL_PAIRS: Array<{ providerKey: PrefKey; modelKey: PrefKey }> = [
   { providerKey: 'chat.provider', modelKey: 'chat.model' },
   { providerKey: 'summary.provider', modelKey: 'summary.model' },
@@ -107,8 +110,8 @@ function validateProviderModel(body: Record<string, unknown>): string | null {
     const model = body[modelKey] !== undefined ? String(body[modelKey]) : getSetting(modelKey)
     const provider = body[providerKey] !== undefined ? String(body[providerKey]) : getSetting(providerKey)
     if (!model || !provider) continue
-    // google-translate, deepl, ollama, and vllm have no static model list
-    if (provider === 'google-translate' || provider === 'deepl' || provider === 'ollama' || provider === 'vllm') continue
+    // google-translate and deepl take no model; ollama, vllm, and openrouter have no static model list
+    if (provider === 'google-translate' || provider === 'deepl' || DYNAMIC_MODEL_PROVIDERS.includes(provider)) continue
     // claude-code uses anthropic model IDs
     const effectiveProvider = provider === 'claude-code' ? 'anthropic' : provider
     const allowedModels = getModelValues(effectiveProvider)
@@ -222,13 +225,13 @@ export async function settingsRoutes(api: FastifyInstance): Promise<void> {
       }
       const allowed = PREF_ALLOWED[key]
       if (allowed && !allowed.includes(value)) {
-        // Skip static model list check when provider is ollama or vllm (dynamic models)
+        // Skip static model list check for providers with dynamic model lists
         const modelKeyPair = PROVIDER_MODEL_PAIRS.find(p => p.modelKey === key)
         if (modelKeyPair) {
           const provider = body[modelKeyPair.providerKey] !== undefined
             ? String(body[modelKeyPair.providerKey])
-            : getSetting(modelKeyPair.providerKey)
-          if (provider === 'ollama' || provider === 'vllm') {
+            : getSetting(modelKeyPair.providerKey) || ''
+          if (DYNAMIC_MODEL_PROVIDERS.includes(provider)) {
             upsertSetting(key, value)
             updated = true
             continue
@@ -571,6 +574,7 @@ export async function settingsRoutes(api: FastifyInstance): Promise<void> {
     gemini: 'api_key.gemini',
     openai: 'api_key.openai',
     vllm: 'api_key.vllm',
+    openrouter: 'api_key.openrouter',
     'google-translate': 'api_key.google_translate',
     deepl: 'api_key.deepl',
   }
@@ -702,6 +706,72 @@ export async function settingsRoutes(api: FastifyInstance): Promise<void> {
       reply.send({
         ok: true,
         model_count: data.data?.length || 0,
+      })
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Connection failed'
+      reply.send({ ok: false, error: message })
+    }
+  })
+
+  // --- OpenRouter endpoints ---
+
+  async function openrouterFetch(path: string): Promise<Response> {
+    const { getOpenRouterBaseUrl, getOpenRouterApiKey } = await import('../providers/llm/openrouter.js')
+    const apiKey = getOpenRouterApiKey()
+    const headers: Record<string, string> = {}
+    if (apiKey) headers['Authorization'] = `Bearer ${apiKey}`
+    return fetch(`${getOpenRouterBaseUrl()}${path}`, { headers, signal: AbortSignal.timeout(10_000) })
+  }
+
+  interface OpenRouterModel {
+    id: string
+    name?: string
+    pricing?: { prompt?: string; completion?: string }
+  }
+
+  api.get('/api/settings/openrouter/models', async (_request, reply) => {
+    try {
+      const res = await openrouterFetch('/models')
+      if (!res.ok) {
+        reply.send({ models: [] })
+        return
+      }
+      const data = await res.json() as { data?: OpenRouterModel[] }
+      // OpenRouter returns hundreds of models; the vendor prefix of the id
+      // (e.g. "anthropic" in "anthropic/claude-sonnet-4.5") groups them in the UI.
+      const models = (data.data || [])
+        .map(m => ({
+          name: m.id,
+          label: m.name || m.id,
+          vendor: m.id.includes('/') ? m.id.split('/')[0] : 'other',
+        }))
+        .sort((a, b) => a.name.localeCompare(b.name))
+      reply.send({ models })
+    } catch {
+      reply.send({ models: [] })
+    }
+  })
+
+  api.get('/api/settings/openrouter/status', async (_request, reply) => {
+    try {
+      // /models is public, so /key is what actually verifies the stored API key.
+      const [keyRes, modelsRes] = await Promise.all([
+        openrouterFetch('/key'),
+        openrouterFetch('/models'),
+      ])
+      if (!keyRes.ok) {
+        reply.send({ ok: false, error: `HTTP ${keyRes.status}` })
+        return
+      }
+      const keyData = await keyRes.json() as { data?: { label?: string; limit_remaining?: number | null } }
+      const modelsData = modelsRes.ok
+        ? await modelsRes.json() as { data?: unknown[] }
+        : { data: [] }
+      reply.send({
+        ok: true,
+        model_count: modelsData.data?.length || 0,
+        label: keyData.data?.label || '',
+        limit_remaining: keyData.data?.limit_remaining ?? null,
       })
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Connection failed'
