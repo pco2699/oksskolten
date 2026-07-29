@@ -1,5 +1,10 @@
 # Changelog
 
+## [v0.5.0](https://github.com/pco2699/oksskolten/commits/v0.5.0) - 2026-07-29
+### Others
+- feat: add OpenRouter as an LLM provider by @pco2699 in https://github.com/pco2699/oksskolten/pull/1
+- refactor: make OpenRouter the only LLM provider by @pco2699 in https://github.com/pco2699/oksskolten/pull/2
+
 ## [v0.5.0](https://github.com/babarot/oksskolten/compare/v0.4.2...v0.5.0) - 2026-06-08
 ### New Features
 - feat: add support for vLLM LLM provider by @pju-hoge in https://github.com/babarot/oksskolten/pull/56
