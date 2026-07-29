@@ -110,3 +110,151 @@ describe('openrouterProvider', () => {
     expect(result.outputTokens).toBe(7)
   })
 })
+
+// ---------------------------------------------------------------------------
+// Model catalog
+// ---------------------------------------------------------------------------
+
+function catalogResponse(models: unknown[], ok = true) {
+  return {
+    ok,
+    status: ok ? 200 : 500,
+    json: async () => ({ data: models }),
+  }
+}
+
+/** Re-import the module so its in-memory catalog cache starts empty */
+async function freshModule() {
+  vi.resetModules()
+  return import('./openrouter.js')
+}
+
+describe('getOpenRouterCatalog', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    delete process.env.OPENROUTER_BASE_URL
+    vi.mocked(db.getSetting).mockReturnValue('sk-or-v1-test')
+  })
+
+  it('maps catalog entries and converts per-token prices to $/M tokens', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(catalogResponse([
+      { id: 'anthropic/claude-sonnet-4.5', name: 'Anthropic: Claude Sonnet 4.5', pricing: { prompt: '0.000003', completion: '0.000015' } },
+    ]))
+    vi.stubGlobal('fetch', fetchMock)
+
+    const { getOpenRouterCatalog } = await freshModule()
+    const models = await getOpenRouterCatalog()
+
+    expect(models).toEqual([{
+      name: 'anthropic/claude-sonnet-4.5',
+      label: 'Anthropic: Claude Sonnet 4.5',
+      vendor: 'anthropic',
+      pricing: [3, 15],
+    }])
+    vi.unstubAllGlobals()
+  })
+
+  it('omits pricing when the catalog reports no usable price', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(catalogResponse([
+      { id: 'vendor/free-model', pricing: { prompt: '0', completion: '0' } },
+      { id: 'vendor/no-pricing-field' },
+      { id: 'vendor/garbage-price', pricing: { prompt: 'n/a', completion: 'n/a' } },
+    ])))
+
+    const { getOpenRouterCatalog } = await freshModule()
+    const models = await getOpenRouterCatalog()
+
+    expect(models.map(m => m.pricing)).toEqual([undefined, undefined, undefined])
+    // Falls back to the id when the catalog gives no display name
+    expect(models[0].label).toBe('vendor/free-model')
+    vi.unstubAllGlobals()
+  })
+
+  it('groups ids without a slash under "other" and sorts by id', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(catalogResponse([
+      { id: 'zeta/model' },
+      { id: 'standalone-model' },
+      { id: 'alpha/model' },
+    ])))
+
+    const { getOpenRouterCatalog } = await freshModule()
+    const models = await getOpenRouterCatalog()
+
+    expect(models.map(m => m.name)).toEqual(['alpha/model', 'standalone-model', 'zeta/model'])
+    expect(models.map(m => m.vendor)).toEqual(['alpha', 'other', 'zeta'])
+    vi.unstubAllGlobals()
+  })
+
+  it('caches the catalog and refetches only when forced', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(catalogResponse([{ id: 'a/b' }]))
+    vi.stubGlobal('fetch', fetchMock)
+
+    const { getOpenRouterCatalog } = await freshModule()
+    await getOpenRouterCatalog()
+    await getOpenRouterCatalog()
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+
+    await getOpenRouterCatalog(true)
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+    vi.unstubAllGlobals()
+  })
+
+  it('returns an empty list when OpenRouter is unreachable and nothing is cached', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('Connection refused')))
+
+    const { getOpenRouterCatalog } = await freshModule()
+    expect(await getOpenRouterCatalog()).toEqual([])
+    vi.unstubAllGlobals()
+  })
+
+  it('keeps serving the last good catalog when a refresh fails', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(catalogResponse([{ id: 'a/b' }]))
+    vi.stubGlobal('fetch', fetchMock)
+
+    const { getOpenRouterCatalog } = await freshModule()
+    await getOpenRouterCatalog()
+
+    const lastGood = [{ name: 'a/b', label: 'a/b', vendor: 'a' }]
+
+    fetchMock.mockRejectedValue(new Error('Connection refused'))
+    expect(await getOpenRouterCatalog(true)).toEqual(lastGood)
+
+    fetchMock.mockResolvedValue(catalogResponse([], false))
+    expect(await getOpenRouterCatalog(true)).toEqual(lastGood)
+    vi.unstubAllGlobals()
+  })
+})
+
+describe('openrouterFetch', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    delete process.env.OPENROUTER_BASE_URL
+  })
+
+  it('sends the stored API key as a bearer token', async () => {
+    vi.mocked(db.getSetting).mockReturnValue('sk-or-v1-test')
+    const fetchMock = vi.fn().mockResolvedValue(catalogResponse([]))
+    vi.stubGlobal('fetch', fetchMock)
+
+    const { openrouterFetch } = await freshModule()
+    await openrouterFetch('/key')
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      'https://openrouter.ai/api/v1/key',
+      expect.objectContaining({ headers: { Authorization: 'Bearer sk-or-v1-test' } }),
+    )
+    vi.unstubAllGlobals()
+  })
+
+  it('omits the Authorization header when no key is stored', async () => {
+    vi.mocked(db.getSetting).mockReturnValue(undefined)
+    const fetchMock = vi.fn().mockResolvedValue(catalogResponse([]))
+    vi.stubGlobal('fetch', fetchMock)
+
+    const { openrouterFetch } = await freshModule()
+    await openrouterFetch('/models')
+
+    expect(fetchMock.mock.calls[0][1].headers).toEqual({})
+    vi.unstubAllGlobals()
+  })
+})
