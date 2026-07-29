@@ -27,6 +27,12 @@ When `focusedItemId` is `null` and the next or prev key is pressed, focus moves 
 
 ## Design
 
+### Enable/Disable Toggle: Default State & Storage
+
+Keyboard navigation defaults to **on**. `useKeyboardNavSetting` (`src/hooks/use-keyboard-nav-setting.ts`) persists it client-side under localStorage key `keyboard-navigation-v2`, and it also syncs to the `reading.keyboard_navigation` server preference (same dual-storage pattern as other settings, see [ADR-001](../adr/001-settings-dual-storage.md)).
+
+The localStorage key was migrated from `keyboard-navigation` to `keyboard-navigation-v2` (with a one-time removal of the old key) because the local hook eagerly persists its current value on every mount — every browser that had ever loaded the app already had the old key stored as `'off'` before the default changed, which would have kept overriding the new default. A companion one-time DB migration (`migrations/0010_keyboard_nav_default_on.sql`) flips any existing `reading.keyboard_navigation = 'off'` row to `'on'` for the same reason, since a stored `'off'` from that era is indistinguishable from settings-hydration backfill noise rather than a deliberate user choice. Users can still switch it off in Settings → Reading.
+
 ### Existing Shortcuts
 
 Global shortcuts implemented in `src/hooks/use-global-shortcuts.ts`:
