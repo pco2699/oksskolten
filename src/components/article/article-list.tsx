@@ -161,16 +161,22 @@ export const ArticleList = forwardRef<ArticleListHandle, object>(function Articl
       setFocusedItemId(id)
       const el = document.querySelector(`[data-article-id="${id}"]`)
       el?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
-      // Overlay mode: open article immediately on j/k
-      if (isOverlayMode) {
+      // Overlay mode: if the overlay is already open, j/k swaps the article
+      // shown in it (in sync with the new focus). If the overlay is closed,
+      // j/k only moves the list selection — it must not auto-open the overlay.
+      if (isOverlayMode && overlayUrl != null) {
         const article = articleMap.get(id)
         if (article) setOverlayUrl(article.url)
       }
     },
-    onEnter: isOverlayMode ? undefined : (id) => {
-      // Page mode: Enter to navigate
+    onEnter: (id) => {
       const article = articleMap.get(id)
-      if (article) {
+      if (!article) return
+      if (isOverlayMode) {
+        // Overlay mode: o/Enter opens the focused article in the overlay
+        setOverlayUrl(article.url)
+      } else {
+        // Page mode: Enter navigates to the article page
         void navigate(articleUrlToPath(article.url))
       }
     },

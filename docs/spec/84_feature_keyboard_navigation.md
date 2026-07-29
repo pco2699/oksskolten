@@ -78,11 +78,12 @@ Default key bindings (customizable via Settings → Reading → Key Bindings):
 
 | Shortcut | Action |
 |---|---|
-| `j` (default) | Move focus to the next article and display it in the existing ArticleOverlay |
-| `k` (default) | Move focus to the previous article and display it in the existing ArticleOverlay |
+| `j` (default) | If the overlay is closed, move focus to the next article only (does not open it). If the overlay is already open, move focus and swap the article displayed in it |
+| `k` (default) | Mirror of `j` for the previous article |
+| `Enter` / `o` | Open the focused article in the ArticleOverlay |
 | `Escape` | If the overlay is open, close it (focus is preserved). Press Escape again to clear focus |
 
-In overlay mode, `Enter` is not used. Articles are automatically displayed in the overlay when focus moves via j/k.
+`j`/`k` never auto-open the overlay from the list view — they only move the selection. Once the overlay has been opened (via `Enter`/`o` or a mouse click), `j`/`k` keep swapping the article shown in it in place, staying in sync with list focus, until the overlay is closed.
 
 #### Actions (Both Modes)
 

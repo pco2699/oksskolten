@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { render, screen, fireEvent } from '@testing-library/react'
 import { MemoryRouter, Routes, Route, Outlet } from 'react-router-dom'
 import { LocaleContext } from '../../lib/i18n'
 import { KeyboardNavigationProvider } from '../../contexts/keyboard-navigation-context'
@@ -93,7 +93,8 @@ vi.mock('./article-card', () => ({
 }))
 
 vi.mock('./article-overlay', () => ({
-  ArticleOverlay: () => null,
+  ArticleOverlay: ({ articleUrl }: { articleUrl: string | null }) =>
+    articleUrl ? <div data-testid="overlay">{articleUrl}</div> : null,
 }))
 
 vi.mock('./article-detail', () => ({
@@ -159,6 +160,10 @@ const mockSettings = {
   setHighlightTheme: vi.fn(),
   articleFont: 'sans' as const,
   setArticleFont: vi.fn(),
+  layout: 'list' as const,
+  articleOpenMode: 'page' as const,
+  keyboardNavigation: 'off' as const,
+  keybindings: undefined,
   save: vi.fn(),
 }
 
@@ -190,6 +195,10 @@ describe('ArticleList', () => {
     vi.clearAllMocks()
     swrFeedsData = undefined
     mockSettings.autoMarkRead = 'off' as any
+    mockSettings.layout = 'list' as any
+    mockSettings.articleOpenMode = 'page' as any
+    mockSettings.keyboardNavigation = 'off' as any
+    mockSettings.keybindings = undefined as any
     // Stub IntersectionObserver for tests that enable autoMarkRead
     vi.stubGlobal('IntersectionObserver', class {
       constructor() {}
@@ -475,5 +484,79 @@ describe('ArticleList', () => {
     expect(pulses.length).toBeGreaterThan(0)
 
     vi.unstubAllGlobals()
+  })
+
+  describe('keyboard navigation in overlay mode', () => {
+    function setUpOverlayModeArticles() {
+      mockSettings.articleOpenMode = 'overlay' as any
+      mockSettings.keyboardNavigation = 'on' as any
+      swrInfiniteReturn = {
+        data: [{
+          articles: [
+            makeArticle({ id: 1, title: 'First Article', url: 'https://example.com/1' }),
+            makeArticle({ id: 2, title: 'Second Article', url: 'https://example.com/2' }),
+          ],
+          total: 2,
+          has_more: false,
+        }],
+        error: undefined,
+        size: 1,
+        setSize: vi.fn(),
+        isLoading: false,
+        isValidating: false,
+        mutate: vi.fn(),
+      }
+    }
+
+    it('j moves focus only and does not open the overlay when it is closed', () => {
+      setUpOverlayModeArticles()
+      renderArticleList()
+
+      fireEvent.keyDown(document, { key: 'j' })
+
+      // Focus moved to the first article...
+      const focusedEl = document.querySelector('[data-article-id="1"]')
+      expect(focusedEl?.getAttribute('aria-selected')).toBe('true')
+      // ...but the overlay must not have opened.
+      expect(screen.queryByTestId('overlay')).toBeNull()
+    })
+
+    it('Enter opens the focused article in the overlay', () => {
+      setUpOverlayModeArticles()
+      renderArticleList()
+
+      // First, move focus onto the first article (overlay stays closed).
+      fireEvent.keyDown(document, { key: 'j' })
+      expect(screen.queryByTestId('overlay')).toBeNull()
+
+      // Enter opens it in the overlay.
+      fireEvent.keyDown(document, { key: 'Enter' })
+      expect(screen.getByTestId('overlay').textContent).toBe('https://example.com/1')
+    })
+
+    it('o opens the focused article in the overlay', () => {
+      setUpOverlayModeArticles()
+      renderArticleList()
+
+      fireEvent.keyDown(document, { key: 'j' })
+      fireEvent.keyDown(document, { key: 'o' })
+      expect(screen.getByTestId('overlay').textContent).toBe('https://example.com/1')
+    })
+
+    it('j swaps the article shown in the overlay once it is already open', () => {
+      setUpOverlayModeArticles()
+      renderArticleList()
+
+      // Focus + open the first article.
+      fireEvent.keyDown(document, { key: 'j' })
+      fireEvent.keyDown(document, { key: 'Enter' })
+      expect(screen.getByTestId('overlay').textContent).toBe('https://example.com/1')
+
+      // With the overlay open, j swaps to the next article in place.
+      fireEvent.keyDown(document, { key: 'j' })
+      expect(screen.getByTestId('overlay').textContent).toBe('https://example.com/2')
+      const focusedEl = document.querySelector('[data-article-id="2"]')
+      expect(focusedEl?.getAttribute('aria-selected')).toBe('true')
+    })
   })
 })
