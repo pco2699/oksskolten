@@ -3,11 +3,6 @@ import { render, screen } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import { LocaleContext } from '../../lib/i18n'
 
-let mockIsTouch = false
-vi.mock('../../hooks/use-is-touch-device', () => ({
-  useIsTouchDevice: () => mockIsTouch,
-}))
-
 let mockContextValue: any = {
   articleIds: ['1', '2', '3'],
   articleUrls: {
@@ -44,7 +39,6 @@ function renderArrows(props: Partial<React.ComponentProps<typeof ArticleNavArrow
 describe('ArticleNavArrows', () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    mockIsTouch = false
     mockContextValue = {
       articleIds: ['1', '2', '3'],
       articleUrls: {
@@ -53,13 +47,6 @@ describe('ArticleNavArrows', () => {
         '3': 'https://example.com/3',
       },
     }
-  })
-
-  it('renders nothing on touch devices', () => {
-    mockIsTouch = true
-    renderArrows()
-    expect(screen.queryByLabelText('Previous article')).toBeNull()
-    expect(screen.queryByLabelText('Next article')).toBeNull()
   })
 
   it('renders nothing when the current article is not in the list', () => {

@@ -1,7 +1,6 @@
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { useKeyboardNavigationContext } from '../../contexts/keyboard-navigation-context'
-import { useIsTouchDevice } from '../../hooks/use-is-touch-device'
 import { useI18n } from '../../lib/i18n'
 import { articleUrlToPath } from '../../lib/url'
 
@@ -23,15 +22,15 @@ interface ArticleNavArrowsProps {
 
 /**
  * Feedly-style prev/next chevrons pinned to the edges of the reading view.
- * Desktop only — hidden below the md breakpoint and on touch devices.
+ * Hidden below the md breakpoint via CSS; touch-capable desktops (e.g.
+ * touchscreen laptops report `pointer: coarse`) still get the arrows.
  */
 export function ArticleNavArrows({ currentArticleUrl, onNavigate, variant = 'page' }: ArticleNavArrowsProps) {
   const navigate = useNavigate()
-  const isTouchDevice = useIsTouchDevice()
   const { articleIds, articleUrls } = useKeyboardNavigationContext()
   const { t } = useI18n()
 
-  if (isTouchDevice || articleIds.length === 0) return null
+  if (articleIds.length === 0) return null
 
   const currentId = Object.keys(articleUrls).find(id => articleUrls[id] === currentArticleUrl)
   const currentIndex = currentId ? articleIds.indexOf(currentId) : -1

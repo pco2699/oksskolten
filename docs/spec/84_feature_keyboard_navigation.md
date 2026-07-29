@@ -104,7 +104,7 @@ Toggling read/unread (`m`) uses the existing `PATCH /api/articles/:id/seen` endp
 
 ### Prev/Next Edge Arrows
 
-Feedly-style chevron buttons (`ChevronLeft`/`ChevronRight`) are pinned to the far left/right edges of the reading view, vertically centered. Desktop only — hidden below the `md` breakpoint and on touch devices (`useIsTouchDevice`).
+Feedly-style chevron buttons (`ChevronLeft`/`ChevronRight`) are pinned to the far left/right edges of the reading view, vertically centered. Hidden below the `md` breakpoint via CSS only — shown regardless of pointer type, since touch-capable desktops (e.g. touchscreen laptops) report `pointer: coarse` and would otherwise wrongly lose the arrows.
 
 Implemented in `src/components/article/article-nav-arrows.tsx` (`ArticleNavArrows`). It reads `articleIds`/`articleUrls` from `KeyboardNavigationContext`, resolves the current article's position via a reverse URL lookup, and renders disabled/hidden buttons at the ends of the list.
 
