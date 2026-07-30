@@ -67,11 +67,12 @@ export function createFeed(data: {
   rss_bridge_url?: string | null
   category_id?: number | null
   requires_js_challenge?: number
+  skip_full_text_fetch?: number
   type?: 'rss' | 'clip'
 }): Feed {
   const info = runNamed(`
-    INSERT INTO feeds (name, url, rss_url, rss_bridge_url, category_id, requires_js_challenge, type)
-    VALUES (@name, @url, @rss_url, @rss_bridge_url, @category_id, @requires_js_challenge, @type)
+    INSERT INTO feeds (name, url, rss_url, rss_bridge_url, category_id, requires_js_challenge, skip_full_text_fetch, type)
+    VALUES (@name, @url, @rss_url, @rss_bridge_url, @category_id, @requires_js_challenge, @skip_full_text_fetch, @type)
   `, {
     name: data.name,
     url: data.url,
@@ -79,6 +80,7 @@ export function createFeed(data: {
     rss_bridge_url: data.rss_bridge_url ?? null,
     category_id: data.category_id ?? null,
     requires_js_challenge: data.requires_js_challenge ?? 0,
+    skip_full_text_fetch: data.skip_full_text_fetch ?? 0,
     type: data.type ?? 'rss',
   })
   return getDb().prepare('SELECT * FROM feeds WHERE id = ?').get(info.lastInsertRowid) as Feed

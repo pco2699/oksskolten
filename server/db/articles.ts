@@ -436,6 +436,19 @@ export function updateArticleContent(
 }
 
 /**
+ * Return id + full_text for active articles in the given feed that have a
+ * stored body. Used when a feed switches to skip_full_text_fetch so the
+ * caller can identify bodies that are actually bot-block pages and drop them.
+ */
+export function getArticleBodiesByFeed(feedId: number): { id: number; full_text: string }[] {
+  return getDb().prepare(`
+    SELECT id, full_text
+    FROM active_articles
+    WHERE feed_id = ? AND full_text IS NOT NULL AND trim(full_text) != ''
+  `).all(feedId) as { id: number; full_text: string }[]
+}
+
+/**
  * One-day backoff window between refresh attempts. After we try to repair
  * a stale article and fail (e.g. RSS has no description, the body is
  * legitimately short, or the item dropped out of the current feed), the

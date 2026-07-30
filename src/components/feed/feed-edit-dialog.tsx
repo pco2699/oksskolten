@@ -5,6 +5,7 @@ import { apiPatch } from '../../lib/fetcher'
 import { Dialog, DialogContent, DialogTitle } from '../ui/dialog'
 import { Input } from '../ui/input'
 import { Button } from '../ui/button'
+import { Switch } from '../ui/switch'
 import * as VisuallyHidden from '@radix-ui/react-visually-hidden'
 import type { FeedWithCounts } from '../../../shared/types'
 
@@ -96,26 +97,13 @@ export function FeedEditDialog({ feed, onClose, onUpdated }: FeedEditDialogProps
               />
             )}
           </div>
-          <div className="space-y-1 pt-1">
-            <label className="flex items-center gap-3 cursor-pointer">
-              <button
-                type="button"
-                role="switch"
-                aria-checked={skipFetch}
-                onClick={() => setSkipFetch(v => !v)}
-                className={`relative inline-flex h-6 w-11 shrink-0 rounded-full border-2 border-transparent transition-colors ${
-                  skipFetch ? 'bg-accent' : 'bg-border'
-                }`}
-              >
-                <span
-                  className={`pointer-events-none inline-block h-5 w-5 rounded-full bg-white shadow-sm transition-transform ${
-                    skipFetch ? 'translate-x-5' : 'translate-x-0'
-                  }`}
-                />
-              </button>
-              <span className="text-xs text-text select-none">{t('feeds.editSkipFetchLabel')}</span>
-            </label>
-            <p className="text-xs text-muted">{t('feeds.editSkipFetchNote')}</p>
+          <div className="pt-1">
+            <Switch
+              checked={skipFetch}
+              onCheckedChange={setSkipFetch}
+              label={t('feeds.editSkipFetchLabel')}
+              description={t('feeds.editSkipFetchNote')}
+            />
           </div>
           {error && <p className="text-xs text-error">{error}</p>}
           <div className="flex justify-end gap-2 pt-1">

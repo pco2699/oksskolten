@@ -20,9 +20,12 @@ import {
   getFeedMetrics,
   getCategories,
   createCategory,
+  getArticleBodiesByFeed,
+  updateArticleContent,
 } from '../db.js'
 import { requireJson } from '../auth.js'
 import { fetchSingleFeed, discoverRssUrl } from '../fetcher.js'
+import { isBotBlockPage } from '../fetcher/content.js'
 import { queryRssBridge, inferCssSelectorBridge } from '../rss-bridge.js'
 import { parseOpml, generateOpml } from '../opml.js'
 import { NumericIdParams, parseOrBadRequest } from '../lib/validation.js'
@@ -47,6 +50,7 @@ const CreateFeedBody = z
     discovered_rss_title: z.string().optional(),
     // Phase 2: user chose "this page only" — skip to LLM inference
     force_page_selector: z.boolean().optional(),
+    skip_full_text_fetch: z.union([z.literal(0), z.literal(1)]).optional(),
   })
   .refine((data) => !(data.discovered_rss_url && data.force_page_selector), {
     message: 'discovered_rss_url and force_page_selector are mutually exclusive',
@@ -176,6 +180,7 @@ export async function feedRoutes(api: FastifyInstance): Promise<void> {
           rss_bridge_url: rssBridgeUrl,
           category_id: body.category_id ?? null,
           requires_js_challenge: requiresJsChallenge ? 1 : 0,
+          skip_full_text_fetch: body.skip_full_text_fetch ?? 0,
         })
 
         // Fire-and-forget: fetch articles for the new feed
@@ -203,10 +208,40 @@ export async function feedRoutes(api: FastifyInstance): Promise<void> {
       const body = parseOrBadRequest(UpdateFeedBody, request.body, reply)
       if (!body) return
 
+      const before = getFeedById(params.id)
       const feed = updateFeed(params.id, body)
       if (!feed) {
         reply.status(404).send({ error: 'Feed not found' })
         return
+      }
+
+      // Switching a feed to skip_full_text_fetch retroactively repairs the
+      // articles the old fetch path poisoned. Bot-block pages longer than
+      // MIN_EXTRACTED_LENGTH are invisible to the fetcher's stale-article
+      // refresh (it only considers bodies *shorter* than that), so they
+      // would otherwise stay as the article body forever. Dropping the body
+      // makes them refresh candidates, and the next fetch swaps in the RSS
+      // content. Only bodies positively identified as block pages are
+      // touched — a genuine article body is never discarded, and articles
+      // that have rolled out of the feed window keep whatever they have.
+      if (before?.skip_full_text_fetch === 0 && feed.skip_full_text_fetch === 1) {
+        const blocked = getArticleBodiesByFeed(feed.id).filter(a => isBotBlockPage(a.full_text))
+        for (const article of blocked) {
+          updateArticleContent(article.id, {
+            full_text: null,
+            excerpt: null,
+            // Summary and translation were derived from the block page, so
+            // they are garbage too — clear them so they regenerate.
+            summary: null,
+            full_text_translated: null,
+            translated_lang: null,
+            last_error: null,
+            last_refresh_attempt_at: null,
+          })
+        }
+        if (blocked.length > 0) {
+          log.info(`Feed ${feed.name}: cleared ${blocked.length} bot-block article bodies for RSS refresh`)
+        }
       }
 
       const feeds = getFeeds()
