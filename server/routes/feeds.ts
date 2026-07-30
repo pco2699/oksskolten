@@ -58,6 +58,7 @@ const UpdateFeedBody = z.object({
   rss_bridge_url: z.string().nullable().optional(),
   disabled: z.number().optional(),
   category_id: z.number().nullable().optional(),
+  skip_full_text_fetch: z.union([z.literal(0), z.literal(1)]).optional(),
 })
 
 export async function feedRoutes(api: FastifyInstance): Promise<void> {

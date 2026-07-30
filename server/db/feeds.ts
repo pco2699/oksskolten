@@ -86,7 +86,7 @@ export function createFeed(data: {
 
 export function updateFeed(
   id: number,
-  data: { name?: string; rss_url?: string | null; rss_bridge_url?: string | null; disabled?: number; category_id?: number | null; requires_js_challenge?: number },
+  data: { name?: string; rss_url?: string | null; rss_bridge_url?: string | null; disabled?: number; category_id?: number | null; requires_js_challenge?: number; skip_full_text_fetch?: number },
 ): Feed | undefined {
   const feed = getFeedById(id)
   if (!feed) return undefined
@@ -128,6 +128,16 @@ export function updateFeed(
   if (data.requires_js_challenge !== undefined) {
     fields.push('requires_js_challenge = @requires_js_challenge')
     params.requires_js_challenge = data.requires_js_challenge
+  }
+  if (data.skip_full_text_fetch !== undefined) {
+    fields.push('skip_full_text_fetch = @skip_full_text_fetch')
+    params.skip_full_text_fetch = data.skip_full_text_fetch
+    // Turning the flag on retires any stored fetch failures: those articles
+    // will never be fetched again, so leaving last_error set would keep them
+    // in the retry queue's "exceeded" bucket and surface as feed errors.
+    if (data.skip_full_text_fetch === 1) {
+      fields.push('last_error = NULL', 'error_count = 0')
+    }
   }
 
   if (fields.length === 0) return feed

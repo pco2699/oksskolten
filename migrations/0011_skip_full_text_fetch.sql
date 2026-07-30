@@ -1,0 +1,11 @@
+-- Per-feed opt-out of full-text fetching.
+--
+-- Some sources (Reddit, X, and other aggressively bot-gated sites) either
+-- block the article fetch outright or serve a JS-only shell that Readability
+-- cannot extract. For those feeds the RSS payload already carries everything
+-- worth reading, so fetching the original page costs a request, a
+-- FlareSolverr retry, and often stores a bot-block page as the body.
+--
+-- When this flag is set the pipeline skips fetchFullText entirely and renders
+-- the RSS content (content:encoded / description) as the article body.
+ALTER TABLE feeds ADD COLUMN skip_full_text_fetch INTEGER NOT NULL DEFAULT 0;

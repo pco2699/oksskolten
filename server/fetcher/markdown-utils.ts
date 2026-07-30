@@ -19,6 +19,23 @@ export function convertHtmlToMarkdown(content: string): string {
   return fallbackTurndown.turndown(content)
 }
 
+const IMG_SRC_RE = /<img\b[^>]*?\bsrc\s*=\s*["']([^"']+)["']/i
+
+/**
+ * Pull the first image URL out of an RSS content fragment, resolved against the
+ * article URL. Feeds that skip full-text fetching never retrieve page metadata,
+ * so this stands in for og:image to keep article thumbnails working.
+ */
+export function firstImageFromHtml(html: string, baseUrl: string): string | null {
+  const match = html.match(IMG_SRC_RE)
+  if (!match) return null
+  try {
+    return new URL(match[1], baseUrl).toString()
+  } catch {
+    return null
+  }
+}
+
 /**
  * Generate a plain-text excerpt from Markdown by stripping images and links.
  * Used by both contentWorker (page extraction) and fetcher (RSS fallback).

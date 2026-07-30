@@ -30,6 +30,7 @@ export function FeedEditDialog({ feed, onClose, onUpdated }: FeedEditDialogProps
   const usesBridge = !feed.rss_url && !!feed.rss_bridge_url
   const [name, setName] = useState(feed.name)
   const [rssUrl, setRssUrl] = useState(feed.rss_url ?? '')
+  const [skipFetch, setSkipFetch] = useState(feed.skip_full_text_fetch === 1)
   const [error, setError] = useState('')
   const [saving, setSaving] = useState(false)
 
@@ -51,6 +52,7 @@ export function FeedEditDialog({ feed, onClose, onUpdated }: FeedEditDialogProps
       await apiPatch(`/api/feeds/${feed.id}`, {
         name: trimmedName,
         ...(usesBridge ? {} : { rss_url: trimmedUrl }),
+        skip_full_text_fetch: skipFetch ? 1 : 0,
       })
       onUpdated()
       toast.success(t('feeds.editSuccess', { name: trimmedName }))
@@ -93,6 +95,27 @@ export function FeedEditDialog({ feed, onClose, onUpdated }: FeedEditDialogProps
                 required
               />
             )}
+          </div>
+          <div className="space-y-1 pt-1">
+            <label className="flex items-center gap-3 cursor-pointer">
+              <button
+                type="button"
+                role="switch"
+                aria-checked={skipFetch}
+                onClick={() => setSkipFetch(v => !v)}
+                className={`relative inline-flex h-6 w-11 shrink-0 rounded-full border-2 border-transparent transition-colors ${
+                  skipFetch ? 'bg-accent' : 'bg-border'
+                }`}
+              >
+                <span
+                  className={`pointer-events-none inline-block h-5 w-5 rounded-full bg-white shadow-sm transition-transform ${
+                    skipFetch ? 'translate-x-5' : 'translate-x-0'
+                  }`}
+                />
+              </button>
+              <span className="text-xs text-text select-none">{t('feeds.editSkipFetchLabel')}</span>
+            </label>
+            <p className="text-xs text-muted">{t('feeds.editSkipFetchNote')}</p>
           </div>
           {error && <p className="text-xs text-error">{error}</p>}
           <div className="flex justify-end gap-2 pt-1">

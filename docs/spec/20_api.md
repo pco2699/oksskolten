@@ -706,11 +706,12 @@ The frontend then presents the user with a choice: "Subscribe to the whole site"
   "rss_url": "https://blog.example.com/rss/",
   "rss_bridge_url": "http://rss-bridge/?...",
   "disabled": 0,
-  "category_id": 2
+  "category_id": 2,
+  "skip_full_text_fetch": 1
 }
 ```
 
-Updatable fields: `name`, `rss_url`, `rss_bridge_url`, `disabled` (`0` or `1`), `category_id`. `url` (the site's homepage, used for re-detection) cannot be changed. `rss_url` must be an `http://` or `https://` URL. Setting `disabled: 0` also resets `error_count` to `0` and `last_error` to `NULL`. Changing `rss_url` to a different value also clears `etag`, `last_modified`, `last_content_hash`, `last_error`, `error_count`, and `next_check_at`, so the next fetch hits the new URL fresh instead of reusing stale conditional-GET headers or an existing error backoff schedule.
+Updatable fields: `name`, `rss_url`, `rss_bridge_url`, `disabled` (`0` or `1`), `category_id`, `skip_full_text_fetch` (`0` or `1`). `url` (the site's homepage, used for re-detection) cannot be changed. `rss_url` must be an `http://` or `https://` URL. Setting `disabled: 0` also resets `error_count` to `0` and `last_error` to `NULL`. Setting `skip_full_text_fetch: 1` likewise clears `last_error` and `error_count`, because articles on such feeds are never fetched again and stored failures would otherwise linger as permanent feed errors. Changing `rss_url` to a different value also clears `etag`, `last_modified`, `last_content_hash`, `last_error`, `error_count`, and `next_check_at`, so the next fetch hits the new URL fresh instead of reusing stale conditional-GET headers or an existing error backoff schedule.
 
 ```json
 // Response: 200 (returns all feed fields)

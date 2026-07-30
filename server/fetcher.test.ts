@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { setupTestDb } from './__tests__/helpers/testDb.js'
-import { createFeed, insertArticle, getArticleByUrl, getFeedById, upsertSetting } from './db.js'
+import { createFeed, insertArticle, getArticleByUrl, getFeedById, updateFeed, upsertSetting } from './db.js'
 import type { Feed } from './db.js'
 
 // --- feedsmith mock (controllable) ---
@@ -2736,5 +2736,115 @@ describe('fetchAllFeeds — retry backoff', () => {
     const row = getDb().prepare('SELECT retry_count, last_error FROM articles WHERE url = ?').get('https://example.com/throw') as { retry_count: number; last_error: string | null }
     expect(row.retry_count).toBe(1)
     expect(row.last_error).toBeTruthy()
+  })
+})
+
+// ==========================================================================
+// skip_full_text_fetch
+// ==========================================================================
+
+describe('skip_full_text_fetch', () => {
+  let fetchSingleFeed: typeof import('./fetcher.js').fetchSingleFeed
+
+  beforeEach(async () => {
+    const mod = await import('./fetcher.js')
+    fetchSingleFeed = mod.fetchSingleFeed
+  })
+
+  function seedSkipFeed(): Feed {
+    const feed = seedFeed()
+    updateFeed(feed.id, { skip_full_text_fetch: 1 })
+    return getFeedById(feed.id)!
+  }
+
+  // getArticleByUrl() projects a reader-facing subset that omits last_error.
+  async function lastErrorOf(url: string): Promise<string | null> {
+    const { getDb } = await import('./db.js')
+    const row = getDb().prepare('SELECT last_error FROM articles WHERE url = ?').get(url) as { last_error: string | null }
+    return row.last_error
+  }
+
+  it('renders the RSS content as the body without fetching the article page', async () => {
+    const feed = seedSkipFeed()
+    const rssXml = rss20Xml('Reddit-like', [
+      { title: 'Post', link: 'https://example.com/post', description: '<p>Body straight from the feed.</p>' },
+    ])
+
+    const requested: string[] = []
+    mockFetch.mockImplementation((url: string | URL) => {
+      const u = url.toString()
+      requested.push(u)
+      if (u === feed.rss_url) return Promise.resolve(mockResponse(rssXml, { headers: { 'content-type': 'application/rss+xml' } }))
+      return Promise.resolve(mockResponse(articleHtml()))
+    })
+
+    await fetchSingleFeed(feed)
+
+    const article = getArticleByUrl('https://example.com/post')
+    expect(article).toBeDefined()
+    expect(article!.full_text).toContain('Body straight from the feed.')
+    expect(await lastErrorOf('https://example.com/post')).toBeNull()
+    // The origin page must never be requested.
+    expect(requested).not.toContain('https://example.com/post')
+    expect(mockFlareSolverr).not.toHaveBeenCalled()
+  })
+
+  it('uses the first RSS image as the og image', async () => {
+    const feed = seedSkipFeed()
+    const rssXml = rss20Xml('Reddit-like', [
+      {
+        title: 'With image',
+        link: 'https://example.com/img-post',
+        description: '<p>Text</p><img src="/thumb.png" alt="t">',
+      },
+    ])
+
+    mockFetch.mockImplementation((url: string | URL) => {
+      const u = url.toString()
+      if (u === feed.rss_url) return Promise.resolve(mockResponse(rssXml, { headers: { 'content-type': 'application/rss+xml' } }))
+      return Promise.resolve(mockResponse(articleHtml()))
+    })
+
+    await fetchSingleFeed(feed)
+
+    const article = getArticleByUrl('https://example.com/img-post')
+    expect(article!.og_image).toBe('https://example.com/thumb.png')
+  })
+
+  it('stores an empty body without an error when the RSS item has no content', async () => {
+    const feed = seedSkipFeed()
+    const rssXml = rss20Xml('Reddit-like', [{ title: 'Bare', link: 'https://example.com/bare' }])
+
+    mockFetch.mockImplementation((url: string | URL) => {
+      const u = url.toString()
+      if (u === feed.rss_url) return Promise.resolve(mockResponse(rssXml, { headers: { 'content-type': 'application/rss+xml' } }))
+      return Promise.resolve(mockResponse(articleHtml()))
+    })
+
+    await fetchSingleFeed(feed)
+
+    const article = getArticleByUrl('https://example.com/bare')
+    expect(article).toBeDefined()
+    expect(article!.full_text).toBeNull()
+    expect(await lastErrorOf('https://example.com/bare')).toBeNull()
+  })
+
+  it('still fetches the article page when the flag is off', async () => {
+    const feed = seedFeed()
+    const rssXml = rss20Xml('Normal', [
+      { title: 'Post', link: 'https://example.com/normal', description: '<p>short</p>' },
+    ])
+
+    const requested: string[] = []
+    mockFetch.mockImplementation((url: string | URL) => {
+      const u = url.toString()
+      requested.push(u)
+      if (u === feed.rss_url) return Promise.resolve(mockResponse(rssXml, { headers: { 'content-type': 'application/rss+xml' } }))
+      return Promise.resolve(mockResponse(articleHtml()))
+    })
+
+    await fetchSingleFeed(feed)
+
+    expect(requested).toContain('https://example.com/normal')
   })
 })

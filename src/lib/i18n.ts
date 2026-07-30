@@ -29,6 +29,16 @@ const dict = {
     en: 'This feed is generated via RSS Bridge, so its URL cannot be edited directly.',
     zh: '此订阅源通过 RSS Bridge 生成，URL 无法直接编辑。'
   },
+  'feeds.editSkipFetchLabel': {
+    ja: '本文を取得しない',
+    en: 'Skip full-text fetch',
+    zh: '不抓取正文'
+  },
+  'feeds.editSkipFetchNote': {
+    ja: '元記事を取得せず、RSSの内容をそのまま本文として表示します。Reddit や X などbot対策で取得できないフィードに使います。',
+    en: 'Show the RSS content as the article body instead of fetching the original page. Use this for bot-gated sources such as Reddit or X.',
+    zh: '不抓取原文页面，直接将 RSS 内容作为正文显示。适用于 Reddit、X 等有反爬限制的订阅源。'
+  },
   'feeds.editErrorNameRequired': { ja: '名前を入力してください', en: 'Name is required', zh: '请输入名称'},
   'feeds.editSaving': { ja: '保存中…', en: 'Saving…', zh: '保存中…'},
   'feeds.editSave': { ja: '保存', en: 'Save', zh: '保存'},
