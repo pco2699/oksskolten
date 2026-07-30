@@ -123,6 +123,7 @@ describe('generateOpml', () => {
     error_count: 0,
     disabled: 0,
     requires_js_challenge: 0,
+    skip_full_text_fetch: 0,
     type: 'rss',
     etag: null,
     last_modified: null,
