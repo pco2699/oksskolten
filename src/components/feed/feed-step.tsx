@@ -6,6 +6,7 @@ import { useI18n } from '../../lib/i18n'
 import { Button } from '../ui/button'
 import { Input } from '../ui/input'
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '../ui/select'
+import { Switch } from '../ui/switch'
 import { Loader2, Check, X, Minus } from 'lucide-react'
 import type { Category } from '../../../shared/types'
 
@@ -119,6 +120,7 @@ export function FeedStep({ onClose, onCreated, onFetchStarted, categories }: Fee
   const [nameManuallySet, setNameManuallySet] = useState(false)
   const [url, setUrl] = useState('')
   const [categoryId, setCategoryId] = useState<number | ''>('')
+  const [skipFetch, setSkipFetch] = useState(false)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   const [discovering, setDiscovering] = useState(false)
@@ -187,6 +189,7 @@ export function FeedStep({ onClose, onCreated, onFetchStarted, categories }: Fee
           name: name.trim() || undefined,
           url: url.trim(),
           category_id: categoryId || null,
+          skip_full_text_fetch: skipFetch ? 1 : 0,
           ...phase2,
         }),
       })
@@ -341,6 +344,12 @@ export function FeedStep({ onClose, onCreated, onFetchStarted, categories }: Fee
           </SelectContent>
         </Select>
       )}
+      <Switch
+        checked={skipFetch}
+        onCheckedChange={setSkipFetch}
+        label={t('feeds.editSkipFetchLabel')}
+        description={t('feeds.editSkipFetchNote')}
+      />
       {error && <p className="text-xs text-error">{error}</p>}
       <div className="flex justify-end gap-2">
         <Button variant="outline" onClick={onClose}>

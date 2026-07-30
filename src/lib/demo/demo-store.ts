@@ -75,6 +75,7 @@ interface SeedFeed {
   error_count: number
   last_error: string | null
   requires_js_challenge: number
+  skip_full_text_fetch: number
   etag: string | null
   last_modified: string | null
   last_content_hash: string | null
@@ -145,6 +146,7 @@ function createFeed(overrides: Partial<SeedFeed> & Pick<SeedFeed, 'name' | 'url'
     error_count: 0,
     last_error: null,
     requires_js_challenge: 0,
+    skip_full_text_fetch: 0,
     etag: null,
     last_modified: null,
     last_content_hash: null,

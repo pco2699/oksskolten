@@ -5,6 +5,7 @@ import { apiPatch } from '../../lib/fetcher'
 import { Dialog, DialogContent, DialogTitle } from '../ui/dialog'
 import { Input } from '../ui/input'
 import { Button } from '../ui/button'
+import { Switch } from '../ui/switch'
 import * as VisuallyHidden from '@radix-ui/react-visually-hidden'
 import type { FeedWithCounts } from '../../../shared/types'
 
@@ -30,6 +31,7 @@ export function FeedEditDialog({ feed, onClose, onUpdated }: FeedEditDialogProps
   const usesBridge = !feed.rss_url && !!feed.rss_bridge_url
   const [name, setName] = useState(feed.name)
   const [rssUrl, setRssUrl] = useState(feed.rss_url ?? '')
+  const [skipFetch, setSkipFetch] = useState(feed.skip_full_text_fetch === 1)
   const [error, setError] = useState('')
   const [saving, setSaving] = useState(false)
 
@@ -51,6 +53,7 @@ export function FeedEditDialog({ feed, onClose, onUpdated }: FeedEditDialogProps
       await apiPatch(`/api/feeds/${feed.id}`, {
         name: trimmedName,
         ...(usesBridge ? {} : { rss_url: trimmedUrl }),
+        skip_full_text_fetch: skipFetch ? 1 : 0,
       })
       onUpdated()
       toast.success(t('feeds.editSuccess', { name: trimmedName }))
@@ -93,6 +96,14 @@ export function FeedEditDialog({ feed, onClose, onUpdated }: FeedEditDialogProps
                 required
               />
             )}
+          </div>
+          <div className="pt-1">
+            <Switch
+              checked={skipFetch}
+              onCheckedChange={setSkipFetch}
+              label={t('feeds.editSkipFetchLabel')}
+              description={t('feeds.editSkipFetchNote')}
+            />
           </div>
           {error && <p className="text-xs text-error">{error}</p>}
           <div className="flex justify-end gap-2 pt-1">

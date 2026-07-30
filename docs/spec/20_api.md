@@ -649,6 +649,7 @@ Response headers:
 | `discovered_rss_url` | No | HTTPS URL of a previously discovered RSS feed. When set, skip discovery and use this URL directly (Phase 2: user chose "whole site"). |
 | `discovered_rss_title` | No | Title of the discovered RSS feed. Used for auto-naming when `name` is omitted. |
 | `force_page_selector` | No | If `true`, skip Steps 1–2 and go straight to LLM CSS selector inference (Phase 2: user chose "this page only"). Mutually exclusive with `discovered_rss_url`. |
+| `skip_full_text_fetch` | No | `0` or `1` (default `0`). Set `1` to opt out of full-text fetching from the moment the feed is created, so the initial fetch never requests the origin pages. |
 
 Processing flow:
 1. Check `url` for duplicates → `409 { "error": "Feed URL already exists" }` on duplicate
@@ -706,11 +707,12 @@ The frontend then presents the user with a choice: "Subscribe to the whole site"
   "rss_url": "https://blog.example.com/rss/",
   "rss_bridge_url": "http://rss-bridge/?...",
   "disabled": 0,
-  "category_id": 2
+  "category_id": 2,
+  "skip_full_text_fetch": 1
 }
 ```
 
-Updatable fields: `name`, `rss_url`, `rss_bridge_url`, `disabled` (`0` or `1`), `category_id`. `url` (the site's homepage, used for re-detection) cannot be changed. `rss_url` must be an `http://` or `https://` URL. Setting `disabled: 0` also resets `error_count` to `0` and `last_error` to `NULL`. Changing `rss_url` to a different value also clears `etag`, `last_modified`, `last_content_hash`, `last_error`, `error_count`, and `next_check_at`, so the next fetch hits the new URL fresh instead of reusing stale conditional-GET headers or an existing error backoff schedule.
+Updatable fields: `name`, `rss_url`, `rss_bridge_url`, `disabled` (`0` or `1`), `category_id`, `skip_full_text_fetch` (`0` or `1`). `url` (the site's homepage, used for re-detection) cannot be changed. `rss_url` must be an `http://` or `https://` URL. Setting `disabled: 0` also resets `error_count` to `0` and `last_error` to `NULL`. Setting `skip_full_text_fetch: 1` likewise clears `last_error` and `error_count`, because articles on such feeds are never fetched again and stored failures would otherwise linger as permanent feed errors. The same transition (`0` → `1`) additionally drops the stored body, summary, and translation of any article in the feed whose `full_text` is a bot-block page, so the next fetch replaces it with RSS content; genuine bodies are left untouched. Changing `rss_url` to a different value also clears `etag`, `last_modified`, `last_content_hash`, `last_error`, `error_count`, and `next_check_at`, so the next fetch hits the new URL fresh instead of reusing stale conditional-GET headers or an existing error backoff schedule.
 
 ```json
 // Response: 200 (returns all feed fields)

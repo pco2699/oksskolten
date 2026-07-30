@@ -436,6 +436,19 @@ export function updateArticleContent(
 }
 
 /**
+ * Return id + full_text for active articles in the given feed that have a
+ * stored body. Used when a feed switches to skip_full_text_fetch so the
+ * caller can identify bodies that are actually bot-block pages and drop them.
+ */
+export function getArticleBodiesByFeed(feedId: number): { id: number; full_text: string }[] {
+  return getDb().prepare(`
+    SELECT id, full_text
+    FROM active_articles
+    WHERE feed_id = ? AND full_text IS NOT NULL AND trim(full_text) != ''
+  `).all(feedId) as { id: number; full_text: string }[]
+}
+
+/**
  * One-day backoff window between refresh attempts. After we try to repair
  * a stale article and fail (e.g. RSS has no description, the body is
  * legitimately short, or the item dropped out of the current feed), the
@@ -527,22 +540,29 @@ export function getExistingArticleUrls(urls: string[]): Set<string> {
 
 // Backoff deadline: datetime when the article becomes eligible for retry again.
 // 30 * 2^retry_count minutes, clamped to 32 hours via MIN(retry_count, 6).
-const BACKOFF_DEADLINE = `datetime(last_retry_at, '+' || (30 * (1 << MIN(retry_count, 6))) || ' minutes')`
+// Takes a table alias prefix so it can be used in joined queries.
+const backoffDeadline = (p = '') =>
+  `datetime(${p}last_retry_at, '+' || (30 * (1 << MIN(${p}retry_count, 6))) || ' minutes')`
 
 export function getRetryArticles(
   maxAttempts = RETRY_MAX_ATTEMPTS,
   batchLimit = RETRY_BATCH_LIMIT,
 ): Article[] {
+  // Feeds opted out of full-text fetching are excluded: retrying them would
+  // re-issue the very request the user disabled, and their bodies come from
+  // the RSS payload instead.
   return getDb().prepare(`
-    SELECT * FROM active_articles
-    WHERE last_error IS NOT NULL
-      AND full_text IS NULL
-      AND retry_count < :max_attempts
+    SELECT a.* FROM active_articles a
+    JOIN feeds f ON f.id = a.feed_id
+    WHERE a.last_error IS NOT NULL
+      AND a.full_text IS NULL
+      AND f.skip_full_text_fetch = 0
+      AND a.retry_count < :max_attempts
       AND (
-        last_retry_at IS NULL
-        OR ${BACKOFF_DEADLINE} <= datetime('now')
+        a.last_retry_at IS NULL
+        OR ${backoffDeadline('a.')} <= datetime('now')
       )
-    ORDER BY retry_count ASC, last_retry_at ASC
+    ORDER BY a.retry_count ASC, a.last_retry_at ASC
     LIMIT :batch_limit
   `).all({ max_attempts: maxAttempts, batch_limit: batchLimit }) as Article[]
 }
@@ -556,17 +576,19 @@ export interface RetryStats {
 export function getRetryStats(maxAttempts = RETRY_MAX_ATTEMPTS): RetryStats {
   const row = getDb().prepare(`
     SELECT
-      SUM(CASE WHEN retry_count < :max_attempts AND (
-        last_retry_at IS NULL
-        OR ${BACKOFF_DEADLINE} <= datetime('now')
+      SUM(CASE WHEN a.retry_count < :max_attempts AND (
+        a.last_retry_at IS NULL
+        OR ${backoffDeadline('a.')} <= datetime('now')
       ) THEN 1 ELSE 0 END) AS eligible,
-      SUM(CASE WHEN retry_count < :max_attempts AND
-        last_retry_at IS NOT NULL AND
-        ${BACKOFF_DEADLINE} > datetime('now')
+      SUM(CASE WHEN a.retry_count < :max_attempts AND
+        a.last_retry_at IS NOT NULL AND
+        ${backoffDeadline('a.')} > datetime('now')
       THEN 1 ELSE 0 END) AS backoff_waiting,
-      SUM(CASE WHEN retry_count >= :max_attempts THEN 1 ELSE 0 END) AS exceeded
-    FROM active_articles
-    WHERE last_error IS NOT NULL AND full_text IS NULL
+      SUM(CASE WHEN a.retry_count >= :max_attempts THEN 1 ELSE 0 END) AS exceeded
+    FROM active_articles a
+    JOIN feeds f ON f.id = a.feed_id
+    WHERE a.last_error IS NOT NULL AND a.full_text IS NULL
+      AND f.skip_full_text_fetch = 0
   `).get({ max_attempts: maxAttempts }) as { eligible: number | null; backoff_waiting: number | null; exceeded: number | null }
   return {
     eligible: row.eligible ?? 0,

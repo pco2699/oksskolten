@@ -142,6 +142,8 @@ Main Thread (Event Loop)                Worker Thread (piscina, max 2)
 
 **Implementation files**: `server/fetcher/content.ts` (HTTP fetching + pool invocation), `server/fetcher/contentWorker.ts` (DOM parsing logic), `server/fetcher/markdown-utils.ts` (HTML→Markdown conversion + excerpt generation), `server/lib/cleaner/`
 
+**Opting out per feed**: when a feed has `skip_full_text_fetch = 1`, `fetchArticleContent` never calls `fetchFullText` and the whole pipeline below is bypassed. The RSS content (`content:encoded` / `description`) is converted to Markdown and stored as `full_text`, the first `<img>` in it becomes `og_image`, and an item with no content is stored with an empty body and no `last_error`. This exists for sources that gate scrapers hard enough that fetching is pure cost — Reddit and X return either a block page or a JS-only shell, and the FlareSolverr quality-gate retry (step 8) then burns a browser render per article to reach the same dead end. Such articles are also excluded from the retry queue (`getRetryArticles`).
+
 ```
 fetchFullText(articleUrl, cleanerConfig?)
 │

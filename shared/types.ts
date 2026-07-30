@@ -20,6 +20,8 @@ export interface Feed {
   error_count: number
   disabled: number
   requires_js_challenge: number
+  /** When 1, skip full-text fetching and use the RSS content as the body. */
+  skip_full_text_fetch: number
   type: 'rss' | 'clip'
   etag: string | null
   last_modified: string | null

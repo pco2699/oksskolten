@@ -56,7 +56,7 @@ Because Oksskolten always has the complete text, AI summarization and translatio
 
 ## Features
 
-- **Full-Text Extraction** — Every article is fetched from its source and processed through Readability + 500 noise-removal patterns. You read complete articles inside Oksskolten, never needing to click through to the original site
+- **Full-Text Extraction** — Every article is fetched from its source and processed through Readability + 500 noise-removal patterns. You read complete articles inside Oksskolten, never needing to click through to the original site. Sources that block scrapers outright (Reddit, X) can opt out per feed with a "Skip full-text fetch" toggle that renders the RSS content instead
 - **AI Summarization & Translation** — On-demand article processing through OpenRouter with SSE streaming: one API key, any model from any vendor. Works on full article text, not RSS excerpts
 - **Interactive Chat** — Multi-turn AI conversations with MCP tooling; search articles, get stats, and ask questions about your feeds
 - **Full-Text Search** — Meilisearch-powered search across your entire article archive

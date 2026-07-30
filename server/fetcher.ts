@@ -21,6 +21,7 @@ import { Semaphore, CONCURRENCY, errorMessage } from './fetcher/util.js'
 import { detectAndStoreSimilarArticles } from './similarity.js'
 import { type FetchProgressEvent, emitProgress, markFeedDone } from './fetcher/progress.js'
 import { fetchFullText, isBotBlockPage, convertHtmlToMarkdown, markdownToExcerpt, MIN_EXTRACTED_LENGTH } from './fetcher/content.js'
+import { firstImageFromHtml } from './fetcher/markdown-utils.js'
 import { type FetchRssResult, type RssItem, fetchAndParseRss, RateLimitError } from './fetcher/rss.js'
 import { computeInterval, computeEmpiricalInterval, sqliteFuture, DEFAULT_INTERVAL } from './fetcher/schedule.js'
 import { detectLanguage } from './fetcher/ai.js'
@@ -106,6 +107,8 @@ export async function fetchArticleContent(
   url: string,
   options?: {
     requiresJsChallenge?: boolean
+    /** Feed opted out of full-text fetching — render the RSS content instead */
+    skipFullTextFetch?: boolean
     /** CSS Bridge listing-page excerpt, used as fullText fallback */
     listingExcerpt?: string
     /** Existing article data for retry (skips fetch if full_text present) */
@@ -130,6 +133,16 @@ export async function fetchArticleContent(
   if (existing?.full_text) {
     fullText = existing.full_text
     ogImage = existing.og_image
+  } else if (options?.skipFullTextFetch) {
+    // Feed opted out of full-text fetching (bot-gated sources like Reddit / X,
+    // where the page fetch is blocked or yields a JS-only shell). The RSS
+    // payload is the body — no request to the origin is made at all, and a
+    // missing excerpt is not an error, just an empty body.
+    if (options.listingExcerpt) {
+      fullText = convertHtmlToMarkdown(options.listingExcerpt)
+      excerpt = markdownToExcerpt(fullText)
+      ogImage = firstImageFromHtml(options.listingExcerpt, url)
+    }
   } else if (isAnchorLink && options?.listingExcerpt) {
     fullText = convertHtmlToMarkdown(options.listingExcerpt)
     excerpt = markdownToExcerpt(fullText)
@@ -184,6 +197,8 @@ interface NewArticle {
   url: string
   published_at: string | null
   requires_js_challenge?: boolean
+  /** Feed opted out of full-text fetching — render the RSS content instead */
+  skip_full_text_fetch?: boolean
   /** Excerpt from listing page (CSS Bridge content_selector), used as fullText fallback */
   excerpt?: string
 }
@@ -201,6 +216,7 @@ async function processArticle(task: ArticleTask): Promise<boolean> {
 
   const content = await fetchArticleContent(articleUrl, {
     requiresJsChallenge: task.kind === 'new' ? task.requires_js_challenge : undefined,
+    skipFullTextFetch: task.kind === 'new' ? task.skip_full_text_fetch : undefined,
     listingExcerpt: task.kind === 'new' ? task.excerpt : undefined,
     existingArticle: task.kind === 'retry' ? task.article : undefined,
   })
@@ -302,6 +318,7 @@ export async function fetchSingleFeed(
       url: item.url,
       published_at: item.published_at,
       requires_js_challenge: !!feed.requires_js_challenge,
+      skip_full_text_fetch: !!feed.skip_full_text_fetch,
       excerpt: item.excerpt,
     }))
 
@@ -401,6 +418,7 @@ export async function fetchAllFeeds(
               url: item.url,
               published_at: item.published_at,
               requires_js_challenge: !!feed.requires_js_challenge,
+              skip_full_text_fetch: !!feed.skip_full_text_fetch,
               excerpt: item.excerpt,
             }))
 

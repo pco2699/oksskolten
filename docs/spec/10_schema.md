@@ -109,6 +109,7 @@ CREATE TABLE feeds (
   error_count     INTEGER NOT NULL DEFAULT 0,         -- Consecutive error count
   disabled              INTEGER NOT NULL DEFAULT 0,   -- 1=auto-disabled (5 consecutive failures)
   requires_js_challenge INTEGER NOT NULL DEFAULT 0,   -- 1=site requires bot verification (JS challenge) bypass
+  skip_full_text_fetch  INTEGER NOT NULL DEFAULT 0,   -- 1=never fetch the origin page; render RSS content as the body
   etag                  TEXT,                         -- Previous response ETag (for conditional requests)
   last_modified         TEXT,                         -- Previous response Last-Modified (for conditional requests)
   last_content_hash     TEXT,                         -- SHA-256 of previous response body (for servers without ETag)
@@ -227,6 +228,7 @@ CREATE INDEX idx_similarities_similar_to ON article_similarities(similar_to_id);
 - Articles are identified by `articles.url` (UNIQUE). Feeds are identified by `feeds.id` (INTEGER PK)
 - The `settings` table is a key-value store for user preferences and authentication configuration
 - Feeds with `requires_js_challenge = 1` route all HTTP requests (RSS fetch and article body fetch) through FlareSolverr. This flag is automatically set when bot verification (e.g., Cloudflare 403) is detected during feed registration
+- Feeds with `skip_full_text_fetch = 1` never request the origin article page. The RSS content (`content:encoded` / `description`) is converted to Markdown and stored as `full_text`, and the first `<img>` in that content becomes `og_image`. Intended for aggressively bot-gated sources (Reddit, X) where the page fetch is blocked or returns a JS-only shell. Articles belonging to such feeds are excluded from the full-text retry queue, and enabling the flag clears the feed's `last_error` / `error_count`. Switching the flag from `0` to `1` also drops the stored body of any article in that feed whose `full_text` is a bot-block page (`isBotBlockPage`), along with its derived `summary` / translation, so the next fetch replaces it with RSS content — such pages are longer than `MIN_EXTRACTED_LENGTH` and would otherwise be invisible to the stale-article refresh. Genuine article bodies are never discarded. User-controlled only — unlike `requires_js_challenge`, it is never set automatically
 - `etag` / `last_modified` / `last_content_hash` are cache metadata for bandwidth optimization. Conditional HTTP requests (304 responses) and content hash comparison allow skipping XML parsing for unchanged feeds
 - `next_check_at` / `check_interval` are used for adaptive refresh interval scheduling. The maximum value is chosen from three signals: HTTP `Cache-Control` / `Expires`, RSS `<ttl>`, and article update frequency, then clamped to the range of 15 minutes to 4 hours. On notModified, the previous interval stored in `check_interval` is reused. The datetime format is compatible with `strftime('%Y-%m-%dT%H:%M:%SZ')` (no milliseconds)
 - `feeds.type = 'clip'` denotes the clip-only feed (singleton). It is excluded from Cron fetching. See [80_feature_clip.md](./80_feature_clip.md) for details

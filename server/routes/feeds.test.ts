@@ -324,6 +324,39 @@ describe('POST /api/feeds — RSS discovery pipeline', () => {
     await new Promise(resolve => setTimeout(resolve, 10))
     expect(mockFetchSingleFeed).not.toHaveBeenCalled()
   })
+
+  it('creates the feed with skip_full_text_fetch when requested', async () => {
+    const res = await app.inject({
+      method: 'POST',
+      url: '/api/feeds',
+      headers: json,
+      payload: {
+        url: 'https://reddit.example.com',
+        discovered_rss_url: 'https://reddit.example.com/feed.xml',
+        skip_full_text_fetch: 1,
+      },
+    })
+
+    const events = parseSSE(res.body)
+    const done = events.find(e => e.type === 'done') as any
+    expect(done.feed.skip_full_text_fetch).toBe(1)
+  })
+
+  it('defaults skip_full_text_fetch to 0', async () => {
+    const res = await app.inject({
+      method: 'POST',
+      url: '/api/feeds',
+      headers: json,
+      payload: {
+        url: 'https://example.com',
+        discovered_rss_url: 'https://example.com/feed.xml',
+      },
+    })
+
+    const events = parseSSE(res.body)
+    const done = events.find(e => e.type === 'done') as any
+    expect(done.feed.skip_full_text_fetch).toBe(0)
+  })
 })
 
 // ---------------------------------------------------------------------------
@@ -409,6 +442,98 @@ describe('PATCH /api/feeds/:id', () => {
       payload: { name: 'Nope' },
     })
     expect(res.statusCode).toBe(404)
+  })
+
+  it('accepts skip_full_text_fetch and clears feed error state', async () => {
+    const feed = seedFeed({ rss_url: 'https://example.com/feed.xml' })
+    const { getDb } = await import('../db.js')
+    getDb().prepare('UPDATE feeds SET last_error = ?, error_count = 3 WHERE id = ?').run('boom', feed.id)
+
+    const res = await app.inject({
+      method: 'PATCH',
+      url: `/api/feeds/${feed.id}`,
+      headers: json,
+      payload: { skip_full_text_fetch: 1 },
+    })
+
+    expect(res.statusCode).toBe(200)
+    const body = res.json()
+    expect(body.skip_full_text_fetch).toBe(1)
+    expect(body.last_error).toBeNull()
+    expect(body.error_count).toBe(0)
+  })
+
+  it('rejects a non-boolean skip_full_text_fetch', async () => {
+    const feed = seedFeed({ rss_url: 'https://example.com/feed.xml' })
+
+    const res = await app.inject({
+      method: 'PATCH',
+      url: `/api/feeds/${feed.id}`,
+      headers: json,
+      payload: { skip_full_text_fetch: 2 },
+    })
+
+    expect(res.statusCode).toBe(400)
+  })
+
+  it('drops bot-block article bodies when skip_full_text_fetch is turned on', async () => {
+    const feed = seedFeed({ rss_url: 'https://example.com/feed.xml' })
+    const { insertArticle, getDb } = await import('../db.js')
+
+    const blockedId = insertArticle({
+      feed_id: feed.id,
+      title: 'Blocked',
+      url: 'https://example.com/blocked',
+      published_at: null,
+      full_text: 'Just a moment... Please verify you are a human before continuing to the site.',
+      summary: 'derived from garbage',
+    })
+    const goodId = insertArticle({
+      feed_id: feed.id,
+      title: 'Good',
+      url: 'https://example.com/good',
+      published_at: null,
+      full_text: 'A genuine article body that was extracted correctly and should survive.',
+    })
+
+    await app.inject({
+      method: 'PATCH',
+      url: `/api/feeds/${feed.id}`,
+      headers: json,
+      payload: { skip_full_text_fetch: 1 },
+    })
+
+    const rows = getDb().prepare('SELECT id, full_text, summary FROM articles WHERE id IN (?, ?)').all(blockedId, goodId) as { id: number; full_text: string | null; summary: string | null }[]
+    const blocked = rows.find(r => r.id === blockedId)!
+    const good = rows.find(r => r.id === goodId)!
+
+    expect(blocked.full_text).toBeNull()
+    expect(blocked.summary).toBeNull()
+    // A real body is never discarded.
+    expect(good.full_text).toContain('genuine article body')
+  })
+
+  it('leaves article bodies alone when the flag is already on', async () => {
+    const feed = seedFeed({ rss_url: 'https://example.com/feed.xml', skip_full_text_fetch: 1 })
+    const { insertArticle, getDb } = await import('../db.js')
+
+    const id = insertArticle({
+      feed_id: feed.id,
+      title: 'Blocked',
+      url: 'https://example.com/blocked2',
+      published_at: null,
+      full_text: 'Just a moment... Please verify you are a human before continuing to the site.',
+    })
+
+    await app.inject({
+      method: 'PATCH',
+      url: `/api/feeds/${feed.id}`,
+      headers: json,
+      payload: { skip_full_text_fetch: 1 },
+    })
+
+    const row = getDb().prepare('SELECT full_text FROM articles WHERE id = ?').get(id) as { full_text: string | null }
+    expect(row.full_text).toContain('Just a moment')
   })
 })
 
