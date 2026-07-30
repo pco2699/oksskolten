@@ -1,5 +1,9 @@
 # Changelog
 
+## [v0.5.3](https://github.com/pco2699/oksskolten/compare/v0.5.2...v0.5.3) - 2026-07-30
+### Others
+- Add skip_full_text_fetch flag to opt out of article fetching by @pco2699 in https://github.com/pco2699/oksskolten/pull/6
+
 ## [v0.5.2](https://github.com/pco2699/oksskolten/compare/v0.5.1...v0.5.2) - 2026-07-29
 
 ## [v0.5.1](https://github.com/pco2699/oksskolten/compare/v0.5.0...v0.5.1) - 2026-07-29
