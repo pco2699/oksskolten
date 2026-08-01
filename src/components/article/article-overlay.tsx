@@ -1,6 +1,8 @@
 import * as DialogPrimitive from '@radix-ui/react-dialog'
 import { X } from 'lucide-react'
 import { Dialog, DialogPortal, DialogOverlay, DialogTitle } from '../ui/dialog'
+import { useHistoryDismiss } from '../../hooks/use-history-dismiss'
+import { useSwipeDismiss } from '../../hooks/use-swipe-dismiss'
 import { ArticleDetail } from './article-detail'
 import { ArticleNavArrows } from './article-nav-arrows'
 
@@ -11,7 +13,14 @@ interface ArticleOverlayProps {
   onNavigate?: (url: string) => void
 }
 
+const OVERLAY_HISTORY_KEY = 'article-overlay'
+
 export function ArticleOverlay({ articleUrl, onClose, onNavigate }: ArticleOverlayProps) {
+  // Back gesture / back button closes the overlay instead of navigating the
+  // list page behind it away
+  useHistoryDismiss(!!articleUrl, onClose, OVERLAY_HISTORY_KEY)
+  const swipeHandlers = useSwipeDismiss(onClose)
+
   return (
     <Dialog open={!!articleUrl} onOpenChange={(open) => { if (!open) onClose() }}>
       <DialogPortal>
@@ -22,6 +31,7 @@ export function ArticleOverlay({ articleUrl, onClose, onNavigate }: ArticleOverl
           data-keyboard-nav-passthrough=""
           onOpenAutoFocus={(e) => e.preventDefault()}
           onCloseAutoFocus={(e) => e.preventDefault()}
+          {...swipeHandlers}
         >
           {/* Scrollable inner wrapper — kept separate from the fixed Content box so the
               nav arrows below can stay pinned to the panel's edges without scrolling away. */}
@@ -36,6 +46,9 @@ export function ArticleOverlay({ articleUrl, onClose, onNavigate }: ArticleOverl
               >
                 <X className="w-5 h-5 text-muted" />
               </button>
+              {/* Mobile has no room for the edge chevrons — the same prev/next
+                  navigation lives in this bar instead. */}
+              {articleUrl && <ArticleNavArrows currentArticleUrl={articleUrl} onNavigate={onNavigate} variant="header" />}
             </div>
             {articleUrl && <ArticleDetail articleUrl={articleUrl} />}
           </div>

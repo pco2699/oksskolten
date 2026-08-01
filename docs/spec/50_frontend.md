@@ -176,6 +176,30 @@ Four layout options are available for the article list. Independent from the the
 - Hook: `src/hooks/useLayout.ts` (based on `createLocalStorageHook`)
 - Skeleton UI: Dedicated skeletons corresponding to each layout
 
+### Mobile Gestures
+
+Touch gestures below the `md` breakpoint. All of them are no-ops for mouse/keyboard users.
+
+| Gesture | Where | Behavior |
+|---|---|---|
+| Swipe right | Anywhere on a list page | Opens the sidebar drawer (`useSwipeDrawer`) |
+| Swipe left | Sidebar drawer open | Closes the drawer via `history.back()` |
+| Swipe left | Article card | Opens the article (`SwipeableArticleCard`) |
+| Swipe left / right | Article overlay panel | Closes the overlay (`useSwipeDismiss`) |
+| Back gesture / back button | Sidebar drawer or article overlay open | Dismisses that layer instead of navigating the page behind it away |
+
+#### History-Backed Dismissal
+
+In-app layers that visually behave like a page (sidebar drawer, `ArticleOverlay`) are pure React state, so a back gesture would otherwise navigate the underlying route away while leaving the layer on screen.
+
+`useHistoryDismiss` (`src/hooks/use-history-dismiss.ts`) fixes that: it pushes a marker history entry (`history.pushState({ [stateKey]: true }, '')`) while the layer is open, dismisses the layer on `popstate`, and pops the entry back off when the layer is closed by other means (close button, Escape, swipe) so the stack stays balanced and back never has to be pressed twice. `ArticleOverlay` uses the `article-overlay` key; the drawer keeps its own equivalent handling in `useSwipeDrawer` under the `drawer-open` key.
+
+#### Gesture Precedence
+
+`useSwipeDrawer` listens on `document`, so it would otherwise also react to swipes made inside a modal layered above the page. It ignores any swipe while an open Radix dialog (`[role="dialog"][data-state="open"]`, including `alertdialog`) is present, leaving those gestures to the topmost layer.
+
+`useSwipeDismiss` (`src/hooks/use-swipe-dismiss.ts`) requires ≥60px of horizontal travel dominating vertical travel by 1.5×, ignores multi-touch (pinch zoom), and ignores gestures that start inside a horizontally scrollable descendant (wide code blocks, tables) so scrolling that content never closes the panel.
+
 ### PWA Support
 
 Progressive Web App support via `vite-plugin-pwa`.
