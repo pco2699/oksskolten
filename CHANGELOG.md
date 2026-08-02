@@ -1,5 +1,10 @@
 # Changelog
 
+## [v0.5.4](https://github.com/pco2699/oksskolten/compare/v0.5.3...v0.5.4) - 2026-08-02
+### Others
+- Fix OPML import treating feeds from one host as duplicates by @pco2699 in https://github.com/pco2699/oksskolten/pull/9
+- Close the article overlay on back gesture and swipe on mobile by @pco2699 in https://github.com/pco2699/oksskolten/pull/8
+
 ## [v0.5.3](https://github.com/pco2699/oksskolten/compare/v0.5.2...v0.5.3) - 2026-07-30
 ### Others
 - Add skip_full_text_fetch flag to opt out of article fetching by @pco2699 in https://github.com/pco2699/oksskolten/pull/6
