@@ -4,6 +4,15 @@ import { MD_BREAKPOINT } from '../lib/breakpoints'
 const DRAWER_STATE_KEY = 'drawer-open'
 
 /**
+ * A modal (article overlay, confirm dialog, ...) is on top of the page.
+ * Radix portals its content to <body> and marks it with data-state.
+ * Swipes belong to that layer, not to the drawer underneath it.
+ */
+function isModalOpen(): boolean {
+  return document.querySelector('[role="dialog"][data-state="open"], [role="alertdialog"][data-state="open"]') !== null
+}
+
+/**
  * Swipe to open/close the sidebar drawer on mobile.
  * Also pushes a history entry when the drawer opens so that the native
  * back gesture (or hardware back button) closes the drawer instead of
@@ -46,6 +55,7 @@ export function useSwipeDrawer(
   useEffect(() => {
     const onTouchStart = (e: TouchEvent) => {
       if (window.innerWidth >= MD_BREAKPOINT) return
+      if (isModalOpen()) return
       const touch = e.touches[0]
       touchStart.current = { x: touch.clientX, y: touch.clientY }
     }

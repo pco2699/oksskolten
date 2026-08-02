@@ -16,8 +16,10 @@ interface ArticleNavArrowsProps {
    * 'page' anchors the arrows to the viewport edges (fixed positioning).
    * 'overlay' anchors them to the dialog panel's own box (absolute
    * positioning, since the panel establishes its own containing block).
+   * 'header' renders them inline as a pair of buttons for a toolbar — the
+   * mobile counterpart of the edge chevrons, which are desktop-only.
    */
-  variant?: 'page' | 'overlay'
+  variant?: 'page' | 'overlay' | 'header'
 }
 
 /**
@@ -43,6 +45,34 @@ export function ArticleNavArrows({ currentArticleUrl, onNavigate, variant = 'pag
     if (!url) return
     if (onNavigate) onNavigate(url)
     else void navigate(articleUrlToPath(url))
+  }
+
+  if (variant === 'header') {
+    // Inline pair, mobile only — desktop keeps the edge chevrons.
+    // Disabled ends stay visible (dimmed) so the buttons don't shift around.
+    const headerButtonClass = 'flex h-8 w-8 items-center justify-center rounded-full hover:bg-hover transition-colors disabled:opacity-30 disabled:pointer-events-none'
+    return (
+      <div className="flex items-center gap-1 ml-auto md:hidden">
+        <button
+          type="button"
+          onClick={() => goTo(prevUrl)}
+          disabled={!prevUrl}
+          aria-label={t('article.prevArticle')}
+          className={headerButtonClass}
+        >
+          <ChevronLeft className="w-5 h-5 text-muted" />
+        </button>
+        <button
+          type="button"
+          onClick={() => goTo(nextUrl)}
+          disabled={!nextUrl}
+          aria-label={t('article.nextArticle')}
+          className={headerButtonClass}
+        >
+          <ChevronRight className="w-5 h-5 text-muted" />
+        </button>
+      </div>
+    )
   }
 
   const positionClass = variant === 'overlay' ? 'absolute' : 'fixed'

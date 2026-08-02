@@ -85,4 +85,29 @@ describe('ArticleNavArrows', () => {
     expect(onNavigate).toHaveBeenCalledWith('https://example.com/1')
     expect(mockNavigate).not.toHaveBeenCalled()
   })
+
+  describe('header variant', () => {
+    it('renders an inline pair that is hidden from md up', () => {
+      renderArrows({ variant: 'header' })
+      const prev = screen.getByLabelText('Previous article')
+      expect(prev.parentElement?.className).toContain('md:hidden')
+      // Not the fixed/absolute edge chevrons
+      expect(prev.className).not.toContain('absolute')
+      expect(prev.className).not.toContain('fixed')
+    })
+
+    it('navigates within the overlay when onNavigate is provided', () => {
+      const onNavigate = vi.fn()
+      renderArrows({ onNavigate, variant: 'header' })
+      screen.getByLabelText('Next article').click()
+      expect(onNavigate).toHaveBeenCalledWith('https://example.com/3')
+      expect(mockNavigate).not.toHaveBeenCalled()
+    })
+
+    it('disables the ends of the list', () => {
+      renderArrows({ currentArticleUrl: 'https://example.com/1', variant: 'header' })
+      expect((screen.getByLabelText('Previous article') as HTMLButtonElement).disabled).toBe(true)
+      expect((screen.getByLabelText('Next article') as HTMLButtonElement).disabled).toBe(false)
+    })
+  })
 })

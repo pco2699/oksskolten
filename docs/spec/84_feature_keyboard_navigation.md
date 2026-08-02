@@ -120,6 +120,8 @@ Rendered in both reading modes:
 - **Page mode**: mounted in `ArticleDetailPage` (`src/app.tsx`) with `variant="page"`. Positioned `fixed` relative to the viewport; navigates using `useNavigate()` + `articleUrlToPath()`, the same mechanism as `ArticleZapNavigation`.
 - **Overlay mode**: mounted inside `ArticleOverlay` (`src/components/article/article-overlay.tsx`) with `variant="overlay"`. Positioned `absolute` relative to the dialog's `Content` element (which is itself `position: fixed`, establishing the containing block) — this keeps the arrows pinned to the overlay panel's actual edges without hardcoding its width. An `onNavigate` callback is threaded from `article-list.tsx` (owner of the `overlayUrl` state) through `ArticleOverlay` down to `ArticleNavArrows`, so clicking an arrow swaps the article shown in the overlay instead of navigating the router. The overlay's scrollable content was moved into an inner wrapper `div` (`h-full overflow-y-auto`) so the arrows, as direct children of `Content`, don't scroll away with the article body.
 
+A phone screen has no room for edge chevrons floating over full-bleed article text, so the overlay renders a third `variant="header"`: the same two buttons inline in the overlay's sticky top bar, right-aligned next to the close button, and `md:hidden` so exactly one of the two presentations is visible at any width. Disabled ends stay visible but dimmed (`disabled:opacity-30`) rather than fully hidden, so the pair doesn't shift position at the list boundaries. Page mode does not use the header variant: its header is the shared `Header` component, and on mobile it relies on back/forward navigation instead.
+
 ### Keyboard Shortcuts Help Overlay
 
 Pressing `?` opens `KeyboardShortcutsDialog` (`src/components/ui/keyboard-shortcuts-dialog.tsx`), a simple dialog listing all shortcuts (next/prev, open, open-external, bookmark, toggle-read, mark-all-read, close, and `?` itself), reflecting the user's current custom key bindings. Standard dialog z-index (`z-[70]` via the shared `Dialog` component).
@@ -245,8 +247,8 @@ When the article list is empty (no articles), pressing the next/prev key does no
 | `src/hooks/use-keybindings-setting.test.ts` | Tests for keybindings setting hook |
 | `src/components/layout/page-layout.tsx` | Provider placement |
 | `src/components/article/article-list.tsx` | Article list keyboard nav integration, visual feedback, overlay coordination, mark-all-read confirm dialog |
-| `src/components/article/article-overlay.tsx` | `data-keyboard-nav-passthrough` attribute for j/k passthrough; hosts `ArticleNavArrows` (overlay variant) |
-| `src/components/article/article-nav-arrows.tsx` | Prev/next edge chevrons for both page and overlay reading modes |
+| `src/components/article/article-overlay.tsx` | `data-keyboard-nav-passthrough` attribute for j/k passthrough; hosts `ArticleNavArrows` (overlay + header variants); back-gesture and swipe dismissal |
+| `src/components/article/article-nav-arrows.tsx` | Prev/next chevrons: edge variants for page/overlay reading modes, inline header variant for mobile |
 | `src/components/article/article-zap-navigation.tsx` | j/k/o/v/s/m navigation and actions in the page-mode article detail reader |
 | `src/hooks/use-article-actions.ts` | `isRead`/`toggleReadState` (backs the `m` shortcut in the detail/overlay reader) |
 | `src/hooks/use-keyboard-shortcuts-help.ts` | Global `?` shortcut, mounted in `AppLayout` |
