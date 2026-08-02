@@ -40,6 +40,10 @@ export function getFeedByUrl(url: string): Feed | undefined {
   return getDb().prepare('SELECT * FROM feeds WHERE url = ?').get(url) as Feed | undefined
 }
 
+export function getFeedByRssUrl(rssUrl: string): Feed | undefined {
+  return getDb().prepare('SELECT * FROM feeds WHERE rss_url = ?').get(rssUrl) as Feed | undefined
+}
+
 export function getEnabledFeeds(): Feed[] {
   return getDb().prepare(
     "SELECT * FROM feeds WHERE disabled = 0 AND type = 'rss' AND (next_check_at IS NULL OR next_check_at <= strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))",

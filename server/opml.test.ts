@@ -41,7 +41,7 @@ describe('parseOpml', () => {
     })
   })
 
-  it('uses origin as url when htmlUrl is missing', () => {
+  it('uses the feed URL as url when htmlUrl is missing', () => {
     const xml = `<?xml version="1.0" encoding="UTF-8"?>
 <opml version="2.0">
   <head><title>Test</title></head>
@@ -51,7 +51,25 @@ describe('parseOpml', () => {
 </opml>`
 
     const feeds = parseOpml(xml)
-    expect(feeds[0].url).toBe('https://example.com')
+    expect(feeds[0].url).toBe('https://example.com/feed.xml')
+  })
+
+  it('keeps urls distinct when feeds share a host and have no htmlUrl', () => {
+    const xml = `<?xml version="1.0" encoding="UTF-8"?>
+<opml version="2.0">
+  <head><title>Test</title></head>
+  <body>
+    <outline text="Youtube" title="Youtube">
+      <outline type="rss" text="A" xmlUrl="https://proxy.example.com/?youtube=UC_AAA&amp;norewrite" />
+      <outline type="rss" text="B" xmlUrl="https://proxy.example.com/?youtube=UC_BBB&amp;norewrite" />
+      <outline type="rss" text="C" xmlUrl="https://proxy.example.com/?youtube=UC_CCC&amp;norewrite" />
+    </outline>
+  </body>
+</opml>`
+
+    const feeds = parseOpml(xml)
+    expect(feeds).toHaveLength(3)
+    expect(new Set(feeds.map((f) => f.url)).size).toBe(3)
   })
 
   it('handles nested categories', () => {

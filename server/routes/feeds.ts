@@ -9,6 +9,7 @@ import {
   getFeeds,
   getFeedById,
   getFeedByUrl,
+  getFeedByRssUrl,
   createFeed,
   updateFeed,
   deleteFeed,
@@ -28,7 +29,18 @@ import { fetchSingleFeed, discoverRssUrl } from '../fetcher.js'
 import { isBotBlockPage } from '../fetcher/content.js'
 import { queryRssBridge, inferCssSelectorBridge } from '../rss-bridge.js'
 import { parseOpml, generateOpml } from '../opml.js'
+import type { ParsedFeed } from '../opml.js'
 import { NumericIdParams, parseOrBadRequest } from '../lib/validation.js'
+
+/**
+ * Look up an already-registered feed for an OPML entry.
+ *
+ * The RSS URL is the feed's real identity, so it is checked first; the site URL is
+ * only a secondary match for feeds registered before their RSS URL was known.
+ */
+function findExistingFeed(entry: ParsedFeed): Feed | undefined {
+  return getFeedByRssUrl(entry.rssUrl) ?? getFeedByUrl(entry.url)
+}
 
 const httpOrHttpsUrl = z
   .string({ error: 'url is required' })
@@ -431,7 +443,7 @@ export async function feedRoutes(api: FastifyInstance): Promise<void> {
     }
 
     const feeds = parsed.map((entry) => {
-      const existing = getFeedByUrl(entry.url)
+      const existing = findExistingFeed(entry)
       return {
         name: entry.name,
         url: entry.url,
@@ -476,8 +488,10 @@ export async function feedRoutes(api: FastifyInstance): Promise<void> {
       selectedUrlSet = new Set(urls)
     }
 
+    // Selection is keyed on the RSS URL: it is the only per-feed unique identifier
+    // in an OPML file (several entries can share one htmlUrl).
     const entries = selectedUrlSet
-      ? parsed.filter((entry) => selectedUrlSet!.has(entry.url))
+      ? parsed.filter((entry) => selectedUrlSet!.has(entry.rssUrl))
       : parsed
 
     let imported = 0
@@ -492,7 +506,7 @@ export async function feedRoutes(api: FastifyInstance): Promise<void> {
     for (const entry of entries) {
       try {
         // Check for duplicate by url or rss_url
-        if (getFeedByUrl(entry.url)) {
+        if (findExistingFeed(entry)) {
           skipped++
           continue
         }

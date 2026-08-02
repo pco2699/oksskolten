@@ -106,7 +106,7 @@ describe('DataSection OPML preview', () => {
     })
   })
 
-  it('calls importOpml with selected URLs on import', async () => {
+  it('calls importOpml with the selected RSS URLs on import', async () => {
     await selectFile()
     await waitFor(() => screen.getByText('Import 2 feeds'))
 
@@ -116,8 +116,33 @@ describe('DataSection OPML preview', () => {
       expect(mockImportOpml).toHaveBeenCalledTimes(1)
       const [file, urls] = mockImportOpml.mock.calls[0]
       expect(file).toBeInstanceOf(File)
-      expect(urls).toEqual(expect.arrayContaining(['https://lobste.rs', 'https://xkcd.com']))
-      expect(urls).not.toContain('https://news.ycombinator.com')
+      expect(urls).toEqual(expect.arrayContaining(['https://lobste.rs/rss', 'https://xkcd.com/rss.xml']))
+      expect(urls).not.toContain('https://news.ycombinator.com/rss')
+    })
+  })
+
+  it('tracks selection per feed when several feeds share one site url', async () => {
+    mockPreviewOpml.mockResolvedValue({
+      feeds: [
+        { name: 'Channel A', url: 'https://proxy.example.com', rssUrl: 'https://proxy.example.com/?c=AAA', categoryName: 'Youtube', isDuplicate: false },
+        { name: 'Channel B', url: 'https://proxy.example.com', rssUrl: 'https://proxy.example.com/?c=BBB', categoryName: 'Youtube', isDuplicate: false },
+      ],
+      totalCount: 2,
+      duplicateCount: 0,
+    })
+
+    await selectFile()
+    await waitFor(() => screen.getByText('Import 2 feeds'))
+
+    // Unchecking one feed must not uncheck the other
+    await user.click(screen.getAllByRole('checkbox')[0])
+    await waitFor(() => screen.getByText('Import 1 feeds'))
+
+    await user.click(screen.getByText('Import 1 feeds'))
+
+    await waitFor(() => {
+      const [, urls] = mockImportOpml.mock.calls[0]
+      expect(urls).toEqual(['https://proxy.example.com/?c=BBB'])
     })
   })
 

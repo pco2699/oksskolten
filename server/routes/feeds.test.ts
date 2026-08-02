@@ -779,7 +779,7 @@ describe('POST /api/opml with selectedUrls', () => {
   it('imports only selected feeds', async () => {
     const { body, contentType } = buildMultipart({
       file: { filename: 'feeds.opml', content: sampleOpml },
-      selectedUrls: { content: JSON.stringify(['https://lobste.rs', 'https://xkcd.com']) },
+      selectedUrls: { content: JSON.stringify(['https://lobste.rs/rss', 'https://xkcd.com/rss.xml']) },
     })
 
     const res = await app.inject({
@@ -823,7 +823,7 @@ describe('POST /api/opml with selectedUrls', () => {
 
     const { body, contentType } = buildMultipart({
       file: { filename: 'feeds.opml', content: sampleOpml },
-      selectedUrls: { content: JSON.stringify(['https://news.ycombinator.com', 'https://xkcd.com']) },
+      selectedUrls: { content: JSON.stringify(['https://news.ycombinator.com/rss', 'https://xkcd.com/rss.xml']) },
     })
 
     const res = await app.inject({
@@ -837,5 +837,87 @@ describe('POST /api/opml with selectedUrls', () => {
     const data = res.json()
     expect(data.imported).toBe(1)
     expect(data.skipped).toBe(1)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// POST /api/opml — feeds sharing a single host (proxy / aggregator exports)
+// ---------------------------------------------------------------------------
+
+const sharedHostOpml = `<?xml version="1.0" encoding="UTF-8"?>
+<opml version="1.0">
+  <head><title>Test</title></head>
+  <body>
+    <outline text="Youtube" title="Youtube">
+      <outline type="rss" text="Channel A" xmlUrl="https://proxy.example.com/?youtube=UC_AAA&amp;norewrite" />
+      <outline type="rss" text="Channel B" xmlUrl="https://proxy.example.com/?youtube=UC_BBB&amp;norewrite" />
+      <outline type="rss" text="Channel C" xmlUrl="https://proxy.example.com/?youtube=UC_CCC&amp;norewrite" />
+    </outline>
+  </body>
+</opml>`
+
+describe('POST /api/opml with feeds sharing one host', () => {
+  it('imports every feed instead of treating them as duplicates', async () => {
+    const { body, contentType } = buildMultipart({
+      file: { filename: 'feeds.opml', content: sharedHostOpml },
+    })
+
+    const res = await app.inject({
+      method: 'POST',
+      url: '/api/opml',
+      headers: { 'content-type': contentType },
+      payload: body,
+    })
+
+    expect(res.statusCode).toBe(200)
+    const data = res.json()
+    expect(data.imported).toBe(3)
+    expect(data.skipped).toBe(0)
+    expect(data.errors).toEqual([])
+  })
+
+  it('reports them as new in the preview', async () => {
+    const { body, contentType } = buildMultipart({
+      file: { filename: 'feeds.opml', content: sharedHostOpml },
+    })
+
+    const res = await app.inject({
+      method: 'POST',
+      url: '/api/opml/preview',
+      headers: { 'content-type': contentType },
+      payload: body,
+    })
+
+    expect(res.statusCode).toBe(200)
+    const data = res.json()
+    expect(data.totalCount).toBe(3)
+    expect(data.duplicateCount).toBe(0)
+  })
+
+  it('marks them as duplicates once imported', async () => {
+    const first = buildMultipart({
+      file: { filename: 'feeds.opml', content: sharedHostOpml },
+    })
+    await app.inject({
+      method: 'POST',
+      url: '/api/opml',
+      headers: { 'content-type': first.contentType },
+      payload: first.body,
+    })
+
+    const second = buildMultipart({
+      file: { filename: 'feeds.opml', content: sharedHostOpml },
+    })
+    const res = await app.inject({
+      method: 'POST',
+      url: '/api/opml',
+      headers: { 'content-type': second.contentType },
+      payload: second.body,
+    })
+
+    expect(res.statusCode).toBe(200)
+    const data = res.json()
+    expect(data.imported).toBe(0)
+    expect(data.skipped).toBe(3)
   })
 })

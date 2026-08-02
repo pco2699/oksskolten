@@ -307,7 +307,7 @@ Accepts a file via `multipart/form-data`, parses it, and returns the feed list w
 
 **POST /api/opml** — OPML import
 
-Accepts a file via `multipart/form-data` and bulk-registers feeds. An optional `selectedUrls` field (JSON string array) can be included to import only specific feeds; if omitted, all feeds are imported.
+Accepts a file via `multipart/form-data` and bulk-registers feeds. An optional `selectedUrls` field (JSON string array of `xmlUrl` values, matching `rssUrl` in the preview response) can be included to import only specific feeds; if omitted, all feeds are imported.
 
 ```json
 // Response: 200
@@ -315,7 +315,11 @@ Accepts a file via `multipart/form-data` and bulk-registers feeds. An optional `
 ```
 
 - Only `<outline>` elements with `xmlUrl` are treated as feeds
-- Existing feeds (duplicate URLs) are skipped
+- An outline's `htmlUrl` becomes the feed's `url`; when absent, `xmlUrl` is used. The
+  feed's origin is not used, since `feeds.url` is UNIQUE and many feeds can share one
+  host (proxies, aggregators)
+- A feed is a duplicate when its `xmlUrl` matches an existing `rss_url`, or its `url`
+  matches an existing feed `url`. Duplicates are skipped
 - Parent `<outline>` elements are treated as categories; created if they don't exist
 
 **GET /api/feeds/:id/metrics** — Feed detail metrics
