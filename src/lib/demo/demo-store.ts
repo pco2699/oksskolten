@@ -624,7 +624,8 @@ export const demoStore = {
       const xmlUrl = el.getAttribute('xmlUrl') || ''
       const url = htmlUrl || xmlUrl
       if (!url) return
-      if (selectedUrlSet && !selectedUrlSet.has(url)) return
+      // Selection is keyed on the RSS URL (see the OPML import route).
+      if (selectedUrlSet && !selectedUrlSet.has(xmlUrl)) return
       if (existingUrls.has(url)) {
         skipped++
         return

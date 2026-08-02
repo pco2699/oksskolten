@@ -54,7 +54,7 @@ export function DataSection() {
       setPreviewData(preview)
       setPreviewFile(file)
       setSelectedUrls(new Set(
-        preview.feeds.filter((f) => !f.isDuplicate).map((f) => f.url)
+        preview.feeds.filter((f) => !f.isDuplicate).map((f) => f.rssUrl)
       ))
       setIsPreviewOpen(true)
     } catch (err) {
@@ -96,7 +96,7 @@ export function DataSection() {
 
   function selectAll() {
     if (!previewData) return
-    setSelectedUrls(new Set(previewData.feeds.map((f) => f.url)))
+    setSelectedUrls(new Set(previewData.feeds.map((f) => f.rssUrl)))
   }
 
   function deselectAll() {
@@ -210,13 +210,13 @@ export function DataSection() {
                 <div className="space-y-1">
                   {feeds.map((feed) => (
                     <label
-                      key={feed.url}
+                      key={feed.rssUrl}
                       className="flex items-start gap-2 py-1 px-1 rounded hover:bg-hover cursor-pointer"
                     >
                       <input
                         type="checkbox"
-                        checked={selectedUrls.has(feed.url)}
-                        onChange={() => toggleUrl(feed.url)}
+                        checked={selectedUrls.has(feed.rssUrl)}
+                        onChange={() => toggleUrl(feed.rssUrl)}
                         className="mt-0.5 accent-accent"
                       />
                       <div className="flex-1 min-w-0">

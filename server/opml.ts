@@ -39,7 +39,10 @@ function walkOutlines(outlines: OpmlOutline[], categoryName: string | null, feed
     if (outline['@_xmlUrl']) {
       const rssUrl = outline['@_xmlUrl']
       const htmlUrl = outline['@_htmlUrl']
-      const url = htmlUrl || new URL(rssUrl).origin
+      // Fall back to the feed URL itself, not its origin: `feeds.url` is UNIQUE, so
+      // collapsing to the origin makes every feed served from one host (proxies,
+      // aggregators) look like the same feed.
+      const url = htmlUrl || rssUrl
       const name = outline['@_text'] || outline['@_title'] || new URL(rssUrl).hostname
 
       feeds.push({ name, url, rssUrl, categoryName })
