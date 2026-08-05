@@ -87,6 +87,71 @@ describe('runOpenRouterTurn', () => {
     expect(result.usage.output_tokens).toBe(5)
   })
 
+  it('streams reasoning deltas bracketed by thinking_start / thinking_end', async () => {
+    upsertSetting('api_key.openrouter', 'test-key')
+
+    mockCreate.mockResolvedValue(createMockStream([
+      { choices: [{ delta: { reasoning: 'The user ' }, finish_reason: null }], usage: null },
+      { choices: [{ delta: { reasoning: 'wants a summary' }, finish_reason: null }], usage: null },
+      { choices: [{ delta: { content: 'Here it is.' }, finish_reason: 'stop' }], usage: { prompt_tokens: 10, completion_tokens: 5 } },
+    ]))
+
+    const events: ChatSSEEvent[] = []
+    const { runOpenRouterTurn } = await loadModule()
+    const result = await runOpenRouterTurn({
+      messages: [{ role: 'user', content: 'hi' }],
+      system: 'You are helpful.',
+      model: 'deepseek/deepseek-v4-flash-0731',
+      onEvent: (e) => events.push(e),
+    })
+
+    const types = events.map(e => e.type)
+    expect(types.indexOf('thinking_start')).toBeLessThan(types.indexOf('thinking_end'))
+    expect(types.indexOf('thinking_end')).toBeLessThan(types.indexOf('text_delta'))
+    // thinking_start fires once, on the first reasoning delta only
+    expect(events.filter(e => e.type === 'thinking_start')).toHaveLength(1)
+    expect(events.filter(e => e.type === 'reasoning_delta').map(e => (e as { text: string }).text))
+      .toEqual(['The user ', 'wants a summary'])
+
+    // Reasoning is progress, not content — it must not reach the stored message
+    const text = result.allMessages.at(-1)!.content as ContentBlock[]
+    expect(text).toEqual([{ type: 'text', text: 'Here it is.' }])
+  })
+
+  it('closes thinking when a reasoning round ends without any text', async () => {
+    upsertSetting('api_key.openrouter', 'test-key')
+
+    // Round 1: thinks, then only calls a tool — no content delta to close on
+    mockCreate.mockResolvedValueOnce(createMockStream([
+      { choices: [{ delta: { reasoning: 'I should search' }, finish_reason: null }], usage: null },
+      {
+        choices: [{
+          delta: { tool_calls: [{ index: 0, id: 'call_1', function: { name: 'search_articles', arguments: '{}' } }] },
+          finish_reason: 'tool_calls',
+        }],
+        usage: null,
+      },
+    ]))
+    mockExecuteTool.mockResolvedValue('[]')
+
+    // Round 2: plain answer
+    mockCreate.mockResolvedValueOnce(createMockStream([
+      { choices: [{ delta: { content: 'Nothing found.' }, finish_reason: 'stop' }], usage: null },
+    ]))
+
+    const events: ChatSSEEvent[] = []
+    const { runOpenRouterTurn } = await loadModule()
+    await runOpenRouterTurn({
+      messages: [{ role: 'user', content: 'search' }],
+      system: 'You are helpful.',
+      model: 'deepseek/deepseek-v4-flash-0731',
+      onEvent: (e) => events.push(e),
+    })
+
+    expect(events.filter(e => e.type === 'thinking_start')).toHaveLength(1)
+    expect(events.filter(e => e.type === 'thinking_end')).toHaveLength(1)
+  })
+
   it('handles tool use loop with streaming tool call deltas', async () => {
     upsertSetting('api_key.openrouter', 'test-key')
 

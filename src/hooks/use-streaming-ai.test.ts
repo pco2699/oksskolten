@@ -43,6 +43,42 @@ describe('useStreamingAI', () => {
     expect(result.current.error).toBe(null)
   })
 
+  it('accumulates reasoning separately from the answer', async () => {
+    mockStreamPost.mockImplementation((
+      _url: string,
+      onDelta: (t: string) => void,
+      onReasoning: (t: string) => void,
+    ) => {
+      onReasoning('Let me')
+      onReasoning(' think')
+      onDelta('Answer')
+      return Promise.resolve({ usage: { input_tokens: 0, output_tokens: 0 } })
+    })
+    const metrics = mockMetrics()
+    const { result } = renderHook(() => useStreamingAI(1, metrics, defaultOptions))
+
+    await act(async () => { await result.current.run() })
+
+    expect(result.current.reasoningText).toBe('Let me think')
+    expect(result.current.streamingText).toBe('Answer')
+  })
+
+  it('clears reasoning from a previous run before starting a new one', async () => {
+    mockStreamPost.mockImplementationOnce((_u: string, _d: unknown, onReasoning: (t: string) => void) => {
+      onReasoning('old thought')
+      return Promise.resolve({ usage: { input_tokens: 0, output_tokens: 0 } })
+    })
+    const metrics = mockMetrics()
+    const { result } = renderHook(() => useStreamingAI(1, metrics, defaultOptions))
+
+    await act(async () => { await result.current.run() })
+    expect(result.current.reasoningText).toBe('old thought')
+
+    mockStreamPost.mockResolvedValue({ usage: { input_tokens: 0, output_tokens: 0 } })
+    await act(async () => { await result.current.run() })
+    expect(result.current.reasoningText).toBe('')
+  })
+
   it('does nothing when articleId is undefined', async () => {
     const metrics = mockMetrics()
     const { result } = renderHook(() => useStreamingAI(undefined, metrics, defaultOptions))
