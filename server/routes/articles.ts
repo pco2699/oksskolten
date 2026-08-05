@@ -58,6 +58,7 @@ const ArticlesQuery = z.object({
   feed_id: coerceOptionalNumber,
   category_id: coerceOptionalNumber,
   unread: z.string().optional(),
+  unread_since: z.string().optional(),
   bookmarked: z.string().optional(),
   liked: z.string().optional(),
   read: z.string().optional(),
@@ -214,6 +215,10 @@ export async function articleRoutes(api: FastifyInstance): Promise<void> {
     const feedId = query.feed_id ?? undefined
     const categoryId = query.category_id ?? undefined
     const unread = query.unread === '1'
+    // Canonicalize before handing it to SQLite; an unparsable value is dropped
+    // so the query falls back to a plain "seen_at IS NULL" filter.
+    const unreadSinceMs = query.unread_since ? Date.parse(query.unread_since) : NaN
+    const unreadSince = Number.isNaN(unreadSinceMs) ? undefined : new Date(unreadSinceMs).toISOString()
     const bookmarked = query.bookmarked === '1'
     const liked = query.liked === '1'
     const read = query.read === '1'
@@ -222,7 +227,7 @@ export async function articleRoutes(api: FastifyInstance): Promise<void> {
 
     const isClipFeed = feedId != null && getClipFeed()?.id === feedId
     const smartFloor = !noFloor && !isClipFeed && !unread && !bookmarked && !liked && !read
-    const { articles, total, totalWithoutFloor } = getArticles({ feedId, categoryId, unread, bookmarked, liked, read, sort, limit, offset, smartFloor })
+    const { articles, total, totalWithoutFloor } = getArticles({ feedId, categoryId, unread, unreadSince, bookmarked, liked, read, sort, limit, offset, smartFloor })
     const hasMore = offset + articles.length < total
 
     // When unread filter yields 0 results, return total article count (without unread filter)

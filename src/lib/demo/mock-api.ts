@@ -106,6 +106,7 @@ export async function demoFetcher(url: string): Promise<unknown> {
       feedId: params.get('feed_id') ? Number(params.get('feed_id')) : undefined,
       categoryId: params.get('category_id') ? Number(params.get('category_id')) : undefined,
       unread: params.get('unread') === '1',
+      unreadSince: params.get('unread_since') ?? undefined,
       bookmarked: params.get('bookmarked') === '1',
       liked: params.get('liked') === '1',
       read: params.get('read') === '1',

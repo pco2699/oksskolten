@@ -241,6 +241,8 @@ export const demoStore = {
     feedId?: number
     categoryId?: number
     unread?: boolean
+    /** Keeps articles read since this timestamp in the unread set, so paging stays stable. */
+    unreadSince?: string
     bookmarked?: boolean
     liked?: boolean
     read?: boolean
@@ -260,7 +262,11 @@ export const demoStore = {
       const feedIds = new Set(feeds.filter(f => f.category_id === params.categoryId).map(f => f.id))
       result = result.filter(a => feedIds.has(a.feed_id))
     }
-    if (params.unread) result = result.filter(a => a.seen_at == null)
+    if (params.unread) {
+      const since = params.unreadSince ? new Date(params.unreadSince).getTime() : NaN
+      result = result.filter(a =>
+        a.seen_at == null || (!Number.isNaN(since) && new Date(a.seen_at).getTime() >= since))
+    }
     if (params.bookmarked) result = result.filter(a => a.bookmarked_at != null)
     if (params.liked) result = result.filter(a => a.liked_at != null)
     if (params.read) result = result.filter(a => a.read_at != null)

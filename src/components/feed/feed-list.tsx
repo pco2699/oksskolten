@@ -75,7 +75,11 @@ export function FeedList({ isOpen, onClose, onBackdropClose, onCollapse, onMarkA
   const selectedFeedId = feedId ? Number(feedId) : null
   const selectedCategoryId = categoryId ? Number(categoryId) : null
   const { progress, startFeedFetch, subscribeFeedFetch } = useFetchProgressContext()
-  const { data: feedsData, mutate: mutateFeeds } = useSWR<{ feeds: FeedWithCounts[]; bookmark_count: number; like_count: number; clip_feed_id: number | null }>('/api/feeds', fetcher)
+  // revalidateOnMount overrides the global revalidateIfStale: false. The sidebar
+  // is unmounted while an article is open as a full page, and mutations made
+  // from there cannot revalidate a key nobody is subscribed to — so the unread
+  // badges are refreshed when the sidebar comes back instead.
+  const { data: feedsData, mutate: mutateFeeds } = useSWR<{ feeds: FeedWithCounts[]; bookmark_count: number; like_count: number; clip_feed_id: number | null }>('/api/feeds', fetcher, { revalidateOnMount: true })
   const { data: categoriesData, mutate: mutateCategories } = useSWR<{ categories: Category[] }>('/api/categories', fetcher)
   const feeds = useMemo(() => feedsData?.feeds ?? [], [feedsData])
   const categories = useMemo(() => categoriesData?.categories ?? [], [categoriesData])

@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useSWRConfig } from 'swr'
 import { apiPatch, apiPost, apiDelete } from '../lib/fetcher'
+import { adjustFeedUnread } from '../lib/feedCounts'
 import type { ArticleDetail } from '../../shared/types'
 
 export function useArticleActions(article: ArticleDetail | undefined, articleKey: string) {
@@ -83,6 +84,7 @@ export function useArticleActions(article: ArticleDetail | undefined, articleKey
       await apiPatch(`/api/articles/${article.id}/seen`, { seen: next })
       void globalMutate(articleKey)
       revalidateLists()
+      adjustFeedUnread(globalMutate, article.feed_id, next ? -1 : 1)
     } catch {
       setOptimisticRead(undefined)
       void globalMutate(articleKey)

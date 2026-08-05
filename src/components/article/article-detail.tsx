@@ -7,6 +7,7 @@ import { fetcher, apiPost } from '../../lib/fetcher'
 import { queueSeenIds } from '../../lib/offlineQueue'
 import { useSWRConfig } from 'swr'
 import { trackRead } from '../../lib/readTracker'
+import { adjustFeedUnread } from '../../lib/feedCounts'
 import { useArticleActions } from '../../hooks/use-article-actions'
 import { useI18n } from '../../lib/i18n'
 import { useRewriteInternalLinks } from '../../hooks/use-rewrite-internal-links'
@@ -87,7 +88,9 @@ export function ArticleDetail({ articleUrl, enableZapNavigation = false }: Artic
         trackRead(article.id)
       }
       apiPost(`/api/articles/${article.id}/read`)
-        .then(() => globalMutate((key: string) => typeof key === 'string' && key.startsWith('/api/feeds')))
+        .then(() => {
+          if (isFirstSeen) adjustFeedUnread(globalMutate, article.feed_id, -1)
+        })
         .catch(async () => {
           if (isFirstSeen) {
             await queueSeenIds([article.id])

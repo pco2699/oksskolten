@@ -3,6 +3,7 @@ import { render, screen, fireEvent } from '@testing-library/react'
 import { MemoryRouter, Routes, Route, Outlet } from 'react-router-dom'
 import { LocaleContext } from '../../lib/i18n'
 import { KeyboardNavigationProvider } from '../../contexts/keyboard-navigation-context'
+import { TooltipProvider } from '../ui/tooltip'
 import type { ArticleListItem } from '../../../shared/types'
 
 // --- Mocks ---
@@ -21,8 +22,15 @@ let swrInfiniteReturn: any = {
 // Control useSWR return value for /api/feeds
 let swrFeedsData: any = undefined
 
+// Captures the key builder so tests can inspect the request URL per page
+type GetKey = (pageIndex: number, previousPageData: unknown) => string | null
+let lastGetKey: GetKey | undefined
+
 vi.mock('swr/infinite', () => ({
-  default: () => swrInfiniteReturn,
+  default: (getKey: GetKey) => {
+    lastGetKey = getKey
+    return swrInfiniteReturn
+  },
 }))
 
 vi.mock('swr', async () => {
@@ -164,6 +172,8 @@ const mockSettings = {
   articleOpenMode: 'page' as const,
   keyboardNavigation: 'off' as const,
   keybindings: undefined,
+  categoryUnreadOnly: 'off' as const,
+  setCategoryUnreadOnly: vi.fn(),
   save: vi.fn(),
 }
 
@@ -179,12 +189,14 @@ function renderArticleList(initialPath = '/all') {
   return render(
     <MemoryRouter initialEntries={[initialPath]}>
       <LocaleContext.Provider value={{ locale: 'en', setLocale: vi.fn() }}>
-        <Routes>
-          <Route element={<OutletWrapper />}>
-            <Route path="feeds/:feedId" element={<ArticleList />} />
-            <Route path="*" element={<ArticleList />} />
-          </Route>
-        </Routes>
+        <TooltipProvider>
+          <Routes>
+            <Route element={<OutletWrapper />}>
+              <Route path="feeds/:feedId" element={<ArticleList />} />
+              <Route path="*" element={<ArticleList />} />
+            </Route>
+          </Routes>
+        </TooltipProvider>
       </LocaleContext.Provider>
     </MemoryRouter>,
   )
@@ -194,6 +206,8 @@ describe('ArticleList', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     swrFeedsData = undefined
+    lastGetKey = undefined
+    mockSettings.categoryUnreadOnly = 'off' as any
     mockSettings.autoMarkRead = 'off' as any
     mockSettings.layout = 'list' as any
     mockSettings.articleOpenMode = 'page' as any
@@ -629,6 +643,57 @@ describe('ArticleList', () => {
       fireEvent.keyDown(document, { key: 'j' })
       expect(unreadFlag(1)).toBe('1')
       expect(unreadFlag(2)).toBe('1')
+    })
+  })
+
+  describe('unread-only toggle', () => {
+    function keyFor(pageIndex: number) {
+      return lastGetKey!(pageIndex, null)!
+    }
+
+    it('is offered on feed views', () => {
+      renderArticleList('/feeds/1')
+      expect(screen.getByRole('button', { name: 'Unread only' })).toBeTruthy()
+    })
+
+    it('is hidden on collection views', () => {
+      renderArticleList('/bookmarks')
+      expect(screen.queryByRole('button', { name: 'Unread only' })).toBeNull()
+    })
+
+    it('does not filter while the setting is off', () => {
+      renderArticleList('/feeds/1')
+      expect(keyFor(0)).not.toContain('unread=1')
+      expect(screen.getByRole('button', { name: 'Unread only' }).getAttribute('aria-pressed')).toBe('false')
+    })
+
+    it('filters on the unread flag with a stable anchor while the setting is on', () => {
+      mockSettings.categoryUnreadOnly = 'on' as any
+      renderArticleList('/feeds/1')
+
+      const page0 = new URL(keyFor(0), 'http://x')
+      const page1 = new URL(keyFor(1), 'http://x')
+      expect(page0.searchParams.get('unread')).toBe('1')
+      // The same anchor on every page is what keeps OFFSET paging from skipping
+      // articles as they get marked read
+      const anchor = page0.searchParams.get('unread_since')
+      expect(anchor).toBeTruthy()
+      expect(page1.searchParams.get('unread_since')).toBe(anchor)
+      expect(page1.searchParams.get('offset')).toBe('20')
+      expect(screen.getByRole('button', { name: 'Unread only' }).getAttribute('aria-pressed')).toBe('true')
+    })
+
+    it('turns the persisted setting on when clicked while off', () => {
+      renderArticleList('/feeds/1')
+      fireEvent.click(screen.getByRole('button', { name: 'Unread only' }))
+      expect(mockSettings.setCategoryUnreadOnly).toHaveBeenCalledWith('on')
+    })
+
+    it('turns the persisted setting off when clicked while on', () => {
+      mockSettings.categoryUnreadOnly = 'on' as any
+      renderArticleList('/feeds/1')
+      fireEvent.click(screen.getByRole('button', { name: 'Unread only' }))
+      expect(mockSettings.setCategoryUnreadOnly).toHaveBeenCalledWith('off')
     })
   })
 })

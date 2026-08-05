@@ -444,3 +444,32 @@ describe('GET /api/articles?unread=1 — total_all field', () => {
     expect(res.json().total_all).toBeUndefined()
   })
 })
+
+// ---------------------------------------------------------------------------
+// unread_since: keeps OFFSET paging stable while the reader marks articles read
+// ---------------------------------------------------------------------------
+
+describe('GET /api/articles?unread=1&unread_since=…', () => {
+  it('keeps articles read after the anchor in the result set', async () => {
+    const feed = seedFeed()
+    const a1 = seedArticle(feed.id)
+    seedArticle(feed.id)
+    markArticleSeen(a1, true)
+
+    const since = encodeURIComponent(new Date(Date.now() - 60_000).toISOString())
+    const res = await app.inject({ method: 'GET', url: `/api/articles?unread=1&unread_since=${since}` })
+    expect(res.statusCode).toBe(200)
+    expect(res.json().total).toBe(2)
+  })
+
+  it('ignores an unparsable unread_since', async () => {
+    const feed = seedFeed()
+    const a1 = seedArticle(feed.id)
+    seedArticle(feed.id)
+    markArticleSeen(a1, true)
+
+    const res = await app.inject({ method: 'GET', url: '/api/articles?unread=1&unread_since=nonsense' })
+    expect(res.statusCode).toBe(200)
+    expect(res.json().total).toBe(1)
+  })
+})

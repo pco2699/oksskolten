@@ -21,6 +21,8 @@ import { toast } from 'sonner'
 import { Mascot } from '../ui/mascot'
 import { FeedErrorBanner } from '../feed/feed-error-banner'
 import { Skeleton } from '../ui/skeleton'
+import { ActionChip } from '../ui/action-chip'
+import { Circle, CircleDot } from 'lucide-react'
 import { ConfirmDialog } from '../ui/confirm-dialog'
 import { useKeyboardNavigationContext } from '../../contexts/keyboard-navigation-context'
 import { useKeyboardNavigation } from '../../hooks/use-keyboard-navigation'
@@ -52,7 +54,6 @@ export const ArticleList = forwardRef<ArticleListHandle, object>(function Articl
   const { settings } = useAppLayout()
   const clipFeedId = useClipFeedId()
 
-  const isAll = location.pathname === '/all'
   const isBookmarks = location.pathname === '/bookmarks'
   const isLikes = location.pathname === '/likes'
   const isHistory = location.pathname === '/history'
@@ -64,11 +65,13 @@ export const ArticleList = forwardRef<ArticleListHandle, object>(function Articl
   const currentFeed = feedId && feedsData ? feedsData.feeds.find(f => f.id === feedId) : undefined
   const categoryId = categoryIdParam ? Number(categoryIdParam) : undefined
   const [showReadArticles, setShowReadArticles] = useState(false)
-  // The "All" view behaves like a category view: it respects the
-  // categoryUnreadOnly setting and the per-view showReadArticles toggle,
-  // rather than being forced to unread-only.
-  const categoryUnreadOnly = (!!categoryId || isAll) && settings.categoryUnreadOnly === 'on'
-  const unreadOnly = categoryUnreadOnly && !showReadArticles
+  // The unread-only filter applies to every feed/folder list including "All".
+  // It is a persisted setting (also editable in Settings → Reading) that the
+  // toolbar toggle flips, plus a per-view showReadArticles escape hatch used by
+  // the "all caught up" empty state.
+  const canFilterUnread = !isCollectionView
+  const unreadFilterEnabled = canFilterUnread && settings.categoryUnreadOnly === 'on'
+  const unreadOnly = unreadFilterEnabled && !showReadArticles
   const bookmarkedOnly = isBookmarks
   const likedOnly = isLikes
   const readOnly = isHistory
@@ -86,12 +89,35 @@ export const ArticleList = forwardRef<ArticleListHandle, object>(function Articl
   const { t } = useI18n()
   const { progress, startFeedFetch } = useFetchProgressContext()
   const { mutate: globalMutate } = useSWRConfig()
+
+  // Anchor for the unread filter, sent to the server as `unread_since`.
+  //
+  // Without it, OFFSET pagination over an unread-filtered list loses articles:
+  // every article marked read while reading shrinks the server-side result set,
+  // so the next page starts as many articles further down as were read and the
+  // ones in between are never shown (and so never get marked read either).
+  // Pinning the filter to the moment the view was opened keeps the result set
+  // stable for as long as the reader stays in it. Recomputed when the view or
+  // the filter changes so that turning the filter on hides what was already
+  // read before that point, and on an explicit revalidate() so that a
+  // "mark all as read" clears the list instead of leaving it full of read items.
+  const [unreadAnchorGeneration, setUnreadAnchorGeneration] = useState(0)
+  const unreadViewKey = `${location.pathname}:${unreadOnly}:${unreadAnchorGeneration}`
+  const unreadAnchorRef = useRef({ view: unreadViewKey, since: new Date().toISOString() })
+  if (unreadAnchorRef.current.view !== unreadViewKey) {
+    unreadAnchorRef.current = { view: unreadViewKey, since: new Date().toISOString() }
+  }
+  const unreadSince = unreadAnchorRef.current.since
+
   const getKey = (pageIndex: number, previousPageData: ArticlesResponse | null) => {
     if (previousPageData && !previousPageData.has_more) return null
     const params = new URLSearchParams()
     if (feedId) params.set('feed_id', String(feedId))
     if (categoryId) params.set('category_id', String(categoryId))
-    if (unreadOnly) params.set('unread', '1')
+    if (unreadOnly) {
+      params.set('unread', '1')
+      params.set('unread_since', unreadSince)
+    }
     if (bookmarkedOnly) params.set('bookmarked', '1')
     if (likedOnly) params.set('liked', '1')
     if (readOnly) params.set('read', '1')
@@ -110,14 +136,21 @@ export const ArticleList = forwardRef<ArticleListHandle, object>(function Articl
   )
 
   useImperativeHandle(ref, () => ({
-    revalidate: () => mutate(),
-  }), [mutate])
+    revalidate: () => {
+      // A fresh anchor changes every page key, which refetches the list from
+      // scratch — the point of revalidating an unread view is usually to drop
+      // what was just marked read. Without the filter the keys do not carry the
+      // anchor, so fall back to a plain revalidation.
+      if (unreadOnly) setUnreadAnchorGeneration(g => g + 1)
+      else void mutate()
+    },
+  }), [mutate, unreadOnly])
 
   const articles = useMemo(() => data ? data.flatMap(page => page.articles) : [], [data])
   const hasMore = data ? data[data.length - 1]?.has_more ?? false : false
   const isEmpty = data?.[0]?.articles.length === 0
   const totalAll = data?.[0]?.total_all
-  const allReadEmpty = isEmpty && categoryUnreadOnly && !showReadArticles && totalAll != null && totalAll > 0
+  const allReadEmpty = isEmpty && unreadOnly && totalAll != null && totalAll > 0
   const hiddenByFloor = data?.[0]?.total_without_floor != null
     ? data[0].total_without_floor - (data[0].total ?? 0)
     : 0
@@ -479,13 +512,13 @@ export const ArticleList = forwardRef<ArticleListHandle, object>(function Articl
     }
   }, [feedId, categoryId, flushBatch])
 
-  // Reset autoReadIds, noFloor, showReadArticles, and keyboard focus when feed/category changes
+  // Reset autoReadIds, noFloor, showReadArticles, and keyboard focus when the view changes
   useEffect(() => {
     setAutoReadIds(new Set())
     setNoFloor(false)
     setShowReadArticles(false)
     setFocusedItemId(null)
-  }, [feedId, categoryId, setFocusedItemId])
+  }, [feedId, categoryId, location.pathname, setFocusedItemId])
 
   return (
     <main ref={listRef} className="max-w-2xl md:max-w-3xl lg:max-w-4xl mx-auto" role={!isGridLayout ? 'listbox' : undefined}>
@@ -503,6 +536,23 @@ export const ArticleList = forwardRef<ArticleListHandle, object>(function Articl
 
       {currentFeed && currentFeed.type !== 'clip' && settings.showFeedActivity === 'on' && (
         <FeedMetricsBar feed={currentFeed} />
+      )}
+
+      {canFilterUnread && (
+        <div className="flex justify-end px-4 md:px-6 pt-2 pb-1">
+          <ActionChip
+            active={unreadOnly}
+            aria-pressed={unreadOnly}
+            onClick={() => {
+              setShowReadArticles(false)
+              settings.setCategoryUnreadOnly(unreadOnly ? 'off' : 'on')
+            }}
+            tooltip={t('articles.unreadOnlyTooltip')}
+          >
+            {unreadOnly ? <CircleDot size={13} /> : <Circle size={13} />}
+            {t('articles.unreadOnly')}
+          </ActionChip>
+        </div>
       )}
 
       {isLoading && <ArticleListSkeleton layout={layout} showThumbnails={displayConfig.showThumbnails} />}
