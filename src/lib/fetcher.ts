@@ -29,6 +29,7 @@ export const apiDelete = (url: string) => request(url, 'DELETE')
 export async function streamPost(
   url: string,
   onDelta: (text: string) => void,
+  onReasoning?: (text: string) => void,
 ): Promise<{ usage: { input_tokens: number; output_tokens: number; billing_mode?: 'openrouter'; model?: string } }> {
   const res = await fetch(url, {
     method: 'POST',
@@ -53,6 +54,8 @@ export async function streamPost(
   await parseSSEStream<StreamPayload>(res, (payload) => {
     if (payload.type === 'delta') {
       onDelta(payload.text as string)
+    } else if (payload.type === 'reasoning') {
+      onReasoning?.(payload.text as string)
     } else if (payload.type === 'error') {
       throw new ApiError((payload.error as string) || 'Unknown error', 0, {})
     } else if (payload.type === 'done') {

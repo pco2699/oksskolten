@@ -20,12 +20,14 @@ export function useStreamingAI(
 ) {
   const [processing, setProcessing] = useState(false)
   const [streamingText, setStreamingText] = useState('')
+  const [reasoningText, setReasoningText] = useState('')
   const [error, setError] = useState<string | null>(null)
 
   const run = useCallback(async () => {
     if (articleId == null) return
     setProcessing(true)
     setStreamingText('')
+    setReasoningText('')
     setError(null)
     metrics.reset()
     const startTime = Date.now()
@@ -34,6 +36,7 @@ export function useStreamingAI(
       const { usage } = await streamPost(
         options.endpoint(articleId),
         (delta) => setStreamingText(prev => prev + delta),
+        (delta) => setReasoningText(prev => prev + delta),
       )
 
       const elapsed = (Date.now() - startTime) / 1000
@@ -71,5 +74,5 @@ export function useStreamingAI(
     return sanitizeHtml(html)
   }, [streamingText, options.fixUnclosedBold])
 
-  return { processing, streamingText, streamingHtml, error, run }
+  return { processing, streamingText, reasoningText, streamingHtml, error, run }
 }

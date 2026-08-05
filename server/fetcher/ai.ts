@@ -54,8 +54,19 @@ ${fullText}`
 interface AiTaskConfig {
   modelKey: string
   maxTokensKey: string
+  reasoningKey: string
   defaultMaxTokens: number
+  reasoningMaxTokens: number
   buildPrompt: (text: string) => string
+}
+
+/**
+ * Summarizing and translating are throughput tasks, not puzzles, so reasoning
+ * stays off unless the user asks for it. Models that think by default would
+ * otherwise burn tokens and wall-clock time on every article.
+ */
+function resolveReasoning(config: AiTaskConfig): boolean {
+  return getSetting(config.reasoningKey) === 'on'
 }
 
 /**
@@ -63,18 +74,24 @@ interface AiTaskConfig {
  * settings overrides the built-in default; anything else (unset, empty,
  * malformed) falls back. Lets users of models whose context window is smaller
  * than the defaults lower the completion cap.
+ *
+ * The default is raised when reasoning is on because providers bill reasoning
+ * tokens against the same cap — a budget sized for the answer alone gets eaten
+ * by the thinking and truncates the output.
  */
-function resolveMaxTokens(config: AiTaskConfig): number {
+function resolveMaxTokens(config: AiTaskConfig, reasoning: boolean): number {
+  const fallback = reasoning ? config.reasoningMaxTokens : config.defaultMaxTokens
   const raw = getSetting(config.maxTokensKey)
-  if (!raw) return config.defaultMaxTokens
+  if (!raw) return fallback
   const parsed = Number(raw)
-  return Number.isInteger(parsed) && parsed > 0 ? parsed : config.defaultMaxTokens
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : fallback
 }
 
 async function runAiTask(
   config: AiTaskConfig,
   fullText: string,
   onText?: (delta: string) => void,
+  onReasoning?: (delta: string) => void,
 ): Promise<{ text: string } & AiTextResult> {
   // OpenRouter has no default model — its catalog is paid and changes constantly,
   // so a model id is only ever what the user configured.
@@ -83,15 +100,18 @@ async function runAiTask(
   const provider = getProvider(LLM_PROVIDER)
   provider.requireKey()
   const prompt = config.buildPrompt(fullText)
-  const maxTokens = resolveMaxTokens(config)
+  const reasoning = resolveReasoning(config)
+  const maxTokens = resolveMaxTokens(config, reasoning)
   const result = onText
     ? await provider.streamMessage(
-        { model, maxTokens, messages: [{ role: 'user', content: prompt }] },
+        { model, maxTokens, reasoning, messages: [{ role: 'user', content: prompt }] },
         onText,
+        onReasoning,
       )
     : await provider.createMessage({
         model,
         maxTokens,
+        reasoning,
         messages: [{ role: 'user', content: prompt }],
       })
   return {
@@ -104,19 +124,25 @@ async function runAiTask(
 }
 
 const SUMMARIZE_MAX_TOKENS = 2048
+const SUMMARIZE_MAX_TOKENS_REASONING = 8192
 const TRANSLATE_MAX_TOKENS = 16384
+const TRANSLATE_MAX_TOKENS_REASONING = 24576
 
 const summarizeConfig: AiTaskConfig = {
   modelKey: 'summary.model',
   maxTokensKey: 'summary.max_tokens',
+  reasoningKey: 'summary.reasoning',
   defaultMaxTokens: SUMMARIZE_MAX_TOKENS,
+  reasoningMaxTokens: SUMMARIZE_MAX_TOKENS_REASONING,
   buildPrompt: buildSummarizePrompt,
 }
 
 const translateConfig: AiTaskConfig = {
   modelKey: 'translate.model',
   maxTokensKey: 'translate.max_tokens',
+  reasoningKey: 'translate.reasoning',
   defaultMaxTokens: TRANSLATE_MAX_TOKENS,
+  reasoningMaxTokens: TRANSLATE_MAX_TOKENS_REASONING,
   buildPrompt: buildTranslatePrompt,
 }
 
@@ -128,8 +154,9 @@ export async function summarizeArticle(fullText: string): Promise<{ summary: str
 export async function streamSummarizeArticle(
   fullText: string,
   onText: (delta: string) => void,
+  onReasoning?: (delta: string) => void,
 ): Promise<{ summary: string } & AiTextResult> {
-  const r = await runAiTask(summarizeConfig, fullText, onText)
+  const r = await runAiTask(summarizeConfig, fullText, onText, onReasoning)
   return { summary: r.text, inputTokens: r.inputTokens, outputTokens: r.outputTokens, billingMode: r.billingMode, model: r.model }
 }
 
@@ -141,7 +168,8 @@ export async function translateArticle(fullText: string): Promise<{ fullTextTran
 export async function streamTranslateArticle(
   fullText: string,
   onText: (delta: string) => void,
+  onReasoning?: (delta: string) => void,
 ): Promise<{ fullTextTranslated: string } & AiTextResult> {
-  const r = await runAiTask(translateConfig, fullText, onText)
+  const r = await runAiTask(translateConfig, fullText, onText, onReasoning)
   return { fullTextTranslated: r.text, inputTokens: r.inputTokens, outputTokens: r.outputTokens, billingMode: r.billingMode, model: r.model }
 }

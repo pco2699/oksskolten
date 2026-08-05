@@ -78,10 +78,38 @@ describe('openrouterProvider', () => {
         { role: 'system', content: 'you are a bot' },
         { role: 'user', content: 'hello' },
       ],
+      provider: { sort: 'throughput' },
     })
     expect(result.text).toBe('test response')
     expect(result.inputTokens).toBe(10)
     expect(result.outputTokens).toBe(20)
+  })
+
+  it('omits the reasoning flag entirely when the caller does not set it', async () => {
+    vi.mocked(db.getSetting).mockReturnValue('sk-or-v1-test')
+    mockChatResponse()
+
+    await openrouterProvider.createMessage({
+      model: 'anthropic/claude-sonnet-4.5',
+      maxTokens: 100,
+      messages: [{ role: 'user', content: 'hello' }],
+    })
+
+    expect(createMock.mock.calls[0][0]).not.toHaveProperty('reasoning')
+  })
+
+  it.each([true, false])('forwards reasoning=%s to OpenRouter', async (reasoning) => {
+    vi.mocked(db.getSetting).mockReturnValue('sk-or-v1-test')
+    mockChatResponse()
+
+    await openrouterProvider.createMessage({
+      model: 'deepseek/deepseek-v4-flash-0731',
+      maxTokens: 100,
+      reasoning,
+      messages: [{ role: 'user', content: 'hello' }],
+    })
+
+    expect(createMock.mock.calls[0][0].reasoning).toEqual({ enabled: reasoning })
   })
 
   it('streamMessage accumulates deltas and usage', async () => {
@@ -108,6 +136,56 @@ describe('openrouterProvider', () => {
     expect(result.text).toBe('Hello world')
     expect(result.inputTokens).toBe(5)
     expect(result.outputTokens).toBe(7)
+  })
+
+  it('streamMessage reports reasoning separately from the answer', async () => {
+    vi.mocked(db.getSetting).mockReturnValue('sk-or-v1-test')
+    createMock.mockResolvedValue({
+      async *[Symbol.asyncIterator]() {
+        yield { choices: [{ delta: { reasoning: 'Let me' } }] }
+        yield { choices: [{ delta: { reasoning: ' think' } }] }
+        yield { choices: [{ delta: { content: 'Answer' } }] }
+      },
+    })
+
+    const deltas: string[] = []
+    const thoughts: string[] = []
+    const result = await openrouterProvider.streamMessage(
+      {
+        model: 'deepseek/deepseek-v4-flash-0731',
+        maxTokens: 50,
+        reasoning: true,
+        messages: [{ role: 'user', content: 'hi' }],
+      },
+      d => deltas.push(d),
+      d => thoughts.push(d),
+    )
+
+    expect(thoughts).toEqual(['Let me', ' think'])
+    // Reasoning is progress, not content — it must never leak into the result
+    expect(deltas).toEqual(['Answer'])
+    expect(result.text).toBe('Answer')
+  })
+
+  it('streamMessage drops reasoning when the caller wants only the answer', async () => {
+    vi.mocked(db.getSetting).mockReturnValue('sk-or-v1-test')
+    createMock.mockResolvedValue({
+      async *[Symbol.asyncIterator]() {
+        yield { choices: [{ delta: { reasoning: 'thinking' } }] }
+        yield { choices: [{ delta: { content: 'Answer' } }] }
+      },
+    })
+
+    const result = await openrouterProvider.streamMessage(
+      {
+        model: 'deepseek/deepseek-v4-flash-0731',
+        maxTokens: 50,
+        messages: [{ role: 'user', content: 'hi' }],
+      },
+      () => {},
+    )
+
+    expect(result.text).toBe('Answer')
   })
 })
 

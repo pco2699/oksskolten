@@ -5,6 +5,7 @@ import { useModelCatalog } from '../../../hooks/use-model-catalog'
 import type { CatalogModel } from '../../../data/aiModels'
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectGroup, SelectLabel, SelectItem } from '@/components/ui/select'
 import { Input } from '@/components/ui/input'
+import { Switch } from '@/components/ui/switch'
 import type { Settings } from '../../../hooks/use-settings'
 import type { TranslateFn } from '../../../lib/i18n'
 
@@ -18,6 +19,8 @@ interface TaskConfig {
   maxTokensValue?: string
   setMaxTokens?: (v: string) => void
   defaultMaxTokens?: number
+  reasoningValue?: string
+  setReasoning?: (v: 'on' | 'off') => void
 }
 
 const SWR_KEY_OPTS = { revalidateOnFocus: false } as const
@@ -42,6 +45,8 @@ export function TaskModelSection({ settings, t }: { settings: Settings; t: TFunc
       maxTokensValue: settings.summaryMaxTokens || '',
       setMaxTokens: settings.setSummaryMaxTokens,
       defaultMaxTokens: 2048,
+      reasoningValue: settings.summaryReasoning || 'off',
+      setReasoning: settings.setSummaryReasoning,
     },
     {
       labelKey: 'integration.task.translate',
@@ -50,13 +55,15 @@ export function TaskModelSection({ settings, t }: { settings: Settings; t: TFunc
       maxTokensValue: settings.translateMaxTokens || '',
       setMaxTokens: settings.setTranslateMaxTokens,
       defaultMaxTokens: 16384,
+      reasoningValue: settings.translateReasoning || 'off',
+      setReasoning: settings.setTranslateReasoning,
     },
   ]
 
   // Show brief "Saved" feedback on any task model change
   const [showSaved, setShowSaved] = useState(false)
-  const prevValues = useRef(tasks.map(t => `${t.modelValue}:${t.maxTokensValue ?? ''}`).join('|'))
-  const currentValues = tasks.map(t => `${t.modelValue}:${t.maxTokensValue ?? ''}`).join('|')
+  const prevValues = useRef(tasks.map(t => `${t.modelValue}:${t.maxTokensValue ?? ''}:${t.reasoningValue ?? ''}`).join('|'))
+  const currentValues = tasks.map(t => `${t.modelValue}:${t.maxTokensValue ?? ''}:${t.reasoningValue ?? ''}`).join('|')
   useEffect(() => {
     if (prevValues.current !== currentValues) {
       prevValues.current = currentValues
@@ -99,6 +106,14 @@ function TaskModelRow({ task, t }: { task: TaskConfig; t: TFunc }) {
       <span className="block text-xs font-medium text-text select-none">{t(task.labelKey)}</span>
       <ModelSelect modelValue={task.modelValue} setModel={task.setModel} t={t} />
       {task.setMaxTokens && <MaxTokensInput task={task} t={t} />}
+      {task.setReasoning && (
+        <Switch
+          checked={task.reasoningValue === 'on'}
+          onCheckedChange={checked => task.setReasoning!(checked ? 'on' : 'off')}
+          label={t('integration.reasoning')}
+          description={t('integration.reasoningDesc')}
+        />
+      )}
     </div>
   )
 }

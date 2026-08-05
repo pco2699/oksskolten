@@ -919,9 +919,11 @@ Unset items are `null`.
 | `appearance.mascot` | `"off"` / `"dream-puff"` / `"sleepy-giant"` |
 | `chat.model` | OpenRouter model ID (e.g. `"deepseek/deepseek-v4-flash"`). Any string — the catalog is not a fixed list |
 | `summary.model` | OpenRouter model ID |
-| `summary.max_tokens` | Positive integer 1-200000 (max output tokens for summarization; default 2048). Empty string to delete |
+| `summary.max_tokens` | Positive integer 1-200000 (max output tokens for summarization; default 2048, or 8192 with reasoning on). Empty string to delete |
+| `summary.reasoning` | `"on"` / `"off"` (default off — let the model think before summarizing) |
 | `translate.model` | OpenRouter model ID |
-| `translate.max_tokens` | Positive integer 1-200000 (max output tokens for translation; default 16384). Empty string to delete |
+| `translate.max_tokens` | Positive integer 1-200000 (max output tokens for translation; default 16384, or 24576 with reasoning on). Empty string to delete |
+| `translate.reasoning` | `"on"` / `"off"` (default off) |
 
 
 **GET /api/settings/api-keys/:provider** — Check API key configuration status (auth required)

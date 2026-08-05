@@ -25,7 +25,7 @@ export function useSummarize(
     onComplete: (text: string) => setSummary(text),
   }), [])
 
-  const { processing: summarizing, streamingText, streamingHtml, error, run } =
+  const { processing: summarizing, streamingText, reasoningText, streamingHtml, error, run } =
     useStreamingAI(article?.id, metrics, options)
 
   const handleSummarize = useCallback(() => run(), [run])
@@ -36,5 +36,5 @@ export function useSummarize(
     return sanitizeHtml(html)
   }, [summary])
 
-  return { summary, summarizing, streamingText, handleSummarize, summaryHtml, streamingHtml, error }
+  return { summary, summarizing, streamingText, reasoningText, handleSummarize, summaryHtml, streamingHtml, error }
 }

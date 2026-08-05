@@ -1,10 +1,12 @@
 import { Skeleton } from '../ui/skeleton'
 import { SanitizedHTML } from '../ui/sanitized-html'
+import { ReasoningStream } from '../ui/reasoning-stream'
 
 interface ArticleContentBodyProps {
   translating: boolean
   translatingText: string
   translatingHtml: string
+  reasoningText: string
   displayContent: string
 }
 
@@ -12,10 +14,15 @@ export function ArticleContentBody({
   translating,
   translatingText,
   translatingHtml,
+  reasoningText,
   displayContent,
 }: ArticleContentBodyProps) {
   if (translating && translatingText) {
     return <SanitizedHTML html={translatingHtml} className="prose transition-opacity duration-150" />
+  }
+
+  if (translating && reasoningText) {
+    return <ReasoningStream text={reasoningText} />
   }
 
   if (translating) {

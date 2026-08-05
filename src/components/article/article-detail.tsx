@@ -51,14 +51,14 @@ export function ArticleDetail({ articleUrl, enableZapNavigation = false }: Artic
   const articleRef = useRef<HTMLElement>(null)
 
   const metrics = useMetrics()
-  const { summary, summarizing, streamingText, handleSummarize, summaryHtml, streamingHtml, error: summarizeError } = useSummarize(article, metrics)
+  const { summary, summarizing, streamingText, reasoningText, handleSummarize, summaryHtml, streamingHtml, error: summarizeError } = useSummarize(article, metrics)
   // Only pass translation to the hook if it matches the current locale; stale translations are treated as absent
   const isTranslationCurrent = article?.translated_lang === (translateTargetLang || locale)
   const translateInput = useMemo(() =>
     article ? { id: article.id, full_text_translated: isTranslationCurrent ? article.full_text_translated : null } : undefined,
     [article, isTranslationCurrent],
   )
-  const { viewMode, setViewMode, translating, translatingText, fullTextTranslated, handleTranslate, translatingHtml, error: translateError } = useTranslate(translateInput, metrics)
+  const { viewMode, setViewMode, translating, translatingText, reasoningText: translateReasoningText, fullTextTranslated, handleTranslate, translatingHtml, error: translateError } = useTranslate(translateInput, metrics)
   const {
     isBookmarked, isLiked, archivingImages, deleteConfirmOpen, setDeleteConfirmOpen,
     toggleBookmark, toggleLike, toggleReadState, handleArchiveImages, handleDelete,
@@ -238,6 +238,7 @@ export function ArticleDetail({ articleUrl, enableZapNavigation = false }: Artic
         summary={summary}
         summarizing={summarizing}
         streamingText={streamingText}
+        reasoningText={reasoningText}
         summaryHtml={summaryHtml}
         streamingHtml={streamingHtml}
         summarizeError={summarizeError}
@@ -287,6 +288,7 @@ export function ArticleDetail({ articleUrl, enableZapNavigation = false }: Artic
         translating={translating}
         translatingText={translatingText}
         translatingHtml={translatingHtml}
+        reasoningText={translateReasoningText}
         displayContent={displayContent}
       />
       <ImageLightbox src={lightboxSrc} onClose={() => setLightboxSrc(null)} />

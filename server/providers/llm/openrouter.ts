@@ -10,6 +10,12 @@ const DEFAULT_BASE_URL = 'https://openrouter.ai/api/v1'
 const APP_URL = 'https://github.com/babarot/oksskolten'
 const APP_TITLE = 'Oksskolten'
 
+// The SDK defaults (10 minute timeout, 2 retries) mean a stalled generation can
+// silently occupy half an hour before surfacing an error. A thinking model on a
+// long article is slow but not that slow, so fail sooner and retry once.
+const REQUEST_TIMEOUT_MS = 5 * 60 * 1000
+const MAX_RETRIES = 1
+
 let cachedBaseUrl = ''
 let cachedKey = ''
 let cachedClient: OpenAI | null = null
@@ -32,6 +38,8 @@ export function getOpenRouterClient(): OpenAI {
   cachedClient = new OpenAI({
     baseURL: baseUrl,
     apiKey: key,
+    timeout: REQUEST_TIMEOUT_MS,
+    maxRetries: MAX_RETRIES,
     defaultHeaders: {
       'HTTP-Referer': APP_URL,
       'X-Title': APP_TITLE,
@@ -116,6 +124,31 @@ function toOpenAIMessages(params: LLMMessageParams): OpenAI.ChatCompletionMessag
   return messages
 }
 
+/**
+ * Params OpenRouter accepts alongside the OpenAI schema.
+ *
+ * `reasoning` matters most: several models (DeepSeek V4 among them) think by
+ * default, and their reasoning tokens are billed against max_completion_tokens
+ * while producing no visible output — a summary that should take seconds stalls
+ * instead. `provider.sort` keeps a request off the slowest host serving a model.
+ */
+interface OpenRouterExtraBody {
+  reasoning?: { enabled: boolean }
+  provider?: { sort: 'throughput' }
+}
+
+function extraBody(params: LLMMessageParams): OpenRouterExtraBody {
+  const body: OpenRouterExtraBody = { provider: { sort: 'throughput' } }
+  if (params.reasoning !== undefined) body.reasoning = { enabled: params.reasoning }
+  return body
+}
+
+/** OpenRouter carries reasoning text on a delta field the OpenAI schema has no name for. */
+function reasoningDelta(delta: unknown): string {
+  const raw = (delta as { reasoning?: unknown } | undefined)?.reasoning
+  return typeof raw === 'string' ? raw : ''
+}
+
 export const openrouterProvider: LLMProvider = {
   name: 'openrouter',
 
@@ -128,11 +161,15 @@ export const openrouterProvider: LLMProvider = {
   async createMessage(params: LLMMessageParams): Promise<LLMStreamResult> {
     const client = getOpenRouterClient()
 
-    const response = await client.chat.completions.create({
+    const body = {
       model: params.model,
       max_completion_tokens: params.maxTokens,
       messages: toOpenAIMessages(params),
-    })
+      ...extraBody(params),
+    }
+    const response = await client.chat.completions.create(
+      body as OpenAI.ChatCompletionCreateParamsNonStreaming,
+    )
 
     const text = response.choices[0]?.message?.content ?? ''
     return {
@@ -142,16 +179,24 @@ export const openrouterProvider: LLMProvider = {
     }
   },
 
-  async streamMessage(params: LLMMessageParams, onText: (delta: string) => void): Promise<LLMStreamResult> {
+  async streamMessage(
+    params: LLMMessageParams,
+    onText: (delta: string) => void,
+    onReasoning?: (delta: string) => void,
+  ): Promise<LLMStreamResult> {
     const client = getOpenRouterClient()
 
-    const stream = await client.chat.completions.create({
+    const body = {
       model: params.model,
       max_completion_tokens: params.maxTokens,
       messages: toOpenAIMessages(params),
       stream: true,
       stream_options: { include_usage: true },
-    })
+      ...extraBody(params),
+    }
+    const stream = await client.chat.completions.create(
+      body as OpenAI.ChatCompletionCreateParamsStreaming,
+    )
 
     let fullText = ''
     let inputTokens = 0
@@ -163,6 +208,9 @@ export const openrouterProvider: LLMProvider = {
         fullText += delta
         onText(delta)
       }
+      // Surfaced separately from the answer: it is progress to show, not content to keep.
+      const thought = reasoningDelta(chunk.choices[0]?.delta)
+      if (thought && onReasoning) onReasoning(thought)
       if (chunk.usage) {
         inputTokens = chunk.usage.prompt_tokens ?? inputTokens
         outputTokens = chunk.usage.completion_tokens ?? outputTokens

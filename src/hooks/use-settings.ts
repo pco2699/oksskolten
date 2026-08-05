@@ -45,8 +45,10 @@ interface Prefs {
   'chat.model': string | null
   'summary.model': string | null
   'summary.max_tokens': string | null
+  'summary.reasoning': string | null
   'translate.model': string | null
   'translate.max_tokens': string | null
+  'translate.reasoning': string | null
   'translate.target_lang': string | null
   'custom_themes': string | null
 }
@@ -83,6 +85,9 @@ export function useSettings() {
   const [translateTargetLang, setTranslateTargetLangState] = useState<string | null>(null)
   const [summaryMaxTokens, setSummaryMaxTokensState] = useState<string | null>(null)
   const [translateMaxTokens, setTranslateMaxTokensState] = useState<string | null>(null)
+  // Reasoning is opt-in: unset means off, matching the server-side default.
+  const [summaryReasoning, setSummaryReasoningState] = useState<string | null>(null)
+  const [translateReasoning, setTranslateReasoningState] = useState<string | null>(null)
 
   // --- DB sync ---
   const { data: prefs, mutate: mutatePrefs } = useSWR<Prefs>(
@@ -175,6 +180,10 @@ export function useSettings() {
       { key: 'translate.target_lang', setter: setTranslateTargetLangState },
       { key: 'summary.max_tokens', setter: setSummaryMaxTokensState },
       { key: 'translate.max_tokens', setter: setTranslateMaxTokensState },
+      { key: 'summary.reasoning', setter: setSummaryReasoningState,
+        validate: v => v === 'on' || v === 'off' },
+      { key: 'translate.reasoning', setter: setTranslateReasoningState,
+        validate: v => v === 'on' || v === 'off' },
     ]
 
     for (const { key, setter, backfillRef, validate } of hydrationMap) {
@@ -315,6 +324,8 @@ export function useSettings() {
     syncedSetTranslateTargetLang,
     syncedSetSummaryMaxTokens,
     syncedSetTranslateMaxTokens,
+    syncedSetSummaryReasoning,
+    syncedSetTranslateReasoning,
   } = useMemo(() => {
     const make = <T extends string>(key: keyof Prefs, setter: (v: T) => void) =>
       (value: T) => {
@@ -349,6 +360,8 @@ export function useSettings() {
       syncedSetTranslateTargetLang: make<string>('translate.target_lang', setTranslateTargetLangState),
       syncedSetSummaryMaxTokens: make<string>('summary.max_tokens', setSummaryMaxTokensState),
       syncedSetTranslateMaxTokens: make<string>('translate.max_tokens', setTranslateMaxTokensState),
+      syncedSetSummaryReasoning: make<'on' | 'off'>('summary.reasoning', setSummaryReasoningState),
+      syncedSetTranslateReasoning: make<'on' | 'off'>('translate.reasoning', setTranslateReasoningState),
     }
     // scheduleSave and dirtyKeysRef are stable refs; remaining setters are useState/useCallback-stable
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -435,6 +448,10 @@ export function useSettings() {
     setSummaryMaxTokens: syncedSetSummaryMaxTokens,
     translateMaxTokens,
     setTranslateMaxTokens: syncedSetTranslateMaxTokens,
+    summaryReasoning,
+    setSummaryReasoning: syncedSetSummaryReasoning,
+    translateReasoning,
+    setTranslateReasoning: syncedSetTranslateReasoning,
     keyboardNavigation,
     setKeyboardNavigation: syncedSetKeyboardNavigation,
     keybindings,

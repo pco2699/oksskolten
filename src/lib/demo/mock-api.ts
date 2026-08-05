@@ -139,8 +139,10 @@ export async function demoFetcher(url: string): Promise<unknown> {
       'chat.model': 'anthropic/claude-haiku-4.5',
       'summary.model': 'anthropic/claude-haiku-4.5',
       'summary.max_tokens': null,
+      'summary.reasoning': null,
       'translate.model': 'anthropic/claude-sonnet-4.5',
       'translate.max_tokens': null,
+      'translate.reasoning': null,
       'translate.target_lang': null,
     }
   }

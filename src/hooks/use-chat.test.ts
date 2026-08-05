@@ -123,6 +123,31 @@ describe('useChat', () => {
     await act(async () => { streamResolve!() })
   })
 
+  it('accumulates reasoning deltas and keeps them out of the message', async () => {
+    const { result } = renderHook(() => useChat())
+
+    await act(async () => {
+      result.current.sendMessage('hi')
+      await Promise.resolve()
+    })
+
+    await act(async () => {
+      capturedOnEvent!({ type: 'thinking_start' })
+      capturedOnEvent!({ type: 'reasoning_delta', text: 'Let me' })
+      capturedOnEvent!({ type: 'reasoning_delta', text: ' think' })
+    })
+    expect(result.current.reasoningText).toBe('Let me think')
+
+    await act(async () => {
+      capturedOnEvent!({ type: 'thinking_end' })
+      capturedOnEvent!({ type: 'text_delta', text: 'Answer' })
+    })
+    // The reasoning is progress, not content — the assistant message holds only the answer
+    expect(result.current.messages[1].text).toBe('Answer')
+
+    await act(async () => { streamResolve!() })
+  })
+
   it('handles tool_use start/end', async () => {
     const { result } = renderHook(() => useChat())
 

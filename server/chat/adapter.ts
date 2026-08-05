@@ -3,6 +3,7 @@ import type { Message } from './types.js'
 export type ChatSSEEvent =
   | { type: 'text_delta'; text: string }
   | { type: 'thinking_start' }
+  | { type: 'reasoning_delta'; text: string }
   | { type: 'thinking_end' }
   | { type: 'tool_use_start'; name: string; tool_use_id: string }
   | { type: 'tool_use_end'; name: string; tool_use_id: string }

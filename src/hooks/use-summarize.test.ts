@@ -75,6 +75,7 @@ describe('useSummarize', () => {
     expect(mockStreamPost).toHaveBeenCalledWith(
       '/api/articles/5/summarize?stream=1',
       expect.any(Function),
+      expect.any(Function),
     )
   })
 

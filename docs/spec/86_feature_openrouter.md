@@ -76,7 +76,9 @@ The API key is stored in the settings DB under `api_key.openrouter` and managed 
 | `api_key.openrouter` | string | `""` | OpenRouter API key (`sk-or-v1-...`) |
 | `chat.model` | string | `""` | OpenRouter model id (e.g. `anthropic/claude-sonnet-4.5`) |
 | `summary.model` | string | `""` | OpenRouter model id |
+| `summary.reasoning` | `on` / `off` | `off` | Let the model think before summarizing |
 | `translate.model` | string | `""` | OpenRouter model id |
+| `translate.reasoning` | `on` / `off` | `off` | Let the model think before translating |
 
 `OPENROUTER_BASE_URL` is an environment variable, not a DB setting.
 
@@ -84,7 +86,7 @@ Nothing falls back to a built-in model. `POST /api/chat` returns 400 `MODEL_NOT_
 
 ### Settings UI
 
-The provider section holds a single `OpenRouterCard`: API key state (configured / not set), a password input, a delete button, and a "Test Connection" button calling `GET /api/settings/openrouter/status`. The provider button group is gone — there is nothing to pick — so each task row is just a model field plus, for summary and translation, a max-tokens override.
+The provider section holds a single `OpenRouterCard`: API key state (configured / not set), a password input, a delete button, and a "Test Connection" button calling `GET /api/settings/openrouter/status`. The provider button group is gone — there is nothing to pick — so each task row is just a model field plus, for summary and translation, a max-tokens override and a reasoning switch.
 
 The model is entered as free text (e.g. `deepseek/deepseek-v4-flash`), because OpenRouter adds models faster than any cached catalog reflects. Below the text field, a dropdown populated from `GET /api/settings/openrouter/models` and grouped by vendor fills the same value. Nothing is auto-selected: the catalog is large and paid, so the id is always an explicit choice.
 

@@ -133,7 +133,11 @@ function extractKnownErrorCode(err: unknown): string | null {
 interface AiHandlerConfig {
   getCached: (article: ArticleDetail) => string | null
   validate?: (article: ArticleDetail) => string | null
-  streamFn: (fullText: string, onDelta: (d: string) => void) => Promise<{ text: string } & AiTextResult>
+  streamFn: (
+    fullText: string,
+    onDelta: (d: string) => void,
+    onReasoning: (d: string) => void,
+  ) => Promise<{ text: string } & AiTextResult>
   nonStreamFn: (fullText: string) => Promise<{ text: string } & AiTextResult>
   applyResult: (articleId: number, text: string) => void
   errorMessage: string
@@ -174,6 +178,7 @@ function createAiHandler(config: AiHandlerConfig) {
         const result = await config.streamFn(
           article.full_text,
           (delta) => { sse.send({ type: 'delta', text: delta }) },
+          (delta) => { sse.send({ type: 'reasoning', text: delta }) },
         )
         config.applyResult(article.id, result.text)
         const usage = formatUsage(result)
@@ -455,8 +460,8 @@ export async function articleRoutes(api: FastifyInstance): Promise<void> {
     { preHandler: [requireJson] },
     createAiHandler({
       getCached: (article) => article.summary,
-      streamFn: async (fullText, onDelta) => {
-        const r = await streamSummarizeArticle(fullText, onDelta)
+      streamFn: async (fullText, onDelta, onReasoning) => {
+        const r = await streamSummarizeArticle(fullText, onDelta, onReasoning)
         return { text: r.summary, ...r }
       },
       nonStreamFn: async (fullText) => {
@@ -483,8 +488,8 @@ export async function articleRoutes(api: FastifyInstance): Promise<void> {
         const userLang = getTranslateTargetLang()
         return article.lang === userLang ? `Article is already in ${userLang}` : null
       },
-      streamFn: async (fullText, onDelta) => {
-        const r = await streamTranslateArticle(fullText, onDelta)
+      streamFn: async (fullText, onDelta, onReasoning) => {
+        const r = await streamTranslateArticle(fullText, onDelta, onReasoning)
         return { text: r.fullTextTranslated, ...r }
       },
       nonStreamFn: async (fullText) => {
