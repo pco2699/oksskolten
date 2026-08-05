@@ -1,5 +1,10 @@
 # Changelog
 
+## [v0.5.6](https://github.com/pco2699/oksskolten/compare/v0.5.5...v0.5.6) - 2026-08-05
+### Others
+- Add reasoning token support for AI tasks and chat by @pco2699 in https://github.com/pco2699/oksskolten/pull/13
+- Fix drawer popstate handling for overlays and desktop by @pco2699 in https://github.com/pco2699/oksskolten/pull/15
+
 ## [v0.5.5](https://github.com/pco2699/oksskolten/compare/v0.5.4...v0.5.5) - 2026-08-05
 ### Others
 - Add unread-only toggle and fix unread paging / stale sidebar counts by @pco2699 in https://github.com/pco2699/oksskolten/pull/11
