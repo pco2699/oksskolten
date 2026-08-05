@@ -340,6 +340,7 @@ Query parameters:
 | `feed_id` | number | — | Filter by feed ID |
 | `category_id` | number | — | Filter by category ID (returns articles from feeds in the category) |
 | `unread` | `"1"` | — | When specified, returns only unread articles (`seen_at IS NULL`). Omitted or other values return all |
+| `unread_since` | ISO 8601 | — | Only meaningful with `unread=1`. Articles marked read at or after this timestamp stay in the result set, so `offset` paging does not skip articles as the reader marks them read (see below). Unparsable values are ignored |
 | `bookmarked` | `"1"` | — | When specified, returns only bookmarked articles |
 | `liked` | `"1"` | — | When specified, returns only liked articles |
 | `read` | `"1"` | — | When specified, returns only read articles (`read_at IS NOT NULL`). For the `/history` route |
@@ -374,6 +375,20 @@ Query parameters:
 ```
 
 `feed_name` is fetched via a JOIN with the `feeds` table. `has_more` is `true` when `offset + articles.length < total`. The frontend stops infinite scrolling when `has_more === false`.
+
+**Stable unread paging (`unread_since`)**
+
+`unread=1` combined with `offset` paging is unstable on its own: every article the reader marks read leaves the result set, so the next page starts that many articles further down and the ones in between are never returned. With 20 articles per page, reading a full page makes the following page skip 20 unread articles — which then never get shown, and so never get marked read either.
+
+`unread_since` pins the filter to the moment the list view was opened:
+
+```sql
+a.seen_at IS NULL OR a.seen_at >= :anchor
+```
+
+The anchor is clamped server-side to `[now - 24 hours, now]` before use, so a browser clock that runs ahead of the server cannot widen the filter, and a tab left open indefinitely cannot resurrect articles read long ago. The clamping and the comparison both happen in SQLite, so no timestamp-format conversion is involved.
+
+The frontend records one anchor per view (`ArticleList`), recomputed when the route or the unread toggle changes, and sends the same value for every page of that view.
 
 **Smart Floor (Automatic Display Range Limiting)**
 

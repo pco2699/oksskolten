@@ -78,6 +78,93 @@ describe('getArticles read filter', () => {
   })
 })
 
+// --- getArticles: unreadSince (stable pagination while reading) ---
+
+describe('getArticles unreadSince', () => {
+  /** 6 articles, newest first: /1 .. /6 */
+  function seedSix() {
+    const feed = seedFeed()
+    const ids: number[] = []
+    for (let i = 1; i <= 6; i++) {
+      ids.push(seedArticle(feed.id, {
+        url: `https://example.com/${i}`,
+        published_at: `2025-01-0${7 - i}T00:00:00Z`,
+      }))
+    }
+    return { feed, ids }
+  }
+
+  it('skips articles when paging an unread list without an anchor', () => {
+    const { ids } = seedSix()
+
+    const page1 = getArticles({ unread: true, limit: 2, offset: 0 })
+    expect(page1.articles.map(a => a.url)).toEqual(['https://example.com/1', 'https://example.com/2'])
+
+    // Reading the first page shrinks the unread set the next OFFSET applies to,
+    // so /3 and /4 fall through the gap and are never returned by either page
+    markArticleSeen(ids[0], true)
+    markArticleSeen(ids[1], true)
+
+    const page2 = getArticles({ unread: true, limit: 2, offset: 2 })
+    expect(page2.articles.map(a => a.url)).toEqual(['https://example.com/5', 'https://example.com/6'])
+  })
+
+  it('keeps paging stable when articles are read after the anchor', () => {
+    const { ids } = seedSix()
+    const anchor = new Date(Date.now() - 60_000).toISOString()
+
+    const page1 = getArticles({ unread: true, unreadSince: anchor, limit: 2, offset: 0 })
+    expect(page1.articles.map(a => a.url)).toEqual(['https://example.com/1', 'https://example.com/2'])
+
+    markArticleSeen(ids[0], true)
+    markArticleSeen(ids[1], true)
+
+    const page2 = getArticles({ unread: true, unreadSince: anchor, limit: 2, offset: 2 })
+    expect(page2.articles.map(a => a.url)).toEqual(['https://example.com/3', 'https://example.com/4'])
+
+    markArticleSeen(ids[2], true)
+    markArticleSeen(ids[3], true)
+
+    const page3 = getArticles({ unread: true, unreadSince: anchor, limit: 2, offset: 4 })
+    expect(page3.articles.map(a => a.url)).toEqual(['https://example.com/5', 'https://example.com/6'])
+  })
+
+  it('still excludes articles read before the anchor', () => {
+    const { ids } = seedSix()
+    markArticleSeen(ids[0], true)
+    getDb().prepare("UPDATE articles SET seen_at = datetime('now', '-5 minutes') WHERE id = ?").run(ids[0])
+
+    // An anchor ahead of the server clock is clamped back to now, so an article
+    // read before the view was opened stays filtered out
+    const anchor = new Date(Date.now() + 60_000).toISOString()
+    const { articles, total } = getArticles({ unread: true, unreadSince: anchor, limit: 100, offset: 0 })
+    expect(total).toBe(5)
+    expect(articles.map(a => a.url)).not.toContain('https://example.com/1')
+  })
+
+  it('clamps an anchor older than the 24h window', () => {
+    const { ids } = seedSix()
+    markArticleSeen(ids[0], true)
+    getDb().prepare("UPDATE articles SET seen_at = datetime('now', '-2 days') WHERE id = ?").run(ids[1])
+
+    const anchor = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString()
+    const urls = getArticles({ unread: true, unreadSince: anchor, limit: 100, offset: 0 })
+      .articles.map(a => a.url)
+    // Read just now — inside the clamped window, so still listed
+    expect(urls).toContain('https://example.com/1')
+    // Read two days ago — outside it
+    expect(urls).not.toContain('https://example.com/2')
+  })
+
+  it('ignores an unparsable anchor and filters on seen_at alone', () => {
+    const { ids } = seedSix()
+    markArticleSeen(ids[0], true)
+
+    const { total } = getArticles({ unread: true, unreadSince: 'not-a-date', limit: 100, offset: 0 })
+    expect(total).toBe(5)
+  })
+})
+
 // --- searchArticles ---
 
 describe('searchArticles', () => {

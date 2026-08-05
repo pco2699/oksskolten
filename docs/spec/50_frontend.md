@@ -8,7 +8,7 @@
 
 ```
 /                              → Redirect to /all
-/all                           → All feeds, aggregated (defaults to unread-only; respects the show-read-articles toggle, same as category views)
+/all                           → All feeds, aggregated (same unread-only toggle as feed and category views)
 /inbox                         → Redirect to /all (legacy bookmarks/PWA shortcuts)
 /bookmarks                     → Bookmarked articles list
 /likes                         → Liked articles list
@@ -63,6 +63,7 @@ Global shortcuts are managed by `useGlobalShortcuts` hook in `src/hooks/use-glob
 |---|---|
 | Library | SWR |
 | Pagination | Infinite scroll (`useSWRInfinite`, `limit=20` per page) |
+| Unread-only filter | A toggle above the article list, shown on feed, category and All views. Backed by the `reading.category_unread_only` preference, so the choice persists and is also editable in Settings → Reading. While it is on, every page of the view sends the same `unread_since` anchor so paging does not skip articles as they get marked read (see [API spec](./20_api.md)) |
 | Display range limit | Smart Floor — For feed/category views, adopts whichever range contains the most articles among three candidates: "last 1 week", "latest 20 articles", and "up to the oldest unread". Skipped if fewer than 20 articles exist. Not applied to All/Bookmarks/Likes/History/Clips |
 | Show older articles | When Smart Floor hides articles, a "show older articles (N)" button appears at the end of the list. Clicking it re-fetches with `no_floor=1` to show all articles |
 | Scroll stop condition | Stops when response `has_more === false` |
@@ -90,6 +91,8 @@ Pull-to-refresh calls `startFeedFetch(feedId)` on individual feed pages to fetch
 | Delete feed (`DELETE /api/feeds/:id`) | `/api/feeds`, `/api/articles` |
 | Update feed (`PATCH /api/feeds/:id`) | `/api/feeds` |
 | Seen/read update (`PATCH .../seen`, `POST .../read`) | `/api/feeds` (to update unread_count) |
+
+Revalidating `/api/feeds` only works while something is subscribed to that key. On the article **page** route the sidebar is unmounted, so a read marked from there has no revalidator to run and the cached counts would stay stale (the global config sets `revalidateIfStale: false`). Two things cover that: `adjustFeedUnread()` in `src/lib/feedCounts.ts` writes the ±1 straight into the cached feed list, and `FeedList` subscribes with `revalidateOnMount: true` so the server value is refetched as soon as the sidebar comes back.
 
 
 ### Feed Metrics

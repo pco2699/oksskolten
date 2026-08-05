@@ -96,6 +96,12 @@ const dict = {
   'articles.empty': { ja: '記事がありません', en: 'No articles', zh: '暂无文章'},
   'articles.allRead': { ja: 'すべて読みました', en: 'All caught up!', zh: '全部读完了！'},
   'articles.showReadArticles': { ja: '既読記事を表示する', en: 'Show read articles', zh: '显示已读文章'},
+  'articles.unreadOnly': { ja: '未読のみ', en: 'Unread only', zh: '仅未读'},
+  'articles.unreadOnlyTooltip': {
+    ja: '未読のみ表示するかどうかを切り替えます',
+    en: 'Toggle between unread-only and all articles',
+    zh: '在仅未读和全部文章之间切换'
+  },
 
   // FeedErrorBanner - pipeline stages
   'feedError.stage.discovery': { ja: 'RSS検出', en: 'RSS Discovery', zh: 'RSS 发现'},
@@ -371,11 +377,11 @@ const dict = {
   },
   'settings.internalLinksOn': { ja: 'オン', en: 'On', zh: '开'},
   'settings.internalLinksOff': { ja: 'オフ', en: 'Off', zh: '关'},
-  'settings.categoryUnreadOnly': { ja: 'カテゴリで未読のみ表示', en: 'Show Only Unread In Categories', zh: '分类中仅显示未读'},
+  'settings.categoryUnreadOnly': { ja: '未読のみ表示', en: 'Show Only Unread', zh: '仅显示未读'},
   'settings.categoryUnreadOnlyDesc': {
-    ja: 'カテゴリビューとAllビューで未読記事のみを表示します',
-    en: 'Show only unread articles in category views and the All view',
-    zh: '在分类视图和"全部"视图中仅显示未读文章'
+    ja: 'フィード・カテゴリ・Allの各ビューで未読記事のみを表示します。記事一覧のトグルからも切り替えられます',
+    en: 'Show only unread articles in feed, category and All views. Also switchable from the toggle above the article list',
+    zh: '在订阅源、分类和"全部"视图中仅显示未读文章。也可通过文章列表上方的开关切换'
   },
   'settings.categoryUnreadOnlyOn': { ja: 'オン', en: 'On', zh: '开'},
   'settings.categoryUnreadOnlyOff': { ja: 'オフ', en: 'Off', zh: '关'},

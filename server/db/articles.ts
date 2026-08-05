@@ -87,10 +87,39 @@ export function recalculateScores(): { updated: number } {
 
 // --- Article list queries ---
 
+/** Longest window the unread anchor may reach back (see resolveUnreadAnchor). */
+const MAX_UNREAD_ANCHOR_HOURS = 24
+
+/**
+ * Clamp a client-supplied unread anchor to [now - MAX_UNREAD_ANCHOR_HOURS, now]
+ * and normalize it to the `YYYY-MM-DD HH:MM:SS` shape `seen_at` is stored in,
+ * so the two can be compared as plain strings.
+ *
+ * Clamping is done in SQLite rather than JS so the comparison never depends on
+ * the browser's clock being in sync with the server's.
+ */
+function resolveUnreadAnchor(isoTimestamp: string): string | null {
+  const row = getNamed<{ anchor: string | null }>(`
+    SELECT MAX(
+      datetime('now', '-${MAX_UNREAD_ANCHOR_HOURS} hours'),
+      MIN(datetime(@since), datetime('now'))
+    ) AS anchor
+  `, { since: isoTimestamp })
+  return row?.anchor ?? null
+}
+
 export function getArticles(opts: {
   feedId?: number
   categoryId?: number
   unread?: boolean
+  /**
+   * ISO timestamp marking when the list view was opened. Articles marked read
+   * at or after it stay in the unread result set, keeping OFFSET pagination
+   * stable while the reader works through the list — without it, every article
+   * marked read shifts the remaining ones forward and the next page skips as
+   * many articles as were read. Only meaningful together with `unread`.
+   */
+  unreadSince?: string
   bookmarked?: boolean
   liked?: boolean
   read?: boolean
@@ -111,7 +140,13 @@ export function getArticles(opts: {
     params.categoryId = opts.categoryId
   }
   if (opts.unread) {
-    conditions.push('a.seen_at IS NULL')
+    const anchor = opts.unreadSince ? resolveUnreadAnchor(opts.unreadSince) : null
+    if (anchor) {
+      conditions.push('(a.seen_at IS NULL OR a.seen_at >= @unreadAnchor)')
+      params.unreadAnchor = anchor
+    } else {
+      conditions.push('a.seen_at IS NULL')
+    }
   }
   if (opts.bookmarked) {
     conditions.push('a.bookmarked_at IS NOT NULL')
