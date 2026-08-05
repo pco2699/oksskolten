@@ -74,6 +74,7 @@ describe('useTranslate', () => {
     expect(mockStreamPost).toHaveBeenCalledWith(
       '/api/articles/10/translate?stream=1',
       expect.any(Function),
+      expect.any(Function),
     )
   })
 

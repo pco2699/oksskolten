@@ -2,6 +2,7 @@ import { type RefObject } from 'react'
 import { Link } from 'react-router-dom'
 import { Loader2 } from 'lucide-react'
 import { ChatMessageBubble } from './chat-message-bubble'
+import { ReasoningStream } from '../ui/reasoning-stream'
 import { useI18n } from '../../lib/i18n'
 import type { ChatMessage } from '../../hooks/use-chat'
 
@@ -14,13 +15,14 @@ interface ChatMessagesProps {
   messages: ChatMessage[]
   streaming: boolean
   thinking: boolean
+  reasoningText: string
   activeTool: ToolStatus | null
   error: string | null
   endRef?: RefObject<HTMLDivElement | null>
   showEndMarker?: boolean
 }
 
-export function ChatMessages({ messages, streaming, thinking, activeTool, error, endRef, showEndMarker }: ChatMessagesProps) {
+export function ChatMessages({ messages, streaming, thinking, reasoningText, activeTool, error, endRef, showEndMarker }: ChatMessagesProps) {
   const { t, tError, isKeyNotSetError } = useI18n()
 
   return (
@@ -40,7 +42,13 @@ export function ChatMessages({ messages, streaming, thinking, activeTool, error,
         </div>
       )}
 
-      {thinking && !activeTool && (
+      {/* Once reasoning text is flowing it carries the spinner itself, so the
+          bare indicator only covers the gap before the first thought lands. */}
+      {thinking && !activeTool && reasoningText && (
+        <ReasoningStream text={reasoningText} />
+      )}
+
+      {thinking && !activeTool && !reasoningText && (
         <div className="flex items-center gap-2 text-muted text-xs py-1 select-none">
           <Loader2 className="w-3 h-3 animate-spin" />
           {t('chat.thinking')}

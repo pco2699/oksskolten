@@ -554,6 +554,8 @@ const dict = {
   'integration.task.translate': { ja: '翻訳', en: 'Translation', zh: '翻译'},
   'integration.maxTokens': { ja: '最大出力トークン数', en: 'Max output tokens', zh: '最大输出 token 数'},
   'integration.maxTokensDesc': { ja: '空欄でデフォルト値を使用。コンテキスト長が短いローカルLLMでは小さくしてください', en: 'Empty uses the default. Lower this for local LLMs with small context windows', zh: '留空使用默认值。上下文窗口较小的本地 LLM 请调低此值'},
+  'integration.reasoning': { ja: '推論（思考）を使う', en: 'Use reasoning', zh: '使用推理'},
+  'integration.reasoningDesc': { ja: 'オフだと思考をスキップして高速になります。DeepSeek など思考がデフォルトONのモデルではオフを推奨', en: 'Off skips the thinking step and is much faster. Recommended off for models like DeepSeek that think by default', zh: '关闭会跳过思考步骤，速度更快。DeepSeek 等默认开启思考的模型建议关闭'},
 
   // Settings — security
   'settings.security': { ja: 'セキュリティ', en: 'Security', zh: '安全'},
@@ -687,6 +689,7 @@ const dict = {
   'chat.searching': { ja: '記事を検索中...', en: 'Searching articles...', zh: '搜索文章中...'},
   'chat.toolRunning': { ja: '${name} を実行中...', en: 'Running ${name}...', zh: '正在运行 ${name}...'},
   'chat.thinking': { ja: '考え中...', en: 'Thinking...', zh: '思考中...'},
+  'ai.reasoning': { ja: '思考中', en: 'Thinking', zh: '思考中'},
   'chat.noConversations': { ja: '会話がありません', en: 'No conversations', zh: '暂无对话'},
   'chat.deleteConfirm': { ja: 'この会話を削除しますか？', en: 'Delete this conversation?', zh: '确定删除此对话？'},
   'chat.settings': { ja: 'チャット', en: 'Chat', zh: '聊天'},

@@ -5,6 +5,17 @@ import { toOpenAITools } from './tools.js'
 import type { ChatTurnParams, RunChatTurnResult } from './adapter.js'
 import { runToolLoop, CHAT_MAX_TOKENS } from './tool-loop.js'
 
+/**
+ * OpenRouter carries reasoning text on a delta field the OpenAI schema has no
+ * name for. Chat keeps reasoning enabled — deliberation helps here — so the
+ * thinking is streamed to the client instead of being dropped, which is what
+ * made a thinking model look frozen.
+ */
+function reasoningDelta(delta: unknown): string {
+  const raw = (delta as { reasoning?: unknown } | undefined)?.reasoning
+  return typeof raw === 'string' ? raw : ''
+}
+
 // --- Neutral → OpenAI message conversion ---
 
 function convertMessagesToChatCompletions(
@@ -111,12 +122,27 @@ export async function runOpenRouterTurn(params: ChatTurnParams, externalClient?:
     const toolCallAccum: Map<number, { id: string; name: string; arguments: string }> = new Map()
     let finishReason: string | null = null
     let usage = { input_tokens: 0, output_tokens: 0 }
+    let thinking = false
 
     for await (const chunk of stream) {
       const choice = chunk.choices[0]
       if (choice) {
+        const thought = reasoningDelta(choice.delta)
+        if (thought) {
+          if (!thinking) {
+            thinking = true
+            onEvent({ type: 'thinking_start' })
+          }
+          onEvent({ type: 'reasoning_delta', text: thought })
+        }
+
         const textDelta = choice.delta?.content
         if (textDelta) {
+          // The answer has started, so the thinking trace is done being useful.
+          if (thinking) {
+            thinking = false
+            onEvent({ type: 'thinking_end' })
+          }
           responseText += textDelta
           onEvent({ type: 'text_delta', text: textDelta })
         }
@@ -147,6 +173,9 @@ export async function runOpenRouterTurn(params: ChatTurnParams, externalClient?:
         usage.output_tokens += chunk.usage.completion_tokens ?? 0
       }
     }
+
+    // A round that reasons and then only calls tools ends without any text delta.
+    if (thinking) onEvent({ type: 'thinking_end' })
 
     const toolCalls = [...toolCallAccum.values()]
 

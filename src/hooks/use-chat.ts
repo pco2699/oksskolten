@@ -24,6 +24,7 @@ export function useChat(articleId?: number, context?: 'home') {
   const [conversationId, setConversationId] = useState<string | null>(null)
   const [streaming, setStreaming] = useState(false)
   const [thinking, setThinking] = useState(false)
+  const [reasoningText, setReasoningText] = useState('')
   const [activeTool, setActiveTool] = useState<ToolStatus | null>(null)
   const [error, setError] = useState<string | null>(null)
   const abortRef = useRef(false)
@@ -34,6 +35,7 @@ export function useChat(articleId?: number, context?: 'home') {
     setError(null)
     setStreaming(true)
     setThinking(false)
+    setReasoningText('')
     abortRef.current = false
 
     // Add user message
@@ -73,6 +75,10 @@ export function useChat(articleId?: number, context?: 'home') {
               break
             case 'thinking_start':
               setThinking(true)
+              setReasoningText('')
+              break
+            case 'reasoning_delta':
+              setReasoningText(prev => prev + (event.text ?? ''))
               break
             case 'thinking_end':
               setThinking(false)
@@ -123,6 +129,7 @@ export function useChat(articleId?: number, context?: 'home') {
     } finally {
       setStreaming(false)
       setThinking(false)
+      setReasoningText('')
       setActiveTool(null)
     }
   }, [conversationId, articleId, context, streaming])
@@ -164,6 +171,7 @@ export function useChat(articleId?: number, context?: 'home') {
     setError(null)
     setStreaming(false)
     setThinking(false)
+    setReasoningText('')
     setActiveTool(null)
   }, [])
 
@@ -172,6 +180,7 @@ export function useChat(articleId?: number, context?: 'home') {
     conversationId,
     streaming,
     thinking,
+    reasoningText,
     activeTool,
     error,
     sendMessage,

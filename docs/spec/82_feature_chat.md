@@ -204,8 +204,10 @@ The endpoint runs in **stateless** Streamable HTTP mode: every request gets a fr
 - Throws `OPENROUTER_KEY_NOT_SET` when no API key is stored; `POST /api/chat` returns 400 `MODEL_NOT_SET` when no model is configured
 - Streamed tool-call deltas are accumulated per index before execution
 - Collects tool results and loops back
-- SSE events: `text_delta`, `tool_use_start`, `tool_use_end`, `done`, `error`
+- SSE events: `text_delta`, `thinking_start`, `reasoning_delta`, `thinking_end`, `tool_use_start`, `tool_use_end`, `done`, `error`
 - Tool support depends on the chosen model — models without tool calling simply answer without invoking tools
+
+Unlike summarization and translation, chat leaves reasoning at the model's own default — deliberation earns its cost in a conversation. Reasoning tokens arrive on a `delta.reasoning` field outside the OpenAI schema; the adapter emits `thinking_start` on the first one, streams each as `reasoning_delta`, and emits `thinking_end` when the answer begins (or when a round ends having only called tools). The client renders the reasoning live, so a thinking model shows progress rather than appearing frozen. Reasoning text is never appended to the assistant message that gets stored.
 
 ### Search Architecture
 
@@ -257,6 +259,9 @@ Request:
 
 Response: SSE stream
   data: { "type": "conversation_id", "conversation_id": "uuid" }
+  data: { "type": "thinking_start" }
+  data: { "type": "reasoning_delta", "text": "The user is asking about" }
+  data: { "type": "thinking_end" }
   data: { "type": "text_delta", "text": "This week's" }
   data: { "type": "tool_use_start", "name": "search_articles" }
   data: { "type": "tool_use_end", "name": "search_articles" }

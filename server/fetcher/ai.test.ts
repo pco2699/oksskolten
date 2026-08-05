@@ -159,6 +159,34 @@ describe('summarizeArticle', () => {
     expect(params.maxTokens).toBe(2048)
   })
 
+  it('keeps reasoning off by default so summaries do not pay for thinking', async () => {
+    mockCreateMessage.mockResolvedValue({ text: 'ok', inputTokens: 0, outputTokens: 0 })
+    await summarizeArticle('text')
+
+    const params = mockCreateMessage.mock.calls[0][0]
+    expect(params.reasoning).toBe(false)
+  })
+
+  it('enables reasoning and widens the token budget when summary.reasoning is on', async () => {
+    mockGetSetting.mockImplementation(settings({ 'summary.reasoning': 'on' }))
+    mockCreateMessage.mockResolvedValue({ text: 'ok', inputTokens: 0, outputTokens: 0 })
+    await summarizeArticle('text')
+
+    const params = mockCreateMessage.mock.calls[0][0]
+    expect(params.reasoning).toBe(true)
+    // Reasoning tokens are billed against the same cap, so the answer needs headroom
+    expect(params.maxTokens).toBe(8192)
+  })
+
+  it('respects an explicit max_tokens even with reasoning on', async () => {
+    mockGetSetting.mockImplementation(settings({ 'summary.reasoning': 'on', 'summary.max_tokens': '512' }))
+    mockCreateMessage.mockResolvedValue({ text: 'ok', inputTokens: 0, outputTokens: 0 })
+    await summarizeArticle('text')
+
+    const params = mockCreateMessage.mock.calls[0][0]
+    expect(params.maxTokens).toBe(512)
+  })
+
   it('uses custom model from settings', async () => {
     mockGetSetting.mockImplementation(settings({ 'summary.model': 'deepseek/deepseek-v4-flash' }))
     mockCreateMessage.mockResolvedValue({ text: 'ok', inputTokens: 0, outputTokens: 0 })
@@ -204,6 +232,17 @@ describe('streamSummarizeArticle', () => {
     const onText = mockStreamMessage.mock.calls[0][1]
     onText('chunk')
     expect(deltas).toEqual(['chunk'])
+  })
+
+  it('passes the onReasoning callback through to the provider', async () => {
+    mockStreamMessage.mockResolvedValue({ text: 'summary', inputTokens: 0, outputTokens: 0 })
+
+    const thoughts: string[] = []
+    await streamSummarizeArticle('text', () => {}, (d) => thoughts.push(d))
+
+    const onReasoning = mockStreamMessage.mock.calls[0][2]
+    onReasoning('thinking')
+    expect(thoughts).toEqual(['thinking'])
   })
 })
 

@@ -25,6 +25,7 @@ export interface ChatState {
   conversationId: string | null
   streaming: boolean
   thinking: boolean
+  reasoningText: string
   activeTool: ToolStatus | null
   error: string | null
   sendMessage: (text: string) => void
@@ -63,6 +64,7 @@ export function ChatPanel({ variant, chatState: externalChatState, articleId, co
     conversationId: currentConversationId,
     streaming,
     thinking,
+    reasoningText,
     activeTool,
     error,
     sendMessage,
@@ -178,6 +180,7 @@ export function ChatPanel({ variant, chatState: externalChatState, articleId, co
         messages={messages}
         streaming={streaming}
         thinking={thinking}
+        reasoningText={reasoningText}
         activeTool={activeTool}
         error={error}
         endRef={messagesEndRef}

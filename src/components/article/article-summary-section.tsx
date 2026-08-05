@@ -3,12 +3,14 @@ import { Link } from 'react-router-dom'
 import { Callout } from '../ui/callout'
 import { Skeleton } from '../ui/skeleton'
 import { SanitizedHTML } from '../ui/sanitized-html'
+import { ReasoningStream } from '../ui/reasoning-stream'
 import { useI18n } from '../../lib/i18n'
 
 interface ArticleSummarySectionProps {
   summary: string | null
   summarizing: boolean
   streamingText: string
+  reasoningText: string
   summaryHtml: string
   streamingHtml: string
   summarizeError: string | null
@@ -19,6 +21,7 @@ export function ArticleSummarySection({
   summary,
   summarizing,
   streamingText,
+  reasoningText,
   summaryHtml,
   streamingHtml,
   summarizeError,
@@ -38,6 +41,11 @@ export function ArticleSummarySection({
 
   return (
     <>
+      {/* Reasoning, while the model is still thinking rather than answering */}
+      {summarizing && !streamingText && reasoningText && (
+        <ReasoningStream text={reasoningText} />
+      )}
+
       {/* Streaming */}
       {summarizing && streamingText && (
         <Callout>
@@ -45,8 +53,8 @@ export function ArticleSummarySection({
         </Callout>
       )}
 
-      {/* Skeleton while waiting for first token */}
-      {summarizing && !streamingText && (
+      {/* Skeleton while waiting for the first token of either kind */}
+      {summarizing && !streamingText && !reasoningText && (
         <Callout>
           <Skeleton className="h-4 w-3/4 mb-2" />
           <Skeleton className="h-4 w-1/2" />

@@ -255,6 +255,16 @@ All AI calls go through OpenRouter, which fronts models from every major vendor 
 
 The max output tokens for each task can also be overridden (`summary.max_tokens`, default 2048; `translate.max_tokens`, default 16384). This matters for models whose context window is smaller than the defaults: a request whose completion cap exceeds the model's capacity fails outright, so lowering the cap makes summarization and translation usable on such models. Unset values fall back to the defaults.
 
+**Reasoning**
+
+Summarizing and translating are throughput tasks, so reasoning is off by default: requests carry `reasoning: { enabled: false }` unless `summary.reasoning` / `translate.reasoning` is `on`. This matters because several models — DeepSeek V4 among them — think by default, and their reasoning tokens are billed against `max_completion_tokens` while producing no visible output. Left enabled, a summary that should take seconds stalls for a minute and can be truncated by a budget the thinking already spent.
+
+When reasoning is on, the token default rises to 8192 (summary) / 24576 (translate) to leave the answer room alongside the thinking. An explicit `*.max_tokens` still wins over both defaults.
+
+Requests also carry `provider: { sort: "throughput" }`, which keeps OpenRouter off the slowest host serving a given model. The OpenAI client is configured with a 5 minute timeout and a single retry, replacing SDK defaults under which a stalled generation could occupy half an hour before surfacing an error.
+
+Reasoning tokens arrive on a `delta.reasoning` field outside the OpenAI schema. They are streamed to the client as SSE `{ type: "reasoning" }` events — separate from the `delta` events carrying the answer — so a thinking model shows live progress instead of appearing frozen. Reasoning text is never mixed into the stored summary or translation.
+
 **Summarization**
 
 ```typescript

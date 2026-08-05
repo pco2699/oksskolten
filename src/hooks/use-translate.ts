@@ -35,10 +35,10 @@ export function useTranslate(
     },
   }), [])
 
-  const { processing: translating, streamingText: translatingText, streamingHtml: translatingHtml, error, run } =
+  const { processing: translating, streamingText: translatingText, reasoningText, streamingHtml: translatingHtml, error, run } =
     useStreamingAI(article?.id, metrics, options)
 
   const handleTranslate = useCallback(() => run(), [run])
 
-  return { viewMode, setViewMode, translating, translatingText, fullTextTranslated, handleTranslate, translatingHtml, error }
+  return { viewMode, setViewMode, translating, translatingText, reasoningText, fullTextTranslated, handleTranslate, translatingHtml, error }
 }
