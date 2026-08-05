@@ -1,5 +1,9 @@
 # Changelog
 
+## [v0.5.5](https://github.com/pco2699/oksskolten/compare/v0.5.4...v0.5.5) - 2026-08-05
+### Others
+- Add unread-only toggle and fix unread paging / stale sidebar counts by @pco2699 in https://github.com/pco2699/oksskolten/pull/11
+
 ## [v0.5.4](https://github.com/pco2699/oksskolten/compare/v0.5.3...v0.5.4) - 2026-08-02
 ### Others
 - Fix OPML import treating feeds from one host as duplicates by @pco2699 in https://github.com/pco2699/oksskolten/pull/9
