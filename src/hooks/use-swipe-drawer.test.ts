@@ -76,6 +76,8 @@ describe('useSwipeDrawer', () => {
 
   it('closes drawer on popstate event when open', () => {
     renderHook(() => useSwipeDrawer(true, setOpen))
+    // Back navigation pops the entry the hook pushed before popstate fires
+    history.replaceState({}, '')
 
     window.dispatchEvent(new PopStateEvent('popstate'))
 
@@ -84,6 +86,26 @@ describe('useSwipeDrawer', () => {
 
   it('does not close drawer on popstate when already closed', () => {
     renderHook(() => useSwipeDrawer(false, setOpen))
+
+    window.dispatchEvent(new PopStateEvent('popstate'))
+
+    expect(setOpen).not.toHaveBeenCalled()
+  })
+
+  it('does not close sidebar on popstate on desktop', () => {
+    Object.defineProperty(window, 'innerWidth', { value: MD_BREAKPOINT, writable: true, configurable: true })
+    renderHook(() => useSwipeDrawer(true, setOpen))
+
+    // An overlay dismissed via history.back() pops an entry the drawer never pushed
+    window.dispatchEvent(new PopStateEvent('popstate'))
+
+    expect(setOpen).not.toHaveBeenCalled()
+  })
+
+  it('keeps drawer open when a layer stacked on top pops its own entry', () => {
+    renderHook(() => useSwipeDrawer(true, setOpen))
+    // Overlay closed, drawer entry is current again
+    history.replaceState({ 'drawer-open': true }, '')
 
     window.dispatchEvent(new PopStateEvent('popstate'))
 

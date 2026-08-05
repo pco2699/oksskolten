@@ -42,9 +42,14 @@ export function useSwipeDrawer(
   // Listen for popstate to close drawer on back navigation
   useEffect(() => {
     const onPopState = () => {
-      if (isOpen) {
-        closeDrawer()
-      }
+      if (!isOpen) return
+      // Desktop: the sidebar is part of the layout, not a history-backed layer.
+      // No entry was ever pushed for it, so a back navigation is never ours.
+      if (window.innerWidth >= MD_BREAKPOINT) return
+      // A layer stacked on top of the drawer (article overlay, dialog) popped its
+      // own entry — ours is current again, so the drawer stays open.
+      if (history.state?.[DRAWER_STATE_KEY]) return
+      closeDrawer()
     }
 
     window.addEventListener('popstate', onPopState)
