@@ -197,6 +197,11 @@ In-app layers that visually behave like a page (sidebar drawer, `ArticleOverlay`
 
 `useHistoryDismiss` (`src/hooks/use-history-dismiss.ts`) fixes that: it pushes a marker history entry (`history.pushState({ [stateKey]: true }, '')`) while the layer is open, dismisses the layer on `popstate`, and pops the entry back off when the layer is closed by other means (close button, Escape, swipe) so the stack stays balanced and back never has to be pressed twice. `ArticleOverlay` uses the `article-overlay` key; the drawer keeps its own equivalent handling in `useSwipeDrawer` under the `drawer-open` key.
 
+Because `popstate` is a global event, every layer hears every pop. `useSwipeDrawer` therefore only closes the drawer when the pop was actually its own:
+
+- Above the `md` breakpoint the sidebar is a layout element and never pushes an entry, so a pop is never the drawer's — the sidebar stays open when an overlay above it is dismissed.
+- Below the breakpoint, a still-present `drawer-open` marker in `history.state` means a layer stacked above the drawer popped its own entry, so the drawer stays open.
+
 #### Gesture Precedence
 
 `useSwipeDrawer` listens on `document`, so it would otherwise also react to swipes made inside a modal layered above the page. It ignores any swipe while an open Radix dialog (`[role="dialog"][data-state="open"]`, including `alertdialog`) is present, leaving those gestures to the topmost layer.
