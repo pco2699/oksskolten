@@ -1,5 +1,11 @@
 # Changelog
 
+## [v0.5.7](https://github.com/pco2699/oksskolten/compare/v0.5.6...v0.5.7) - 2026-08-06
+### Others
+- Fix correctness, security, and consistency issues found in code review by @pco2699 in https://github.com/pco2699/oksskolten/pull/16
+- Hide feeds with no unread articles from the sidebar by @pco2699 in https://github.com/pco2699/oksskolten/pull/18
+- Add YouTube video transcription and bot-check page detection by @pco2699 in https://github.com/pco2699/oksskolten/pull/19
+
 ## [v0.5.6](https://github.com/pco2699/oksskolten/compare/v0.5.5...v0.5.6) - 2026-08-05
 ### Others
 - Add reasoning token support for AI tasks and chat by @pco2699 in https://github.com/pco2699/oksskolten/pull/13
