@@ -1,5 +1,9 @@
 # Changelog
 
+## [v0.5.8](https://github.com/pco2699/oksskolten/compare/v0.5.7...v0.5.8) - 2026-08-06
+### Others
+- Fix article deduplication order in backfill transaction by @pco2699 in https://github.com/pco2699/oksskolten/pull/20
+
 ## [v0.5.7](https://github.com/pco2699/oksskolten/compare/v0.5.6...v0.5.7) - 2026-08-06
 ### Others
 - Fix correctness, security, and consistency issues found in code review by @pco2699 in https://github.com/pco2699/oksskolten/pull/16
