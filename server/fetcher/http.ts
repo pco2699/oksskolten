@@ -1,4 +1,5 @@
 import { safeFetch } from './ssrf.js'
+import { readCapped } from './response-limits.js'
 import { fetchViaFlareSolverr } from './flaresolverr.js'
 
 export const USER_AGENT = 'Mozilla/5.0 (compatible; RSSReader/1.0)'
@@ -49,19 +50,17 @@ function charsetFromBytes(buf: Uint8Array): string | null {
  * Decode response body with auto-detected encoding.
  * Priority: Content-Type charset → HTML meta charset → UTF-8 fallback
  *
+ * The body is read through `readCapped`, which aborts past `MAX_RESPONSE_BYTES`
+ * — a hostile or misconfigured origin streaming an endless body would otherwise
+ * be buffered in full and take the process out of memory.
+ *
  * The response body must not have been consumed yet (no prior .text() or .arrayBuffer() call).
  */
 export async function decodeResponse(res: Response): Promise<string> {
   const ct = res.headers.get('content-type') || ''
   const headerCharset = charsetFromContentType(ct)
 
-  // Content-Type explicitly specifies UTF-8 — use res.text() for fast path
-  if (headerCharset && /^utf-?8$/i.test(headerCharset)) {
-    return res.text()
-  }
-
-  // charset unknown or non-UTF-8 → read as binary and detect
-  const buf = new Uint8Array(await res.arrayBuffer())
+  const buf = await readCapped(res)
   const charset = headerCharset || charsetFromBytes(buf) || 'utf-8'
 
   try {

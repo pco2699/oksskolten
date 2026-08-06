@@ -28,9 +28,21 @@ export function _setSearchReady(value: boolean): void {
 
 type ChangeEntry =
   | { action: 'upsert'; id: number; doc: MeiliArticleDoc }
+  | { action: 'patch'; id: number; fields: Partial<MeiliArticleDoc> }
   | { action: 'delete'; id: number }
 
+/**
+ * Writes that land while a rebuild is running. The rebuild populates a staging
+ * index and swaps it in, which discards anything written to the live index in
+ * the meantime — so every mutation is recorded here and replayed afterwards.
+ * Null when no rebuild is in progress.
+ */
 let changeLog: ChangeEntry[] | null = null
+
+/** Record a mutation for post-rebuild replay. No-op outside a rebuild. */
+function recordChange(entry: ChangeEntry): void {
+  if (changeLog) changeLog.push(entry)
+}
 
 // --- Index settings ---
 
@@ -122,18 +134,21 @@ export async function rebuildSearchIndex(): Promise<void> {
       await client.deleteIndex(ARTICLES_STAGING_INDEX).waitTask({ timeout: MEILI_TASK_TIMEOUT_MS })
     }
 
-    // 5. Replay change log
+    // 5. Replay change log, in recorded order so a later patch is not undone
+    //    by an earlier full-document upsert for the same article.
     if (changeLog && changeLog.length > 0) {
       const prodIndex = client.index(ARTICLES_INDEX)
-      const upserts = changeLog.filter((e): e is Extract<ChangeEntry, { action: 'upsert' }> => e.action === 'upsert')
-      const deletes = changeLog.filter((e): e is Extract<ChangeEntry, { action: 'delete' }> => e.action === 'delete')
-
-      if (upserts.length > 0) {
-        await prodIndex.addDocuments(upserts.map((e) => e.doc)).waitTask({ timeout: MEILI_TASK_TIMEOUT_MS })
+      const replay = changeLog
+      for (const entry of replay) {
+        if (entry.action === 'upsert') {
+          await prodIndex.addDocuments([entry.doc]).waitTask({ timeout: MEILI_TASK_TIMEOUT_MS })
+        } else if (entry.action === 'patch') {
+          await prodIndex.updateDocuments([{ id: entry.id, ...entry.fields }]).waitTask({ timeout: MEILI_TASK_TIMEOUT_MS })
+        } else {
+          await prodIndex.deleteDocument(entry.id)
+        }
       }
-      for (const del of deletes) {
-        await prodIndex.deleteDocument(del.id)
-      }
+      log.info(`Replayed ${replay.length} changes recorded during rebuild`)
     }
 
     searchReady = true
@@ -219,9 +234,7 @@ export function syncArticleToSearch(doc: MeiliArticleDoc): void {
       log.error('Failed to sync article:', err)
     })
 
-    if (changeLog) {
-      changeLog.push({ action: 'upsert', id: doc.id, doc })
-    }
+    recordChange({ action: 'upsert', id: doc.id, doc })
   } catch (err) {
     log.error('Failed to sync article:', err)
   }
@@ -235,9 +248,7 @@ export function deleteArticleFromSearch(id: number): void {
       log.error('Failed to delete article from index:', err)
     })
 
-    if (changeLog) {
-      changeLog.push({ action: 'delete', id })
-    }
+    recordChange({ action: 'delete', id })
   } catch (err) {
     log.error('Failed to delete article from index:', err)
   }
@@ -250,6 +261,9 @@ export function syncArticleScoreToSearch(id: number, score: number): void {
     index.updateDocuments([{ id, score }]).catch((err) => {
       log.error('Failed to sync score:', err)
     })
+
+    // Recorded so a rebuild running right now does not swap this score away.
+    recordChange({ action: 'patch', id, fields: { score } })
   } catch (err) {
     log.error('Failed to sync score:', err)
   }
@@ -263,6 +277,12 @@ export function syncArticleFiltersToSearch(updates: { id: number; is_unread?: bo
     index.updateDocuments(updates).catch((err) => {
       log.error('Failed to sync article filters:', err)
     })
+
+    // Recorded so read/like/bookmark changes made during a rebuild survive the
+    // staging swap instead of silently reverting until the next full rebuild.
+    for (const { id, ...fields } of updates) {
+      recordChange({ action: 'patch', id, fields })
+    }
   } catch (err) {
     log.error('Failed to sync article filters:', err)
   }
@@ -273,14 +293,15 @@ export function deleteArticlesFromSearch(articleIds: number[]): void {
   try {
     const client = getSearchClient()
     const index = client.index(ARTICLES_INDEX)
-    index.deleteDocuments({ filter: `id IN [${articleIds.join(',')}]` }).catch((err) => {
+    // Delete by id list, not by filter expression: `id` is the primary key and
+    // is not in `filterableAttributes`, so a `filter: 'id IN [...]'` form is
+    // rejected by Meilisearch and the rows are never removed.
+    index.deleteDocuments(articleIds).catch((err) => {
       log.error('Failed to batch delete articles:', err)
     })
 
-    if (changeLog) {
-      for (const id of articleIds) {
-        changeLog.push({ action: 'delete', id })
-      }
+    for (const id of articleIds) {
+      recordChange({ action: 'delete', id })
     }
   } catch (err) {
     log.error('Failed to batch delete articles:', err)
@@ -312,6 +333,7 @@ export async function syncAllScoredArticlesToSearch(): Promise<number> {
   for (let i = 0; i < rows.length; i += BATCH_SIZE) {
     const batch = rows.slice(i, i + BATCH_SIZE)
     await index.updateDocuments(batch.map(({ id, score }) => ({ id, score }))).waitTask({ timeout: MEILI_TASK_TIMEOUT_MS })
+    for (const { id, score } of batch) recordChange({ action: 'patch', id, fields: { score } })
   }
 
   return rows.length

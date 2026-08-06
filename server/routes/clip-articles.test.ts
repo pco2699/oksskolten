@@ -11,11 +11,12 @@ import fs from 'node:fs'
 // Mocks
 // ---------------------------------------------------------------------------
 
-const { mockArchiveArticleImages, mockIsImageArchivingEnabled, mockDeleteArticleImages, mockFetchArticleContent } = vi.hoisted(() => ({
+const { mockArchiveArticleImages, mockIsImageArchivingEnabled, mockDeleteArticleImages, mockFetchArticleContent, mockGetImagesDir } = vi.hoisted(() => ({
   mockArchiveArticleImages: vi.fn(),
   mockIsImageArchivingEnabled: vi.fn(),
   mockDeleteArticleImages: vi.fn(),
   mockFetchArticleContent: vi.fn(),
+  mockGetImagesDir: vi.fn<() => string | null>(),
 }))
 
 vi.mock('../fetcher.js', async () => {
@@ -38,6 +39,7 @@ vi.mock('../fetcher/article-images.js', () => ({
   archiveArticleImages: (...args: unknown[]) => mockArchiveArticleImages(...args),
   isImageArchivingEnabled: (...args: unknown[]) => mockIsImageArchivingEnabled(...args),
   deleteArticleImages: (...args: unknown[]) => mockDeleteArticleImages(...args),
+  getImagesDir: () => mockGetImagesDir(),
 }))
 
 // ---------------------------------------------------------------------------
@@ -412,6 +414,18 @@ describe('GET /api/articles/images/:filename', () => {
   beforeEach(() => {
     tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'reader-test-images-'))
     upsertSetting('images.storage_path', tmpDir)
+    mockGetImagesDir.mockReturnValue(tmpDir)
+  })
+
+  it('404: when the configured storage path is not an allowed directory', async () => {
+    mockGetImagesDir.mockReturnValue(null)
+
+    const res = await app.inject({
+      method: 'GET',
+      url: '/api/articles/images/1_abc123.png',
+    })
+
+    expect(res.statusCode).toBe(404)
   })
 
   it('200: serves image with correct content-type and cache headers', async () => {

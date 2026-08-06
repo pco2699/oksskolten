@@ -8,7 +8,16 @@ import { logger } from '../logger.js'
 
 const log = logger.child('retention')
 
-/** Normalize a URL so that raw-Unicode and percent-encoded forms compare equal. */
+/**
+ * Normalize a URL so that raw-Unicode and percent-encoded forms compare equal.
+ *
+ * Every write path must normalize before storing and every read path must
+ * normalize before comparing — `new URL().href` also lowercases the host,
+ * appends a root "/" to bare origins and drops default ports, so a stored raw
+ * URL and a normalized lookup would otherwise never match.
+ * See `backfillNormalizedArticleUrls` for the one-time repair of rows written
+ * before this invariant held.
+ */
 export function normalizeUrl(raw: string): string {
   try { return new URL(raw).href } catch { return raw }
 }
@@ -412,7 +421,9 @@ export function insertArticle(data: {
   `, {
     feed_id: data.feed_id,
     title: data.title,
-    url: data.url,
+    // Normalized on write so `getArticleByUrl` / `getExistingArticleUrls`,
+    // which both normalize before comparing, can find the row again.
+    url: normalizeUrl(data.url),
     published_at: data.published_at,
     lang: data.lang ?? null,
     full_text: data.full_text ?? null,
@@ -537,6 +548,14 @@ export function countStaleArticlesByFeed(feedId: number, minLength: number): num
   return row.n
 }
 
+/**
+ * Given a list of candidate URLs, return the subset that already exists.
+ *
+ * The returned set is keyed by the *caller's* URL strings, not by their
+ * normalized forms, so `existing.has(item.url)` works directly on raw feed
+ * input. Returning normalized keys instead would silently never match a caller
+ * that filters on the original string.
+ */
 export function getExistingArticleUrls(urls: string[]): Set<string> {
   if (urls.length === 0) return new Set()
   const normalized = urls.map(normalizeUrl)
@@ -565,12 +584,60 @@ export function getExistingArticleUrls(urls: string[]): Set<string> {
 
   const dbUrls = new Set(rows.map(r => r.url))
   const existing = new Set<string>()
-  for (const u of normalized) {
-    if (dbUrls.has(u)) { existing.add(u); continue }
-    if (u.startsWith('https://') && dbUrls.has('http://' + u.slice(8))) existing.add(u)
-    else if (u.startsWith('http://') && dbUrls.has('https://' + u.slice(7))) existing.add(u)
-  }
+  urls.forEach((original, i) => {
+    const u = normalized[i]
+    const found = dbUrls.has(u)
+      || (u.startsWith('https://') && dbUrls.has('http://' + u.slice(8)))
+      || (u.startsWith('http://') && dbUrls.has('https://' + u.slice(7)))
+    // Key by the caller's original string — see the doc comment above.
+    if (found) existing.add(original)
+  })
   return existing
+}
+
+/**
+ * One-time repair for articles stored before `insertArticle` normalized URLs.
+ *
+ * Rows whose stored URL differs from its normalized form are invisible to
+ * `getArticleByUrl` and `getExistingArticleUrls`, which means the detail page
+ * 404s and the fetcher re-downloads the article on every tick (the insert then
+ * fails on the UNIQUE constraint and is swallowed). Rewriting them to the
+ * normalized form can collide with an existing row, in which case the lower id
+ * wins and the duplicate is deleted.
+ */
+export function backfillNormalizedArticleUrls(): { updated: number; deduped: number } {
+  const rows = getDb().prepare('SELECT id, url FROM articles ORDER BY id').all() as { id: number; url: string }[]
+
+  const canonical = new Map<string, number>()
+  const toUpdate: { id: number; url: string }[] = []
+  const toDelete: number[] = []
+
+  for (const row of rows) {
+    const normalized = normalizeUrl(row.url)
+    const claimedBy = canonical.get(normalized)
+    if (claimedBy !== undefined) {
+      // A lower-id row already owns this normalized URL — drop the duplicate.
+      toDelete.push(row.id)
+      continue
+    }
+    canonical.set(normalized, row.id)
+    if (normalized !== row.url) toUpdate.push({ id: row.id, url: normalized })
+  }
+
+  if (toUpdate.length === 0 && toDelete.length === 0) return { updated: 0, deduped: 0 }
+
+  getDb().transaction(() => {
+    const update = getDb().prepare('UPDATE articles SET url = ? WHERE id = ?')
+    for (const row of toUpdate) update.run(row.url, row.id)
+    const del = getDb().prepare('DELETE FROM articles WHERE id = ?')
+    for (const id of toDelete) del.run(id)
+  })()
+
+  // Duplicates are gone from SQLite but still indexed; drop them from search too.
+  if (toDelete.length > 0) deleteArticlesFromSearch(toDelete)
+
+  log.info(`URL normalization backfill: ${toUpdate.length} updated, ${toDelete.length} duplicates removed`)
+  return { updated: toUpdate.length, deduped: toDelete.length }
 }
 
 // Backoff deadline: datetime when the article becomes eligible for retry again.

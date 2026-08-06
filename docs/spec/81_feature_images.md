@@ -50,6 +50,22 @@ POST /api/articles/:id/archive-images
         └─ Record timestamp via markImagesArchived(articleId)
 ```
 
+### Storage Path Confinement
+
+`images.storage_path` is settable over the API and is joined with a
+request-supplied filename when serving images, so an unconstrained value would
+expose arbitrary host files. Allowed roots:
+
+- `DATA_DIR` (always)
+- `IMAGES_STORAGE_ROOT`, when the operator sets that environment variable — for
+  putting images on a separate volume
+
+A relative value is resolved against `DATA_DIR`. A path outside every allowed
+root is rejected with `400` on write, and ignored on read (the endpoint returns
+`404` and archiving is skipped) so a value stored before this validation existed
+cannot be used. Note the asymmetry that makes this a boundary: the env var is
+operator-controlled, the setting is settable by any write-scoped API token.
+
 ### Image Serving
 
 Images archived in local mode are served via `GET /api/articles/images/:filename`.

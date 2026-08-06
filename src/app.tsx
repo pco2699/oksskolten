@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route, Navigate, Outlet, useParams, useLocation, useNavigate, useOutletContext } from 'react-router-dom'
+import { BrowserRouter, Routes, Route, Navigate, Outlet, useParams, useLocation, useNavigate, useOutletContext, useNavigationType, matchPath } from 'react-router-dom'
 import { useState, useMemo, useRef, useEffect, useLayoutEffect, useCallback, lazy, Suspense } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import useSWR, { SWRConfig } from 'swr'
@@ -256,10 +256,38 @@ function ArticleDetailPage() {
   )
 }
 
-// Determine the "page type" for animation decisions
-function getPageType(pathname: string): 'detail' | 'list' {
-  if (pathname === '/' || pathname === '/all' || pathname === '/inbox' || pathname === '/bookmarks' || pathname === '/likes' || pathname === '/history' || pathname === '/clips' || pathname.startsWith('/feeds/') || pathname.startsWith('/categories/') || pathname.startsWith('/settings') || pathname.startsWith('/chat')) {
-    return 'list'
+/**
+ * The app's routes, and the "page type" each one animates as.
+ *
+ * Single source of truth for both `<Routes>` and `getPageType`. When these were
+ * two separate lists, adding a route to one and forgetting the other made the
+ * new page animate as an article detail and fall through to the `/*` catch-all.
+ */
+const APP_ROUTES = [
+  { path: '/', element: <HomePageWrapper />, pageType: 'list' },
+  { path: '/all', element: <ArticleListPage />, pageType: 'list' },
+  { path: '/inbox', element: <Navigate to="/all" replace />, pageType: 'list' },
+  { path: '/bookmarks', element: <ArticleListPage />, pageType: 'list' },
+  { path: '/likes', element: <ArticleListPage />, pageType: 'list' },
+  { path: '/history', element: <ArticleListPage />, pageType: 'list' },
+  { path: '/clips', element: <ArticleListPage />, pageType: 'list' },
+  { path: '/feeds/:feedId', element: <ArticleListPage />, pageType: 'list' },
+  { path: '/categories/:categoryId', element: <ArticleListPage />, pageType: 'list' },
+  { path: '/settings', element: <Navigate to="/settings/general" replace />, pageType: 'list' },
+  { path: '/settings/:tab', element: <SettingsPageWrapper />, pageType: 'list' },
+  { path: '/chat', element: <ChatPageWrapper />, pageType: 'list' },
+  { path: '/chat/:conversationId', element: <ChatPageWrapper />, pageType: 'list' },
+  // Catch-all: an article URL encoded into the path.
+  { path: '/*', element: <ArticleDetailPage />, pageType: 'detail' },
+] as const satisfies ReadonlyArray<{ path: string; element: React.ReactNode; pageType: 'list' | 'detail' }>
+
+/** Determine the "page type" for animation decisions. */
+export function getPageType(pathname: string): 'detail' | 'list' {
+  for (const route of APP_ROUTES) {
+    if (route.path === '/*') continue
+    if (matchPath(route.path, pathname)) return route.pageType
+    // `/settings` and `/chat` also cover their nested paths.
+    if (route.path.includes(':') && matchPath(`${route.path}/*`, pathname)) return route.pageType
   }
   return 'detail'
 }
@@ -283,18 +311,12 @@ function AnimatedRoutes() {
   const isTouchDevice = useIsTouchDevice()
   const pageType = getPageType(location.pathname)
 
-  // Track navigation direction to avoid double-animation on swipe-back.
-  // Browser's native swipe-back already animates, so we only slide on PUSH.
-  const navAction = useRef<'PUSH' | 'POP' | 'REPLACE'>('PUSH')
-  useEffect(() => {
-    const handler = () => { navAction.current = 'POP' }
-    window.addEventListener('popstate', handler)
-    return () => window.removeEventListener('popstate', handler)
-  }, [])
-
-  // Reset to PUSH after each render so link navigations get the slide
-  const currentAction = navAction.current
-  useEffect(() => { navAction.current = 'PUSH' })
+  // Track navigation direction to avoid double-animation on swipe-back: the
+  // browser's native swipe-back already animates, so only slide on PUSH.
+  // Router state rather than a popstate listener plus a ref mutated in a
+  // dep-less effect — that pattern read a ref during render, which is not safe
+  // under concurrent rendering.
+  const currentAction = useNavigationType()
 
   // Save scroll position when navigating away from a page
   const prevPathname = useRef(location.pathname)
@@ -329,20 +351,9 @@ function AnimatedRoutes() {
         <ScrollRestore pathname={location.pathname} pageType={pageType} />
         <Routes location={location}>
           <Route element={<AppLayout />}>
-            <Route path="/" element={<HomePageWrapper />} />
-            <Route path="/all" element={<ArticleListPage />} />
-            <Route path="/inbox" element={<Navigate to="/all" replace />} />
-            <Route path="/bookmarks" element={<ArticleListPage />} />
-            <Route path="/likes" element={<ArticleListPage />} />
-            <Route path="/history" element={<ArticleListPage />} />
-            <Route path="/clips" element={<ArticleListPage />} />
-            <Route path="/feeds/:feedId" element={<ArticleListPage />} />
-            <Route path="/categories/:categoryId" element={<ArticleListPage />} />
-            <Route path="/settings" element={<Navigate to="/settings/general" replace />} />
-            <Route path="/settings/:tab" element={<SettingsPageWrapper />} />
-            <Route path="/chat" element={<ChatPageWrapper />} />
-            <Route path="/chat/:conversationId" element={<ChatPageWrapper />} />
-            <Route path="/*" element={<ArticleDetailPage />} />
+            {APP_ROUTES.map(route => (
+              <Route key={route.path} path={route.path} element={route.element} />
+            ))}
           </Route>
         </Routes>
       </motion.div>

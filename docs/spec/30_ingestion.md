@@ -53,7 +53,14 @@ Cron runs at 5-minute intervals (`*/5 * * * *`) and processes only feeds whose `
        - After parsing and before duplicate checking, strip 60+ tracking parameters from all article URLs
        - Targets: utm_*, mtm_*, fbclid, gclid, msclkid, twclid, mc_cid, _hsenc, etc.
        - Prevents duplicate insertion when the same article is served with different tracking parameters
+   2g. Normalize URLs (`normalizeUrl`, i.e. `new URL().href`)
+       - Applied on write in insertArticle, so the stored URL is canonical
+       - Also collapses raw-Unicode vs percent-encoded paths, bare origins vs
+         trailing slash, host casing, and default ports
+       - See docs/adr/003-normalized-article-urls.md
 3. SELECT each article URL -> add those not in articles to the new article list (max 30 per feed)
+   - getExistingArticleUrls returns a set keyed by the caller's URL strings, so
+     the fetcher can filter on the raw feed URL directly
 4. Retrieve existing articles eligible for retry:
    SELECT * FROM articles
    WHERE last_error IS NOT NULL

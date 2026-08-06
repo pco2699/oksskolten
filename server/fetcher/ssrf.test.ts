@@ -9,9 +9,13 @@ vi.mock('node:dns/promises', () => ({ lookup: (...args: unknown[]) => mockLookup
 const mockFetch = vi.fn()
 vi.stubGlobal('fetch', mockFetch)
 
+/** `assertSafeUrl` resolves with `{ all: true }`, so the mock returns a list. */
+const resolvesTo = (...addresses: string[]) =>
+  mockLookup.mockResolvedValue(addresses.map((address) => ({ address, family: address.includes(':') ? 6 : 4 })))
+
 beforeEach(() => {
   vi.clearAllMocks()
-  mockLookup.mockResolvedValue({ address: '93.184.216.34', family: 4 })
+  resolvesTo('93.184.216.34')
 })
 
 // ---------------------------------------------------------------------------
@@ -87,20 +91,77 @@ describe('assertSafeUrl', () => {
 
   describe('DNS resolution checks', () => {
     it('blocks hostname resolving to private IP', async () => {
-      mockLookup.mockResolvedValue({ address: '127.0.0.1', family: 4 })
+      resolvesTo('127.0.0.1')
       await expect(assertSafeUrl('http://evil.com')).rejects.toThrow(
         'resolves to private IP',
       )
     })
 
     it('allows hostname resolving to public IP', async () => {
-      mockLookup.mockResolvedValue({ address: '93.184.216.34', family: 4 })
+      resolvesTo('93.184.216.34')
       await expect(assertSafeUrl('http://example.com')).resolves.toBeUndefined()
+    })
+
+    it('blocks when any record is private, not just the first', async () => {
+      resolvesTo('93.184.216.34', '10.0.0.5')
+      await expect(assertSafeUrl('http://split-horizon.example')).rejects.toThrow(
+        'resolves to private IP',
+      )
     })
 
     it('tolerates DNS failure (lets fetch handle it)', async () => {
       mockLookup.mockRejectedValue(new Error('ENOTFOUND'))
       await expect(assertSafeUrl('http://nonexistent.example')).resolves.toBeUndefined()
+    })
+  })
+
+  // Regression coverage: each of these reached the network before the address
+  // parsing was canonicalized.
+  describe('alternate IP encodings', () => {
+    it.each([
+      ['http://2130706433/', 'decimal 127.0.0.1'],
+      ['http://127.1/', 'short-form 127.0.0.1'],
+      ['http://0x7f.0x0.0x0.0x1/', 'hex octets'],
+      ['http://0177.0.0.1/', 'octal first octet'],
+      ['http://2852039166/', 'decimal 169.254.169.254 (cloud metadata)'],
+      ['http://0/', 'bare zero'],
+    ])('blocks %s (%s)', async (url) => {
+      await expect(assertSafeUrl(url)).rejects.toThrow('private IP')
+    })
+
+    it('does not consult DNS for encoded literals', async () => {
+      await expect(assertSafeUrl('http://2130706433/')).rejects.toThrow('private IP')
+      expect(mockLookup).not.toHaveBeenCalled()
+    })
+
+    it('still allows a public decimal literal', async () => {
+      // 93.184.216.34 == 1572395042
+      await expect(assertSafeUrl('http://1572395042/')).resolves.toBeUndefined()
+    })
+  })
+
+  describe('IPv4-mapped IPv6', () => {
+    it.each([
+      'http://[::ffff:127.0.0.1]/',
+      'http://[::ffff:7f00:1]/',
+      'http://[::ffff:169.254.169.254]/',
+    ])('blocks %s', async (url) => {
+      await expect(assertSafeUrl(url)).rejects.toThrow('private IP')
+    })
+
+    it('blocks a hostname resolving to an IPv4-mapped loopback', async () => {
+      resolvesTo('::ffff:127.0.0.1')
+      await expect(assertSafeUrl('http://evil.example')).rejects.toThrow('resolves to private IP')
+    })
+  })
+
+  describe('additional reserved ranges', () => {
+    it.each([
+      ['http://100.64.0.1/', 'CGNAT'],
+      ['http://224.0.0.1/', 'multicast'],
+      ['http://255.255.255.255/', 'broadcast'],
+    ])('blocks %s (%s)', async (url) => {
+      await expect(assertSafeUrl(url)).rejects.toThrow('private IP')
     })
   })
 

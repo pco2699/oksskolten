@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import path from 'node:path'
 import os from 'node:os'
 import fs from 'node:fs'
@@ -40,9 +40,19 @@ import { extractByDotPath, isImageArchivingEnabled, deleteArticleImages, archive
 // Setup
 // ---------------------------------------------------------------------------
 
+// These cases point images.storage_path at an OS temp dir, which lives outside
+// DATA_DIR. Authorize it the way an operator would in production.
+const originalStorageRoot = process.env.IMAGES_STORAGE_ROOT
+
 beforeEach(() => {
   vi.clearAllMocks()
   mockGetSetting.mockReturnValue(undefined)
+  process.env.IMAGES_STORAGE_ROOT = fs.realpathSync(os.tmpdir())
+})
+
+afterEach(() => {
+  if (originalStorageRoot === undefined) delete process.env.IMAGES_STORAGE_ROOT
+  else process.env.IMAGES_STORAGE_ROOT = originalStorageRoot
 })
 
 // ---------------------------------------------------------------------------

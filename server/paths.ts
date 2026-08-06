@@ -35,6 +35,38 @@ export function dataPath(...segments: string[]): string {
 }
 
 /**
+ * Directories a user-configured storage path is allowed to live under.
+ *
+ * DATA_DIR always; plus `IMAGES_STORAGE_ROOT` when the operator sets it, for
+ * the common self-hosting case of putting images on a separate volume. The
+ * split matters: the env var is operator-controlled, whereas the storage path
+ * itself is settable over the API by anyone holding a write-scoped token.
+ */
+export function allowedStorageRoots(): string[] {
+  const roots = [path.resolve(DATA_DIR)]
+  const extra = process.env.IMAGES_STORAGE_ROOT
+  if (extra) roots.push(path.resolve(extra))
+  return roots
+}
+
+/**
+ * Resolve a user-configured directory, rejecting anything outside the
+ * allowed roots.
+ *
+ * The image storage path is settable over the API and is later joined with a
+ * request-supplied filename to read and write files. Unconstrained, pointing it
+ * at `/etc` turns the image endpoint into arbitrary host file access. Returns
+ * null when the path escapes every allowed root.
+ */
+export function resolveUserDataPath(input: string): string | null {
+  const resolved = path.resolve(DATA_DIR, input)
+  for (const root of allowedStorageRoots()) {
+    if (resolved === root || resolved.startsWith(root + path.sep)) return resolved
+  }
+  return null
+}
+
+/**
  * Find the project root directory by walking up from __dirname until
  * package.json is found. Works under both tsx (source) and compiled
  * (dist/ or dist-server/) environments where __dirname depth differs.

@@ -419,13 +419,13 @@ The floor is **not applied** in:
 - `q`: Required. Full-text search via Meilisearch (with typo tolerance and relevance ranking). Search targets are `title`, `full_text`, `full_text_ja`
 - `feed_id`: Optional. Filter by feed ID (Meilisearch filter)
 - `category_id`: Optional. Filter by category ID (Meilisearch filter)
-- `since`: Optional. Start datetime ISO 8601 (Meilisearch filter)
-- `until`: Optional. End datetime ISO 8601 (Meilisearch filter)
+- `since`: Optional. Start datetime ISO 8601 (Meilisearch filter). Rejected with `400` if unparsable
+- `until`: Optional. End datetime ISO 8601 (Meilisearch filter). Rejected with `400` if unparsable
 - `unread`: Optional. `1` for unread only, `0` for read only (SQLite post-filter)
 - `liked`: Optional. `1` for liked only (SQLite post-filter)
 - `bookmarked`: Optional. `1` for bookmarked only (SQLite post-filter)
 - `limit`: Optional (default 20, max 50)
-- Returns `503` when the search index is not yet built
+- Returns `503` when the search index is not yet built, or when the Meilisearch query fails. A backend failure is never reported as an empty result set — callers can distinguish "no matches" from "search is down"
 
 ```json
 // Response: 200

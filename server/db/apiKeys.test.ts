@@ -1,9 +1,12 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import { setupTestDb } from '../__tests__/helpers/testDb.js'
-import { createApiKey, listApiKeys, deleteApiKey, validateApiKey } from './apiKeys.js'
+import { createApiKey, listApiKeys, deleteApiKey, validateApiKey, _resetLastUsedThrottle } from './apiKeys.js'
 
 beforeEach(() => {
   setupTestDb()
+  // Key ids restart at 1 with each fresh test DB, so a throttle entry left over
+  // from a previous case would suppress the next last_used_at write.
+  _resetLastUsedThrottle()
 })
 
 describe('apiKeys', () => {
@@ -91,6 +94,18 @@ describe('apiKeys', () => {
 
       const keys = listApiKeys()
       expect(keys[0].last_used_at).not.toBeNull()
+    })
+
+    it('throttles repeat last_used_at writes within the interval', () => {
+      const created = createApiKey('hot-path')
+      validateApiKey(created.key)
+      const first = listApiKeys()[0].last_used_at
+      expect(first).not.toBeNull()
+
+      // A second validation inside the window must not issue another write:
+      // this runs on every authenticated request.
+      validateApiKey(created.key)
+      expect(listApiKeys()[0].last_used_at).toBe(first)
     })
 
     it('returns null after key is deleted', () => {
