@@ -1,5 +1,9 @@
 # Changelog
 
+## [v0.5.9](https://github.com/pco2699/oksskolten/compare/v0.5.8...v0.5.9) - 2026-08-06
+### Others
+- Add score distribution baseline measurement for recommendation by @pco2699 in https://github.com/pco2699/oksskolten/pull/22
+
 ## [v0.5.8](https://github.com/pco2699/oksskolten/compare/v0.5.7...v0.5.8) - 2026-08-06
 ### Others
 - Fix article deduplication order in backfill transaction by @pco2699 in https://github.com/pco2699/oksskolten/pull/20
