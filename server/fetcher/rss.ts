@@ -261,6 +261,43 @@ function cleanItems(items: RssItem[]): RssItem[] {
     .map(item => ({ ...item, url: cleanUrl(item.url) }))
 }
 
+/**
+ * Pull the description out of a Media RSS `<media:group><media:description>`.
+ *
+ * YouTube's channel feed carries no `<content>` or `<summary>` — the description
+ * box lives here alone. Without it a YouTube entry reaches the fetch pipeline
+ * with nothing to fall back on when the video's captions cannot be retrieved.
+ * Parsers disagree on the shape (nested object, flattened key, `#text` node),
+ * so each known spelling is probed.
+ */
+function mediaDescriptionOf(item: Record<string, unknown>): string | undefined {
+  const asRecord = (value: unknown): Record<string, unknown> | undefined =>
+    value && typeof value === 'object' ? (value as Record<string, unknown>) : undefined
+
+  // feedsmith namespaces Media RSS under `media` and repeats the first group as
+  // `group`; fast-xml-parser keeps the raw `media:group` element.
+  const media = asRecord(item.media)
+  const groups = [
+    asRecord(media?.group),
+    asRecord((media?.groups as unknown[] | undefined)?.[0]),
+    asRecord(item['media:group']),
+  ]
+
+  const candidates = [
+    ...groups.flatMap(group => [group?.description, group?.['media:description']]),
+    media?.description,
+    item['media:description'],
+  ]
+
+  for (const candidate of candidates) {
+    if (typeof candidate === 'string' && candidate.trim()) return candidate
+    const record = asRecord(candidate)
+    const value = record?.value ?? record?.['#text']
+    if (typeof value === 'string' && value.trim()) return value
+  }
+  return undefined
+}
+
 async function parseRssXml(xml: string): Promise<RssItem[]> {
   // Try feedsmith first
   try {
@@ -290,7 +327,8 @@ async function parseRssXml(xml: string): Promise<RssItem[]> {
             }
           }
           const rawExcerpt = item.content_encoded || item['content:encoded'] || item.content || item.description || item.summary
-          const excerpt = typeof rawExcerpt === 'string' ? rawExcerpt : (rawExcerpt && typeof rawExcerpt === 'object' && 'value' in rawExcerpt ? String((rawExcerpt as Record<string, unknown>).value) : undefined)
+          const excerpt = (typeof rawExcerpt === 'string' ? rawExcerpt : (rawExcerpt && typeof rawExcerpt === 'object' && 'value' in rawExcerpt ? String((rawExcerpt as Record<string, unknown>).value) : undefined))
+            || mediaDescriptionOf(item)
           return {
             title: (item.title as string) || 'Untitled',
             url: (url || item.id) as string,
@@ -346,7 +384,7 @@ async function parseRssXml(xml: string): Promise<RssItem[]> {
           : (entry.link as Record<string, string>)?.['@_href'] || (entry.link as string)
         const id = entry.id as string | undefined
         const effectiveUrl = link || (id && /^https?:\/\//i.test(id) ? id : '') || ''
-        const excerpt = textOf(entry.content) || textOf(entry.summary)
+        const excerpt = textOf(entry.content) || textOf(entry.summary) || mediaDescriptionOf(entry)
         return {
           title: textOf(entry.title) || 'Untitled',
           url: effectiveUrl,

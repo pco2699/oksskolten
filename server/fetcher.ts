@@ -23,6 +23,9 @@ import { type FetchProgressEvent, emitProgress, markFeedDone } from './fetcher/p
 import { fetchFullText, convertHtmlToMarkdown, markdownToExcerpt, MIN_EXTRACTED_LENGTH } from './fetcher/content.js'
 import { isBotBlockPage } from './lib/blocked-body.js'
 import { firstImageFromHtml } from './fetcher/markdown-utils.js'
+import { fetchYouTubeContent, parseYouTubeVideoId } from './fetcher/youtube.js'
+import { getSetting } from './db/settings.js'
+import { DEFAULT_LANGUAGE } from '../shared/lang.js'
 import { type FetchRssResult, type RssItem, fetchAndParseRss, RateLimitError } from './fetcher/rss.js'
 import { computeInterval, computeEmpiricalInterval, sqliteFuture, DEFAULT_INTERVAL } from './fetcher/schedule.js'
 import { detectLanguage } from './fetcher/ai.js'
@@ -104,6 +107,17 @@ export interface FetchedContent {
   title: string | null
 }
 
+/**
+ * Caption languages to prefer, best first: the user's reading language, then
+ * English, which most channels caption even when they publish in another
+ * language. A track in a language nobody here reads is still better than no
+ * body at all, so this is a preference, not a filter.
+ */
+function preferredTranscriptLanguages(): string[] {
+  const userLang = getSetting('general.language') || DEFAULT_LANGUAGE
+  return userLang === 'en' ? ['en'] : [userLang, 'en']
+}
+
 export async function fetchArticleContent(
   url: string,
   options?: {
@@ -147,6 +161,24 @@ export async function fetchArticleContent(
   } else if (isAnchorLink && options?.listingExcerpt) {
     fullText = convertHtmlToMarkdown(options.listingExcerpt)
     excerpt = markdownToExcerpt(fullText)
+  } else if (parseYouTubeVideoId(url)) {
+    // A watch page has no prose to extract — the player is JS — and from a
+    // server IP it is usually the "unusual traffic" interstitial anyway. Build
+    // the body from captions and the description box instead. Deliberately no
+    // fall-through to fetchFullText: scraping is what produced the block pages.
+    try {
+      const video = await fetchYouTubeContent(url, { preferredLanguages: preferredTranscriptLanguages() })
+      if (video) {
+        fullText = video.fullText
+        ogImage = video.ogImage
+        excerpt = markdownToExcerpt(video.fullText)
+        title = video.title
+      } else {
+        lastError = 'youtube: no captions or description available'
+      }
+    } catch (err) {
+      lastError = `fetchYouTubeContent: ${errorMessage(err)}`
+    }
   } else {
     try {
       const result = await fetchFullText(url, { requiresJsChallenge: options?.requiresJsChallenge })

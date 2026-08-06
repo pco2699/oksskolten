@@ -132,6 +132,41 @@ When the fallback triggers, the RSS content is only used if it is more substanti
 
 This addresses SPA sites where even FlareSolverr returns rendered HTML but `preClean` removes `display: none` elements, leaving Readability with an effectively empty DOM — while the RSS feed itself often contains the full article content (as used by readers like Feedly).
 
+### YouTube Videos (`server/fetcher/youtube.ts`)
+
+A YouTube watch page is never scraped. It has no prose to extract — the player is JavaScript — and from a server IP YouTube usually answers with its "unusual traffic" interstitial, which Readability extracts as if it were the article. `fetchArticleContent` therefore routes any URL that `parseYouTubeVideoId()` recognises (`/watch?v=`, `youtu.be/`, `/shorts/`, `/embed/`, `/live/`, `/v/`) to `fetchYouTubeContent()` instead, and deliberately does **not** fall through to `fetchFullText` — scraping is what produced the block pages in the first place.
+
+The body is built from what a video actually contains in text form:
+
+| Source | Endpoint | Provides |
+|---|---|---|
+| InnerTube player | `POST /youtubei/v1/player` | `shortDescription`, caption track list, title, thumbnails |
+| Timed text | The track's signed `baseUrl` + `fmt=json3` | The transcript (legacy `<transcript>` XML is parsed too) |
+| oEmbed | `GET /oembed` | Title / channel / thumbnail — not bot-gated, so it backfills a refused player call |
+
+Stored `full_text` is Markdown with up to two sections:
+
+```markdown
+## Description
+
+<the description box, verbatim>
+
+## Transcript (en, auto-generated)
+
+[0:00] Caption lines grouped into ~600-character paragraphs …
+
+[1:23] … each prefixed with the timestamp it starts at
+```
+
+Behavior notes:
+
+- **Client fallback**: InnerTube is tried with the `ANDROID` client, then `WEB`. YouTube refuses these unevenly by IP reputation and which one works shifts over time, so a refusal (`!res.ok`, or a `playabilityStatus` other than `OK`) moves to the next client rather than aborting.
+- **Caption choice** (`pickCaptionTrack`): preferred languages are tried **in order** — the user's `general.language`, then `en` — and within each, a human-written track beats an automatic (`kind: 'asr'`) one. If no preference matches, any human-written track is used, then any track at all: captions in the wrong language still beat no body.
+- **Transcript cap**: `MAX_TRANSCRIPT_CHARS` (60,000) — multi-hour streams would otherwise dominate a batch summarize call. Truncation appends `… (transcript truncated)`.
+- **Degradation**: no captions still yields the description; a refused player call still yields oEmbed metadata. When neither a description nor captions can be retrieved, `fullText` stays `null` with `last_error = "youtube: no captions or description available"` — an honest empty body rather than a summary of an interstitial.
+- **Repairing existing articles**: migration `0012_youtube_reset_block_pages.sql` clears the body — and the summary / translation derived from it — of any YouTube article whose stored `full_text` matches an interstitial, sets `last_error`, and resets `retry_count`, which puts it back in the retry queue so the captions pipeline rebuilds it. Bodies that are not positively identified as block pages are left alone.
+- **Feed-level fallback**: YouTube's channel feed carries no `<content>` or `<summary>`; the description box lives in `<media:group><media:description>`. `parseRssXml` extracts it as the item excerpt (both the feedsmith and fast-xml-parser paths), so the standard RSS content fallback still leaves a body when the video APIs are refused entirely.
+
 ### Full-Text Retrieval and Markdown Conversion Pipeline
 
 End-to-end flow from article URL to Markdown text. A multi-stage pipeline combining HTML cleaning (defuddle-based) and Readability that removes noise such as ads, navigation, and tracking attributes before converting to Markdown. Runs entirely locally with no external API dependencies.
