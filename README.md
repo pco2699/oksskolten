@@ -179,6 +179,7 @@ docker compose up --build   # HMR enabled
 
 npm test                    # Run all tests
 npm run build               # Production build
+npm run score:baseline      # Report how engagement scores are distributed (read-only)
 ```
 
 On first startup with an empty database, sample feeds and articles are automatically loaded from the demo seed data (`src/lib/demo/seed/*.json`). This gives you a populated UI to work with immediately. The seed is idempotent — it only runs when no RSS feeds exist in the database. To start with an empty database instead, set `NO_SEED=1`.

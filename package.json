@@ -15,6 +15,7 @@
     "build": "vite build",
     "start": "tsx --env-file-if-exists=.env server/index.ts",
     "lint": "eslint src/ server/ shared/",
+    "score:baseline": "tsx --env-file-if-exists=.env scripts/score-baseline.ts",
     "typecheck": "tsc --noEmit",
     "test": "mise exec node@22 -- vitest run",
     "test:watch": "mise exec node@22 -- vitest"

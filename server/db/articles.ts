@@ -40,26 +40,43 @@ function buildMeiliDoc(id: number): MeiliArticleDoc | null {
 
 // --- Score computation ---
 
-const SCORE_DECAY_FACTOR = 0.05
+export const SCORE_DECAY_FACTOR = 0.05
 const SEARCH_BOOST_FACTOR = 5.0
 
 /**
- * Build the engagement × decay score SQL expression.
- * @param prefix - table alias (e.g. 'a.') for JOIN queries, or '' for single-table UPDATE
+ * Build the engagement half of the score expression (the sum of action weights).
+ * Exported so measurement code can observe it in isolation without restating the weights.
  */
-function scoreExpr(prefix: string, opts?: { searchBoost?: boolean }): string {
+export function engagementExpr(prefix: string): string {
   const p = prefix
-  const engagement = `(
+  return `(
     (CASE WHEN ${p}liked_at IS NOT NULL THEN 10 ELSE 0 END)
     + (CASE WHEN ${p}bookmarked_at IS NOT NULL THEN 5 ELSE 0 END)
     + (CASE WHEN ${p}full_text_translated IS NOT NULL THEN 3 ELSE 0 END)
     + (CASE WHEN ${p}read_at IS NOT NULL THEN 2 ELSE 0 END)
   )`
-  const decay = `(1.0 / (1.0 + (julianday('now') - julianday(
+}
+
+/** Days elapsed since the article's last activity — the input to the decay curve. */
+export function daysSinceActivityExpr(prefix: string): string {
+  const p = prefix
+  return `(julianday('now') - julianday(
     COALESCE(${p}read_at, ${p}published_at, ${p}fetched_at)
-  )) * ${SCORE_DECAY_FACTOR}))`
+  ))`
+}
+
+/** Build the time-decay half of the score expression. */
+export function decayExpr(prefix: string): string {
+  return `(1.0 / (1.0 + ${daysSinceActivityExpr(prefix)} * ${SCORE_DECAY_FACTOR}))`
+}
+
+/**
+ * Build the engagement × decay score SQL expression.
+ * @param prefix - table alias (e.g. 'a.') for JOIN queries, or '' for single-table UPDATE
+ */
+export function scoreExpr(prefix: string, opts?: { searchBoost?: boolean }): string {
   const boost = opts?.searchBoost ? ` * ${SEARCH_BOOST_FACTOR}` : ''
-  return `(${engagement} * ${decay}${boost})`
+  return `(${engagementExpr(prefix)} * ${decayExpr(prefix)}${boost})`
 }
 
 /** WHERE clause for articles that have engagement or a non-zero score. Shared with search sync. */
