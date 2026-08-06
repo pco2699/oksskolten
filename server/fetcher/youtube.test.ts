@@ -327,12 +327,43 @@ describe('fetchYouTubeContent', () => {
     expect(content?.transcriptLanguage).toBeNull()
   })
 
-  it('returns null when the video has neither a description nor captions', async () => {
+  it('returns a null body, not a failure, when the video has neither a description nor captions', async () => {
     mockSafeFetch.mockImplementation(async (url: string) => {
       if (url.includes('/youtubei/v1/player')) {
         return jsonResponse({ playabilityStatus: { status: 'OK' }, videoDetails: { title: 'Silent' } })
       }
       return jsonResponse({ title: 'oEmbed title' })
+    })
+
+    // Distinct from null: the fetch succeeded and the answer is "no text".
+    // The caller relies on this to keep the article out of the retry queue,
+    // and the title and thumbnail are still usable.
+    const content = await fetchYouTubeContent('https://www.youtube.com/watch?v=dQw4w9WgXcQ')
+    expect(content).not.toBeNull()
+    expect(content?.fullText).toBeNull()
+    expect(content?.title).toBe('Silent')
+    expect(content?.ogImage).toBe('https://i.ytimg.com/vi/dQw4w9WgXcQ/hqdefault.jpg')
+  })
+
+  it('returns null when the video metadata cannot be retrieved at all', async () => {
+    // A refused player is a fault, so this stays a retryable error rather
+    // than a settled "no text" result.
+    mockSafeFetch.mockImplementation(async () => jsonResponse('', { ok: false, status: 503 }))
+
+    expect(await fetchYouTubeContent('https://www.youtube.com/watch?v=dQw4w9WgXcQ')).toBeNull()
+  })
+
+  it('reports a refused player as a failure even when oEmbed answers', async () => {
+    // The real-world shape of a bot-gated fetch: the ANDROID client is turned
+    // away with HTTP 400, the WEB client returns LOGIN_REQUIRED, and oEmbed
+    // still serves a title. oEmbed has no description field, so it cannot show
+    // the video is textless — treating this as "no text" would permanently
+    // write off videos that do have descriptions and captions.
+    mockSafeFetch.mockImplementation(async (url: string) => {
+      if (url.includes('/youtubei/v1/player')) {
+        return jsonResponse({ playabilityStatus: { status: 'LOGIN_REQUIRED', reason: "Sign in to confirm you're not a bot" } })
+      }
+      return jsonResponse({ title: 'oEmbed title', thumbnail_url: 'https://i.ytimg.com/vi/dQw4w9WgXcQ/hqdefault.jpg' })
     })
 
     expect(await fetchYouTubeContent('https://www.youtube.com/watch?v=dQw4w9WgXcQ')).toBeNull()

@@ -169,12 +169,17 @@ export async function fetchArticleContent(
     try {
       const video = await fetchYouTubeContent(url, { preferredLanguages: preferredTranscriptLanguages() })
       if (video) {
+        // A null body means the video has no captions and an empty
+        // description. That is settled, not pending: no amount of retrying
+        // produces captions after the fact, so it is left unflagged and the
+        // article renders as the embedded player with an empty body. Only a
+        // failure to reach YouTube at all (below) is worth another attempt.
         fullText = video.fullText
         ogImage = video.ogImage
-        excerpt = markdownToExcerpt(video.fullText)
+        excerpt = video.fullText ? markdownToExcerpt(video.fullText) : null
         title = video.title
       } else {
-        lastError = 'youtube: no captions or description available'
+        lastError = 'youtube: could not retrieve video metadata'
       }
     } catch (err) {
       lastError = `fetchYouTubeContent: ${errorMessage(err)}`
@@ -239,13 +244,28 @@ interface NewArticle {
 interface RetryArticle {
   kind: 'retry'
   article: Article
+  /**
+   * Excerpt from the article's feed, when that feed was pulled in the same
+   * sweep. Lets a retry fall back to RSS content exactly as a first attempt
+   * does — see `collectFeedTasks`.
+   */
+  excerpt?: string
 }
 
 type ArticleTask = NewArticle | RetryArticle
 
 /** Result of pulling one feed's RSS and turning it into pending article tasks. */
 type FeedFetchOutcome =
-  | { status: 'tasks'; tasks: NewArticle[] }
+  | {
+    status: 'tasks'
+    tasks: NewArticle[]
+    /**
+     * Every item in the feed keyed by normalized URL, including ones already
+     * stored. Retry tasks are gathered separately, from the database, so this
+     * is how they recover the RSS excerpt for their own article.
+     */
+    excerptsByUrl: Map<string, string>
+  }
   | { status: 'not-modified' }
   | { status: 'error' }
 
@@ -310,7 +330,12 @@ async function collectFeedTasks(feed: Feed, opts?: { skipCache?: boolean }): Pro
       excerpt: item.excerpt,
     }))
 
-  return { status: 'tasks', tasks }
+  const excerptsByUrl = new Map<string, string>()
+  for (const item of rssResult.items) {
+    if (item.excerpt) excerptsByUrl.set(normalizeUrl(item.url), item.excerpt)
+  }
+
+  return { status: 'tasks', tasks, excerptsByUrl }
 }
 
 /** Returns true if the retry article still has an error after processing. */
@@ -320,7 +345,7 @@ async function processArticle(task: ArticleTask): Promise<boolean> {
   const content = await fetchArticleContent(articleUrl, {
     requiresJsChallenge: task.kind === 'new' ? task.requires_js_challenge : undefined,
     skipFullTextFetch: task.kind === 'new' ? task.skip_full_text_fetch : undefined,
-    listingExcerpt: task.kind === 'new' ? task.excerpt : undefined,
+    listingExcerpt: task.excerpt,
     existingArticle: task.kind === 'retry' ? task.article : undefined,
   })
 
@@ -457,6 +482,9 @@ async function fetchAllFeedsInner(
   // Phase A: Fetch RSS for each feed and collect new articles (per-feed limit)
   // Track new article counts per feed for progress events
   const feedNewCounts = new Map<number, number>()
+  // RSS excerpts seen anywhere in this sweep, so Phase B can hand a retry the
+  // same fallback content a first attempt would have had.
+  const excerptsByUrl = new Map<string, string>()
 
   await Promise.all(
     feeds.map(feed =>
@@ -469,6 +497,7 @@ async function fetchAllFeedsInner(
         if (outcome.status === 'error') return
         allTasks.push(...outcome.tasks)
         feedNewCounts.set(feed.id, outcome.tasks.length)
+        for (const [url, excerpt] of outcome.excerptsByUrl) excerptsByUrl.set(url, excerpt)
       }),
     ),
   )
@@ -481,7 +510,10 @@ async function fetchAllFeedsInner(
   const retryArticles = getRetryArticles()
   for (const article of retryArticles) {
     updateArticleContent(article.id, { last_retry_at: new Date().toISOString() })
-    allTasks.push({ kind: 'retry', article })
+    // Only feeds pulled in this sweep contribute an excerpt; one that answered
+    // 304, errored, or was not due yet simply leaves this undefined, which is
+    // the behaviour every retry had before.
+    allTasks.push({ kind: 'retry', article, excerpt: excerptsByUrl.get(normalizeUrl(article.url)) })
   }
 
   if (allTasks.length === 0) {

@@ -620,6 +620,50 @@ describe('fetchAllFeeds', () => {
     expect(row.last_error).toBeNull()
   })
 
+  it('falls back to the RSS excerpt on a retry, not just on the first attempt', async () => {
+    // The article is still listed in the feed with a usable description, but
+    // its page cannot be fetched. A first attempt would fall back to the RSS
+    // content; a retry used to be denied that fallback and stayed empty
+    // forever, which is how YouTube articles accumulated with a null body
+    // while their feed carried the video description all along.
+    const feed = seedFeed()
+    const body = 'Description straight from the feed, long enough to be a real body. '.repeat(4)
+    const articleId = insertArticle({
+      feed_id: feed.id,
+      title: 'Retry Me',
+      url: 'https://example.com/retry',
+      published_at: '2024-01-01T00:00:00Z',
+      last_error: 'fetchFullText: HTTP 500',
+    })
+    // Park the article inside the stale-refresh backoff so that path cannot
+    // repair it. This is the state real articles sit in for most of the day —
+    // one refresh attempt was made when the feed had no description yet, and
+    // the next is 24 hours out — leaving the 5-minute retry as the only way
+    // back. Without it, the refresh path would repair the article in Phase A
+    // and the retry would never run.
+    const { updateArticleContent: setRefreshed } = await import('./db.js')
+    setRefreshed(articleId, { last_refresh_attempt_at: new Date().toISOString() })
+
+    const rssXml = rss20Xml('Test', [
+      { title: 'Retry Me', link: 'https://example.com/retry', description: body },
+    ])
+
+    mockFetch.mockImplementation((url: string | URL) => {
+      const u = url.toString()
+      if (u === feed.rss_url) return Promise.resolve(mockResponse(rssXml, { headers: { 'content-type': 'application/rss+xml' } }))
+      // The page itself stays broken, so the RSS excerpt is the only source.
+      return Promise.resolve(mockResponse('Server Error', { status: 500 }))
+    })
+
+    await fetchAllFeeds()
+
+    const { getDb } = await import('./db.js')
+    const row = getDb().prepare('SELECT full_text, last_error FROM articles WHERE url = ?').get('https://example.com/retry') as { full_text: string | null; last_error: string | null }
+    expect(row.full_text).toContain('Description straight from the feed')
+    // Having produced a body, the article is no longer a retry candidate.
+    expect(row.last_error).toBeNull()
+  })
+
   it('isolates feed errors — one failure does not affect others', async () => {
     const feedA = seedFeed({ name: 'Feed A', url: 'https://a.example.com', rss_url: 'https://a.example.com/rss' })
     const feedB = seedFeed({ name: 'Feed B', url: 'https://b.example.com', rss_url: 'https://b.example.com/rss' })
@@ -2913,7 +2957,7 @@ describe('fetchSingleFeed — YouTube videos', () => {
   }
 
   /** YouTube's channel feed: an Atom entry whose only text is media:description. */
-  function youtubeFeedXml(): string {
+  function youtubeFeedXml(description = 'Description straight from the channel feed.'): string {
     return `<?xml version="1.0" encoding="UTF-8"?>
 <feed xmlns:media="http://search.yahoo.com/mrss/" xmlns="http://www.w3.org/2005/Atom">
   <title>Rick Astley</title>
@@ -2923,7 +2967,7 @@ describe('fetchSingleFeed — YouTube videos', () => {
     <published>2025-01-01T00:00:00Z</published>
     <media:group>
       <media:title>Never Gonna Give You Up</media:title>
-      <media:description>Description straight from the channel feed.</media:description>
+      <media:description>${description}</media:description>
     </media:group>
   </entry>
 </feed>`
@@ -2973,5 +3017,36 @@ describe('fetchSingleFeed — YouTube videos', () => {
 
     const article = getArticleByUrl(VIDEO_URL)!
     expect(article.full_text).toContain('Description straight from the channel feed.')
+  })
+
+  it('stores a video with no captions and no description without flagging an error', async () => {
+    // Nothing to read anywhere: the description box is empty, there are no
+    // caption tracks, and the channel feed carries no text either. The
+    // article is still worth keeping — the reader shows the embedded player
+    // — but it must not sit in the retry queue, because no future attempt
+    // can produce captions that do not exist.
+    const feed = seedFeed()
+    const silentPlayer = {
+      playabilityStatus: { status: 'OK' },
+      videoDetails: { title: 'Never Gonna Give You Up', author: 'Rick Astley' },
+    }
+
+    mockFetch.mockImplementation((url: string | URL) => {
+      const u = url.toString()
+      if (u === feed.rss_url) return Promise.resolve(mockResponse(youtubeFeedXml(''), { headers: { 'content-type': 'application/atom+xml' } }))
+      if (u.includes('/youtubei/v1/player')) return Promise.resolve(mockResponse(JSON.stringify(silentPlayer), { headers: { 'content-type': 'application/json' } }))
+      if (u.includes('/oembed')) return Promise.resolve(mockResponse(JSON.stringify({ title: 'Never Gonna Give You Up' }), { headers: { 'content-type': 'application/json' } }))
+      return Promise.resolve(mockResponse('', { status: 404 }))
+    })
+
+    await fetchSingleFeed(feed)
+
+    const article = getArticleByUrl(VIDEO_URL)!
+    expect(article.full_text).toBeNull()
+    // The thumbnail still came back and is what the list view renders.
+    expect(article.og_image).toBe('https://i.ytimg.com/vi/dQw4w9WgXcQ/hqdefault.jpg')
+    const { getDb } = await import('./db.js')
+    const row = getDb().prepare('SELECT last_error FROM articles WHERE url = ?').get(VIDEO_URL) as { last_error: string | null }
+    expect(row.last_error).toBeNull()
   })
 })
