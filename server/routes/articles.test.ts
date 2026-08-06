@@ -39,6 +39,11 @@ function seedFeed(overrides: Partial<Parameters<typeof createFeed>[0]> = {}) {
   return createFeed({ name: 'Test Feed', url: 'https://example.com', ...overrides })
 }
 
+/** Body long enough to clear the summarizer's minimum-length check. */
+function articleBody(text = 'Long article content here.'): string {
+  return text + ' ' + 'The quick brown fox jumps over the lazy dog. '.repeat(10)
+}
+
 function seedArticle(feedId: number, overrides: Partial<Parameters<typeof insertArticle>[0]> = {}) {
   return insertArticle({
     feed_id: feedId,
@@ -63,7 +68,7 @@ beforeEach(async () => {
 describe('POST /api/articles/:id/summarize?stream=1', () => {
   it('returns SSE stream with delta and done events', async () => {
     const feed = seedFeed()
-    const artId = seedArticle(feed.id, { full_text: 'Long article content here' })
+    const artId = seedArticle(feed.id, { full_text: articleBody() })
 
     mockStreamSummarize.mockImplementation(async (_text: string, onDelta: (d: string) => void) => {
       onDelta('sum')
@@ -98,7 +103,7 @@ describe('POST /api/articles/:id/summarize?stream=1', () => {
 
   it('returns cached summary even when stream=1', async () => {
     const feed = seedFeed()
-    const artId = seedArticle(feed.id, { full_text: 'text', summary: 'Cached' })
+    const artId = seedArticle(feed.id, { full_text: articleBody(), summary: 'Cached' })
 
     const res = await app.inject({
       method: 'POST',
@@ -114,7 +119,7 @@ describe('POST /api/articles/:id/summarize?stream=1', () => {
 
   it('handles streaming error after headers sent', async () => {
     const feed = seedFeed()
-    const artId = seedArticle(feed.id, { full_text: 'Long content' })
+    const artId = seedArticle(feed.id, { full_text: articleBody('Long content.') })
 
     mockStreamSummarize.mockRejectedValue(new Error('API timeout'))
 

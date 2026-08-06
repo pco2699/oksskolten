@@ -4,6 +4,7 @@ import { Piscina as PiscinaPool } from 'piscina'
 import { JSDOM } from 'jsdom'
 import { fetchHtml } from './http.js'
 import { fetchViaFlareSolverr } from './flaresolverr.js'
+import { isBotBlockPage, MIN_ARTICLE_BODY_LENGTH } from '../lib/blocked-body.js'
 import type { CleanerConfig } from '../lib/cleaner/selectors.js'
 import type { ParseHtmlInput, ParseHtmlResult } from './contentWorker.js'
 
@@ -78,7 +79,7 @@ async function runWithTimeout(input: ParseHtmlInput, timeoutMs: number): Promise
  * Minimum character count for extracted article text to be considered valid.
  * Shared between fetchFullText (FlareSolverr retry) and fetchArticleContent (RSS fallback).
  */
-export const MIN_EXTRACTED_LENGTH = 200
+export const MIN_EXTRACTED_LENGTH = MIN_ARTICLE_BODY_LENGTH
 
 /**
  * Strip heavy non-content tags before passing HTML to the worker thread.
@@ -249,21 +250,9 @@ function isGarbageExtraction(text: string): boolean {
   return false
 }
 
-/** Detect bot-block / form-submission pages that Readability mistakenly extracts. */
-export function isBotBlockPage(text: string): boolean {
-  const lower = text.toLowerCase()
-  const patterns = [
-    'your submission has been received',
-    'something went wrong while submitting',
-    'please verify you are a human',
-    'checking your browser',
-    'enable javascript and cookies',
-    'just a moment',
-    'attention required',
-    'access denied',
-  ]
-  return patterns.some(p => lower.includes(p))
-}
+// Bot-block / consent / login pages that Readability mistakenly extracts are
+// classified by `isBotBlockPage` in server/lib/blocked-body.ts, shared with the
+// summarize path so the fetcher and the tools agree on what a failed fetch is.
 
 // Re-export markdown utilities so existing import sites don't break.
 // These live in a separate file to avoid circular dependency: contentWorker.ts

@@ -125,7 +125,7 @@ The fetch + fallback + language detection logic is encapsulated in a single expo
 **RSS Content Fallback**: When page-level extraction fails or returns insufficient content, `fetchArticleContent` falls back to the RSS feed's inline content (`<description>` / `<content:encoded>`). The fallback triggers when any of the following conditions are met:
 
 1. `fullText` is `null` (fetch completely failed)
-2. `fullText` matches bot-block patterns (e.g., "checking your browser")
+2. `fullText` matches bot-block patterns (e.g., "checking your browser", "unusual traffic from your computer network", "Before you continue to YouTube") — see `isBotBlockPage` in `server/lib/blocked-body.ts`
 3. `fullText` is shorter than `MIN_EXTRACTED_LENGTH` (200 chars)
 
 When the fallback triggers, the RSS content is only used if it is more substantial (by character count) than whatever was extracted from the page. RSS HTML content is converted to Markdown via `convertHtmlToMarkdown()` in `server/fetcher/markdown-utils.ts`, which auto-detects HTML vs plain text/Markdown and only applies Turndown for HTML input.
@@ -218,7 +218,8 @@ fetchFullText(articleUrl, cleanerConfig?)
 └─ 8. FlareSolverr automatic retry (quality gate) [Main Thread]
       If requires_js_challenge was NOT set and the extracted text is
       under MIN_EXTRACTED_LENGTH (200 chars) or classified as garbage:
-      ├─ Garbage detection (isGarbageExtraction): bot-block patterns,
+      ├─ Garbage detection (isGarbageExtraction): bot-block patterns
+      │   (server/lib/blocked-body.ts),
       │   fewer than 3 prose sentences, or prose ratio < 10% of total text
       ├─ Fetch via FlareSolverr with waitForSelector targeting content containers
       │   (article, main, [role="main"], .post-content, .entry-content)

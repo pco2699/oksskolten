@@ -37,6 +37,7 @@ import { MAX_BATCH_SEEN, MAX_CHECK_URLS } from '../../shared/limits.js'
 import path from 'node:path'
 import fs from 'node:fs'
 import { NumericIdParams, parseOrBadRequest } from '../lib/validation.js'
+import { detectBlockedBody, MIN_ARTICLE_BODY_LENGTH } from '../lib/blocked-body.js'
 
 function getTranslateTargetLang(): string {
   return getSetting('translate.target_lang') || getSetting('general.language') || DEFAULT_LANGUAGE
@@ -138,6 +139,8 @@ function extractKnownErrorCode(err: unknown): string | null {
 interface AiHandlerConfig {
   getCached: (article: ArticleDetail) => string | null
   validate?: (article: ArticleDetail) => string | null
+  /** Reject bodies shorter than this as a failed fetch. Set for summarize only. */
+  minBodyLength?: number
   streamFn: (
     fullText: string,
     onDelta: (d: string) => void,
@@ -156,6 +159,15 @@ function createAiHandler(config: AiHandlerConfig) {
     const article = getArticleById(params.id)
     if (!article) {
       reply.status(404).send({ error: 'Article not found' })
+      return
+    }
+
+    // Before the cache: a body that is really a bot check / consent screen /
+    // login wall produces a confident summary of the interstitial, and any
+    // cached text for such an article was generated from that same page.
+    const blocked = detectBlockedBody(article.full_text, { minLength: config.minBodyLength })
+    if (blocked) {
+      reply.status(400).send({ error: blocked.message, fetch_status: blocked.reason })
       return
     }
 
@@ -472,6 +484,7 @@ export async function articleRoutes(api: FastifyInstance): Promise<void> {
     { preHandler: [requireJson] },
     createAiHandler({
       getCached: (article) => article.summary,
+      minBodyLength: MIN_ARTICLE_BODY_LENGTH,
       streamFn: async (fullText, onDelta, onReasoning) => {
         const r = await streamSummarizeArticle(fullText, onDelta, onReasoning)
         return { text: r.summary, ...r }

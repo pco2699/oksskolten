@@ -18,6 +18,7 @@ import { buildMeiliFilter, meiliSearch } from '../search/client.js'
 import { isSearchReady } from '../search/sync.js'
 import { summarizeArticle, translateArticle } from '../fetcher.js'
 import { getSetting } from '../db/settings.js'
+import { detectBlockedBody, MIN_ARTICLE_BODY_LENGTH, type BlockedBodyReason } from '../lib/blocked-body.js'
 import { DEFAULT_LANGUAGE } from '../../shared/lang.js'
 import { articleUrlToPath } from '../../shared/url.js'
 
@@ -54,6 +55,30 @@ function clampIdList(value: unknown, max: number): { ids: number[]; dropped: num
     .filter((n) => Number.isInteger(n) && n > 0)
   return { ids: valid.slice(0, max), dropped: Math.max(0, valid.length - max) }
 }
+
+/**
+ * Refuse to derive anything from a body that is really a fetch-failure page.
+ *
+ * A bot check / consent screen / login wall extracts as ordinary prose, and an
+ * LLM will summarize it into a confident description of a page nobody wanted to
+ * read. Returning `error` keeps that indistinguishable-from-success case out of
+ * the caller's hands; `fetch_status` says which failure it was, so the model can
+ * report "the page could not be fetched" instead of retrying forever.
+ *
+ * Checked *before* the cached summary too — articles fetched before this gate
+ * existed still carry summaries generated from the block page.
+ */
+function blockedBodyResult(
+  fullText: string | null | undefined,
+  options?: { minLength?: number },
+): { error: string; fetch_status: BlockedBodyReason } | null {
+  const blocked = detectBlockedBody(fullText, options)
+  if (!blocked) return null
+  return { error: blocked.message, fetch_status: blocked.reason }
+}
+
+/** Summarizing needs a body long enough to have something to say; translating does not. */
+const SUMMARIZE_BODY_OPTIONS = { minLength: MIN_ARTICLE_BODY_LENGTH }
 
 // --- Neutral tool definition ---
 
@@ -130,7 +155,7 @@ const searchArticlesTool: ToolDef = {
 
 const getArticleTool: ToolDef = {
   name: 'get_article',
-  description: 'Get article details including full text (full_text), translation (full_text_translated), and summary.',
+  description: 'Get article details including full text (full_text), translation (full_text_translated), and summary. When fetch_status is present the stored full_text is a fetch-failure page (bot check, consent screen, login wall, or a truncated body) rather than the article — do not use it as the article content.',
   inputSchema: {
     type: 'object',
     properties: {
@@ -143,6 +168,9 @@ const getArticleTool: ToolDef = {
     if (!article) return JSON.stringify({ error: 'Article not found' })
     const truncate = (text: string | null | undefined, limit: number) =>
       text && text.length > limit ? text.slice(0, limit) + '\n… (truncated)' : text ?? null
+    // The body is still returned — an agent may legitimately want to look at it
+    // — but it is labelled so it is never mistaken for the article itself.
+    const blocked = detectBlockedBody(article.full_text)
     return JSON.stringify({
       id: article.id,
       feed_name: article.feed_name,
@@ -154,6 +182,7 @@ const getArticleTool: ToolDef = {
       full_text: truncate(article.full_text, 15000),
       full_text_translated: truncate((article as ArticleDetail).full_text_translated, 15000),
       seen_at: article.seen_at,
+      ...(blocked ? { fetch_status: blocked.reason, fetch_status_detail: blocked.message } : {}),
     })
   },
 }
@@ -288,7 +317,7 @@ const toggleBookmarkTool: ToolDef = {
 
 const summarizeArticleTool: ToolDef = {
   name: 'summarize_article',
-  description: 'Summarize an article in the user\'s preferred language. Returns cached summary if already summarized.',
+  description: 'Summarize an article in the user\'s preferred language. Returns cached summary if already summarized. Returns an error with fetch_status instead of a summary when the stored body is a fetch-failure page (bot check, consent screen, login wall, or too short) — the article content was never retrieved, so report that rather than describing the body.',
   inputSchema: {
     type: 'object',
     properties: {
@@ -299,6 +328,8 @@ const summarizeArticleTool: ToolDef = {
   execute: async (input) => {
     const article = getArticleById(input.article_id as number)
     if (!article) return JSON.stringify({ error: 'Article not found' })
+    const blocked = blockedBodyResult(article.full_text, SUMMARIZE_BODY_OPTIONS)
+    if (blocked) return JSON.stringify(blocked)
     if (article.summary) return JSON.stringify({ summary: article.summary, cached: true })
     if (!article.full_text) return JSON.stringify({ error: 'No full text available' })
 
@@ -310,7 +341,7 @@ const summarizeArticleTool: ToolDef = {
 
 const summarizeArticlesTool: ToolDef = {
   name: 'summarize_articles',
-  description: 'Summarize multiple articles in the user\'s preferred language. Returns cached summaries where available.',
+  description: 'Summarize multiple articles in the user\'s preferred language. Returns cached summaries where available. An article whose stored body is a fetch-failure page (bot check, consent screen, login wall, or too short) comes back with an error and fetch_status instead of a summary — the article content was never retrieved, so report that rather than describing the body.',
   inputSchema: {
     type: 'object',
     properties: {
@@ -322,7 +353,7 @@ const summarizeArticlesTool: ToolDef = {
     const { ids, dropped } = clampIdList(input.article_ids, MAX_SUMMARIZE_IDS)
     if (ids.length === 0) return JSON.stringify([])
 
-    type SummaryResult = { id: number; summary?: string; cached?: boolean; error?: string }
+    type SummaryResult = { id: number; summary?: string; cached?: boolean; error?: string; fetch_status?: BlockedBodyReason }
     const results: SummaryResult[] = []
     const CONCURRENCY = 3
     for (let i = 0; i < ids.length; i += CONCURRENCY) {
@@ -330,6 +361,8 @@ const summarizeArticlesTool: ToolDef = {
       const chunkResults = await Promise.all(chunk.map(async (id) => {
         const article = getArticleById(id)
         if (!article) return { id, error: 'Article not found' }
+        const blocked = blockedBodyResult(article.full_text, SUMMARIZE_BODY_OPTIONS)
+        if (blocked) return { id, ...blocked }
         if (article.summary) return { id, summary: article.summary, cached: true }
         if (!article.full_text) return { id, error: 'No full text available' }
 
@@ -365,6 +398,8 @@ const translateArticleTool: ToolDef = {
     const userLang = getSetting('general.language') || DEFAULT_LANGUAGE
     const article = getArticleById(input.article_id as number) as ArticleDetail | undefined
     if (!article) return JSON.stringify({ error: 'Article not found' })
+    const blocked = blockedBodyResult(article.full_text)
+    if (blocked) return JSON.stringify(blocked)
     if (article.full_text_translated && article.translated_lang === userLang) return JSON.stringify({ full_text_translated: article.full_text_translated, cached: true })
     if (!article.full_text) return JSON.stringify({ error: 'No full text available' })
     if (article.lang === userLang) return JSON.stringify({ error: `Article is already in ${userLang}` })
