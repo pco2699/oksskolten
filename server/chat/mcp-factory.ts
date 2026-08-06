@@ -109,18 +109,18 @@ export function createMcpServer(options: CreateMcpServerOptions = {}): McpServer
         }
       }
 
-      log.error('tool start', { name: tool.name, input })
+      log.debug('tool start', { name: tool.name, input })
       const result = await tool.execute(input as Record<string, unknown>)
 
       // Log tool execution for the Claude Code adapter to reconstruct
       if (process.env.TOOL_LOG_PATH) {
-        fs.appendFileSync(
+        await fs.promises.appendFile(
           process.env.TOOL_LOG_PATH,
           JSON.stringify({ name: tool.name, input, result }) + '\n',
         )
       }
 
-      log.error('tool done', { name: tool.name })
+      log.debug('tool done', { name: tool.name })
       return { content: [{ type: 'text' as const, text: result }] }
     })
   }

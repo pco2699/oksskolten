@@ -4,10 +4,11 @@ import useSWR from 'swr'
 import useSWRInfinite from 'swr/infinite'
 import { useSWRConfig } from 'swr'
 import { fetcher } from '../../lib/fetcher'
-import { markSeenOnServer } from '../../lib/markSeenWithQueue'
 import { useI18n } from '../../lib/i18n'
-import { trackRead } from '../../lib/readTracker'
 import { useIsTouchDevice } from '../../hooks/use-is-touch-device'
+import { useInfiniteScroll } from '../../hooks/use-infinite-scroll'
+import { useMarkReadOnScroll } from '../../hooks/use-mark-read-on-scroll'
+import { useOptimisticArticleToggle } from '../../hooks/use-optimistic-article-toggle'
 import { useClipFeedId } from '../../hooks/use-clip-feed-id'
 import { useAppLayout } from '../../app'
 import { ArticleCard, type ArticleDisplayConfig } from './article-card'
@@ -26,7 +27,6 @@ import { Circle, CircleDot } from 'lucide-react'
 import { ConfirmDialog } from '../ui/confirm-dialog'
 import { useKeyboardNavigationContext } from '../../contexts/keyboard-navigation-context'
 import { useKeyboardNavigation } from '../../hooks/use-keyboard-navigation'
-import { apiPatch } from '../../lib/fetcher'
 import type { ArticleListItem, FeedWithCounts } from '../../../shared/types'
 import type { LayoutName } from '../../data/layouts'
 
@@ -39,9 +39,6 @@ interface ArticlesResponse {
 }
 
 const PAGE_SIZE = 20
-
-/** How often (ms) to flush the batch of read article IDs to the server */
-const BATCH_FLUSH_INTERVAL = 1500
 
 export interface ArticleListHandle {
   revalidate: () => void
@@ -127,7 +124,7 @@ export const ArticleList = forwardRef<ArticleListHandle, object>(function Articl
     return `/api/articles?${params.toString()}`
   }
 
-  const { data, error, size, setSize, isLoading, isValidating, mutate } = useSWRInfinite<ArticlesResponse>(
+  const { data, error, setSize, isLoading, isValidating, mutate } = useSWRInfinite<ArticlesResponse>(
     getKey,
     fetcher,
     {
@@ -187,6 +184,30 @@ export const ArticleList = forwardRef<ArticleListHandle, object>(function Articl
   // Short debounce after overlay close to prevent Escape from immediately clearing focus
   const escapeDebounceRef = useRef(false)
 
+  // ---------------------------------------------------------------------------
+  // Pagination, read tracking, and optimistic mutations
+  // ---------------------------------------------------------------------------
+  /** Identifies the current view; changing it resets per-view state. */
+  const viewKey = `${location.pathname}:${feedId ?? ''}:${categoryId ?? ''}`
+
+  const isAutoMarkEnabled = autoMarkRead === 'on'
+  const isTouchDevice = useIsTouchDevice()
+  const listRef = useRef<HTMLElement>(null)
+
+  const { sentinelCallbackRef, requestMore } = useInfiniteScroll({
+    hasMore,
+    isLoading: isValidating,
+    loadMore: () => { void setSize(prev => prev + 1) },
+  })
+
+  const { autoReadIds, markRead, markManyRead } = useMarkReadOnScroll({
+    enabled: isAutoMarkEnabled,
+    listRef,
+    viewKey,
+  })
+
+  const toggleArticleField = useOptimisticArticleToggle<ArticlesResponse>(mutate)
+
   useKeyboardNavigation({
     items: articleIds,
     focusedItemId,
@@ -240,39 +261,7 @@ export const ArticleList = forwardRef<ArticleListHandle, object>(function Articl
     },
     onBookmarkToggle: (id) => {
       const article = articleMap.get(id)
-      if (!article) return
-      const next = !article.bookmarked_at
-      // Optimistic update on the list's SWR cache
-      void mutate(
-        (pages) => pages?.map(page => ({
-          ...page,
-          articles: page.articles.map(a =>
-            String(a.id) === id
-              ? { ...a, bookmarked_at: next ? new Date().toISOString() : null }
-              : a
-          ),
-        })),
-        { revalidate: false },
-      )
-      // Also update the by-url cache so an open overlay (article-detail) reflects
-      // the change immediately. ArticleDetail keys its SWR off the article URL,
-      // which is a separate cache from the list and would otherwise stay stale.
-      const byUrlKey = `/api/articles/by-url?url=${encodeURIComponent(article.url)}`
-      void globalMutate(
-        byUrlKey,
-        (curr: { bookmarked_at: string | null } | undefined) =>
-          curr ? { ...curr, bookmarked_at: next ? new Date().toISOString() : null } : curr,
-        { revalidate: false },
-      )
-      apiPatch(`/api/articles/${article.id}/bookmark`, { bookmarked: next })
-        .then(() => {
-          void globalMutate((key: string) => typeof key === 'string' && key.startsWith('/api/feeds'))
-        })
-        .catch(() => {
-          // Roll back on failure
-          void mutate()
-          void globalMutate(byUrlKey)
-        })
+      if (article) void toggleArticleField(article, 'bookmarked_at')
     },
     onOpenExternal: (id) => {
       const article = articleMap.get(id)
@@ -280,245 +269,25 @@ export const ArticleList = forwardRef<ArticleListHandle, object>(function Articl
     },
     onToggleRead: (id) => {
       const article = articleMap.get(id)
-      if (!article) return
-      const next = article.seen_at == null
-      // Optimistic update on the list's SWR cache
-      void mutate(
-        (pages) => pages?.map(page => ({
-          ...page,
-          articles: page.articles.map(a =>
-            String(a.id) === id
-              ? { ...a, seen_at: next ? new Date().toISOString() : null }
-              : a
-          ),
-        })),
-        { revalidate: false },
-      )
-      // Also update the by-url cache so an open overlay/detail view reflects the change
-      const byUrlKey = `/api/articles/by-url?url=${encodeURIComponent(article.url)}`
-      void globalMutate(
-        byUrlKey,
-        (curr: { seen_at: string | null } | undefined) =>
-          curr ? { ...curr, seen_at: next ? new Date().toISOString() : null } : curr,
-        { revalidate: false },
-      )
-      apiPatch(`/api/articles/${article.id}/seen`, { seen: next })
-        .then(() => {
-          void globalMutate((key: string) => typeof key === 'string' && key.startsWith('/api/feeds'))
-        })
-        .catch(() => {
-          // Roll back on failure
-          void mutate()
-          void globalMutate(byUrlKey)
-        })
+      if (article) void toggleArticleField(article, 'seen_at')
     },
     onMarkAllRead: () => setMarkAllReadConfirmOpen(true),
-    onNearEnd: () => loadMoreRef.current(),
+    onNearEnd: () => requestMore(),
     enabled: isKeyboardNavEnabled,
     keyBindings: keybindings,
   })
 
-  // ---------------------------------------------------------------------------
-  // Infinite scroll
-  // ---------------------------------------------------------------------------
-  const sentinelRef = useRef<HTMLDivElement>(null)
-
-  // Keep loadMore in a stable ref so the IntersectionObserver callback
-  // always sees the latest values without needing to recreate the observer.
-  const loadMoreRef = useRef(() => {})
-  loadMoreRef.current = () => {
-    if (hasMore && !isValidating) {
-      void setSize(size + 1)
-    }
-  }
-
-  // Stable observer — created once via ref callback when sentinel mounts.
-  const sentinelObserverRef = useRef<IntersectionObserver | null>(null)
-  const sentinelCallbackRef = useCallback((node: HTMLDivElement | null) => {
-    // Cleanup previous
-    sentinelObserverRef.current?.disconnect()
-    sentinelObserverRef.current = null
-    sentinelRef.current = node
-
-    if (!node) return
-    const observer = new IntersectionObserver(
-      entries => { if (entries[0].isIntersecting) loadMoreRef.current() },
-      { rootMargin: '200px' },
-    )
-    observer.observe(node)
-    sentinelObserverRef.current = observer
-  }, [])
-
-  // Re-trigger loading when a fetch completes while sentinel is still visible.
-  // IntersectionObserver only fires on threshold crossings, so if the sentinel
-  // stays within the viewport after new articles render, no event fires and
-  // pagination stalls. This effect covers that gap.
-  useEffect(() => {
-    if (!isValidating && hasMore && sentinelRef.current) {
-      const rect = sentinelRef.current.getBoundingClientRect()
-      if (rect.top < window.innerHeight + 200) {
-        void setSize(prev => prev + 1)
-      }
-    }
-  }, [isValidating, hasMore, setSize])
-
-  // ---------------------------------------------------------------------------
-  // Auto-mark-as-read on scroll
-  //
-  // - IntersectionObserver fires when an article overlaps the header (48px)
-  // - UI updates instantly via React state (autoReadIds)
-  // - API calls are batched and flushed every ~1.5 s
-  // ---------------------------------------------------------------------------
-  const [autoReadIds, setAutoReadIds] = useState<Set<number>>(() => new Set())
-  const observerRef = useRef<IntersectionObserver | null>(null)
-  const batchQueue = useRef(new Set<number>())
-  const flushTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-
-  const flushBatch = useCallback(() => {
-    if (batchQueue.current.size === 0) return
-    const ids = [...batchQueue.current]
-    batchQueue.current.clear()
-    markSeenOnServer(ids)
-      .then(() => globalMutate(
-        (key: string) => typeof key === 'string' && key.startsWith('/api/feeds'),
-      ))
-      .catch(() => {})
-  }, [globalMutate])
-
-  const scheduleFlush = useCallback(() => {
-    if (flushTimerRef.current) return
-    flushTimerRef.current = setTimeout(() => {
-      flushTimerRef.current = null
-      flushBatch()
-    }, BATCH_FLUSH_INTERVAL)
-  }, [flushBatch])
-
-  // Mark an article as read: instant UI update + queue for server batch
-  const markRead = useCallback((articleId: number) => {
-    setAutoReadIds(prev => {
-      if (prev.has(articleId)) return prev
-      const next = new Set(prev)
-      next.add(articleId)
-      return next
-    })
-    trackRead(articleId)
-    batchQueue.current.add(articleId)
-    scheduleFlush()
-  }, [scheduleFlush])
-
-  // Stable ref so the observer callback always sees the latest markRead
-  const markReadRef = useRef(markRead)
-  markReadRef.current = markRead
-
   // Mark all currently loaded articles in this view as read (Shift+A shortcut)
   const handleMarkAllReadConfirmed = useCallback(() => {
     setMarkAllReadConfirmOpen(false)
-    const ids = articles.map(a => a.id)
-    if (ids.length === 0) return
-    setAutoReadIds(prev => {
-      const next = new Set(prev)
-      ids.forEach(id => next.add(id))
-      return next
-    })
-    markSeenOnServer(ids)
-      .then(() => globalMutate((key: string) => typeof key === 'string' && key.startsWith('/api/feeds')))
-      .catch(() => {})
-  }, [articles, globalMutate])
+    markManyRead(articles.map(a => a.id))
+  }, [articles, markManyRead])
 
-  const isAutoMarkEnabled = autoMarkRead === 'on'
-  const isTouchDevice = useIsTouchDevice()
-  const listRef = useRef<HTMLElement>(null)
-
-  // Create the IntersectionObserver once when auto-mark is enabled.
-  // The observer instance is kept stable — new article nodes from infinite
-  // scroll are added incrementally via a separate effect, avoiding the
-  // disconnect/recreate race that caused missed or phantom read events.
   useEffect(() => {
-    observerRef.current?.disconnect()
-    observerRef.current = null
-    if (!isAutoMarkEnabled) return
-
-    // Measure actual header height in pixels — iOS Safari rejects rootMargin
-    // values containing calc() or env() that getComputedStyle may return.
-    const headerEl = document.querySelector('[data-header]') as HTMLElement | null
-    const headerH = headerEl ? `${headerEl.offsetHeight}px` : '48px'
-
-    const observer = new IntersectionObserver(
-      entries => {
-        for (const entry of entries) {
-          const el = entry.target as HTMLElement
-          const articleId = Number(el.dataset.articleId)
-          if (!articleId) continue
-          if (el.dataset.articleUnread !== '1') continue
-
-          const rootTop = entry.rootBounds?.top ?? 0
-          if (entry.boundingClientRect.top < rootTop) {
-            markReadRef.current(articleId)
-          }
-        }
-      },
-      {
-        rootMargin: `-${headerH} 0px 0px 0px`,
-        threshold: [0, 1],
-      },
-    )
-
-    observerRef.current = observer
-
-    // Observe all article nodes already in the DOM
-    if (listRef.current) {
-      const nodes = listRef.current.querySelectorAll<HTMLElement>('[data-article-id]')
-      nodes.forEach(node => observer.observe(node))
-    }
-
-    return () => observer.disconnect()
-  }, [isAutoMarkEnabled]) // eslint-disable-line react-hooks/exhaustive-deps
-
-  // Incrementally observe new article nodes added by infinite scroll.
-  // Uses a MutationObserver to detect inserted DOM nodes so the
-  // IntersectionObserver instance stays stable (no disconnect/recreate).
-  useEffect(() => {
-    const list = listRef.current
-    const io = observerRef.current
-    if (!list || !io || !isAutoMarkEnabled) return
-
-    const mo = new MutationObserver(mutations => {
-      for (const m of mutations) {
-        for (const node of m.addedNodes) {
-          if (!(node instanceof HTMLElement)) continue
-          // The node itself might be an article wrapper
-          if (node.dataset.articleId) {
-            io.observe(node)
-          }
-          // Or it might contain article wrappers (e.g. fragment insert)
-          const children = node.querySelectorAll<HTMLElement>('[data-article-id]')
-          children.forEach(child => io.observe(child))
-        }
-      }
-    })
-
-    mo.observe(list, { childList: true, subtree: true })
-    return () => mo.disconnect()
-  }, [isAutoMarkEnabled])
-
-  // Flush remaining batch on unmount or feed/category change
-  useEffect(() => {
-    return () => {
-      if (flushTimerRef.current) {
-        clearTimeout(flushTimerRef.current)
-        flushTimerRef.current = null
-      }
-      flushBatch()
-    }
-  }, [feedId, categoryId, flushBatch])
-
-  // Reset autoReadIds, noFloor, showReadArticles, and keyboard focus when the view changes
-  useEffect(() => {
-    setAutoReadIds(new Set())
     setNoFloor(false)
     setShowReadArticles(false)
     setFocusedItemId(null)
-  }, [feedId, categoryId, location.pathname, setFocusedItemId])
+  }, [viewKey, setFocusedItemId])
 
   return (
     <main ref={listRef} className="max-w-2xl md:max-w-3xl lg:max-w-4xl mx-auto" role={!isGridLayout ? 'listbox' : undefined}>

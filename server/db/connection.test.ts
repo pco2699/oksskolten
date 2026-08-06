@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import { setupTestDb } from '../__tests__/helpers/testDb.js'
-import { bindNamedParams, runNamed, getNamed, allNamed, getDb, runMigrations } from './connection.js'
+import { bindNamedParams, runNamed, getNamed, allNamed, getDb, runMigrations, splitSqlStatements } from './connection.js'
 
 beforeEach(() => {
   setupTestDb()
@@ -115,5 +115,58 @@ describe('duplicate column migration handling', () => {
     expect(() => {
       getDb().exec('ALTER TABLE test_dup ADD COLUMN col1 TEXT')
     }).toThrow(/duplicate column/)
+  })
+})
+
+// --- splitSqlStatements ---
+
+describe('splitSqlStatements', () => {
+  it('splits plain statements on the separator', () => {
+    expect(splitSqlStatements('SELECT 1; SELECT 2;')).toEqual(['SELECT 1', 'SELECT 2'])
+  })
+
+  it('ignores a trailing separator and blank statements', () => {
+    expect(splitSqlStatements('SELECT 1;;\n  \n')).toEqual(['SELECT 1'])
+  })
+
+  it('keeps a semicolon inside a string literal', () => {
+    const sql = "INSERT INTO settings (key, value) VALUES ('a', 'x; y'); SELECT 1;"
+    expect(splitSqlStatements(sql)).toEqual([
+      "INSERT INTO settings (key, value) VALUES ('a', 'x; y')",
+      'SELECT 1',
+    ])
+  })
+
+  it('handles a doubled quote escape inside a literal', () => {
+    const sql = "UPDATE t SET v = 'it''s; fine'; SELECT 1;"
+    expect(splitSqlStatements(sql)).toEqual(["UPDATE t SET v = 'it''s; fine'", 'SELECT 1'])
+  })
+
+  it('keeps a BEGIN … END trigger body as one statement', () => {
+    const sql = `
+      CREATE TRIGGER t AFTER INSERT ON articles
+      BEGIN
+        UPDATE articles SET score = 0 WHERE id = NEW.id;
+        DELETE FROM article_similarities WHERE article_id = NEW.id;
+      END;
+      SELECT 1;
+    `
+    const out = splitSqlStatements(sql)
+    expect(out).toHaveLength(2)
+    expect(out[0]).toContain('CREATE TRIGGER')
+    expect(out[0]).toContain('END')
+    expect(out[1]).toBe('SELECT 1')
+  })
+
+  it('does not split on a semicolon inside a comment', () => {
+    const sql = '-- drop this; really\nSELECT 1;'
+    expect(splitSqlStatements(sql)).toEqual(['-- drop this; really\nSELECT 1'])
+  })
+
+  it('does not treat BEGIN inside an identifier as a block', () => {
+    expect(splitSqlStatements('SELECT beginning FROM t; SELECT 2;')).toEqual([
+      'SELECT beginning FROM t',
+      'SELECT 2',
+    ])
   })
 })

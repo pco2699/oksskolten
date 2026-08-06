@@ -537,6 +537,38 @@ describe('fetchAllFeeds', () => {
     fetchSingleFeed = mod.fetchSingleFeed
   })
 
+  // node-cron fires on schedule regardless of whether the previous sweep
+  // finished, so a slow sweep would otherwise run concurrently with itself.
+  it('joins an in-flight sweep instead of starting a second one', async () => {
+    const feed = seedFeed({ rss_url: 'https://example.com/rss' })
+    const rssXml = rss20Xml('Test', [{ title: 'One', link: 'https://example.com/1' }])
+
+    let rssRequests = 0
+    let releaseRss: (() => void) | null = null
+    const rssGate = new Promise<void>((resolve) => { releaseRss = resolve })
+
+    mockFetch.mockImplementation(async (url: string | URL) => {
+      if (url.toString() === feed.rss_url) {
+        rssRequests++
+        await rssGate
+        return mockResponse(rssXml, { headers: { 'content-type': 'application/rss+xml' } })
+      }
+      return mockResponse(articleHtml())
+    })
+
+    const first = fetchAllFeeds()
+    const second = fetchAllFeeds()
+    expect(second).toBe(first)
+
+    releaseRss!()
+    await Promise.all([first, second])
+
+    expect(rssRequests).toBe(1)
+
+    // Once settled, a later call starts a fresh sweep.
+    expect(fetchAllFeeds()).not.toBe(first)
+  })
+
   it('processes articles from multiple feeds', async () => {
     const feed1 = seedFeed({ name: 'Feed A', url: 'https://a.example.com', rss_url: 'https://a.example.com/rss' })
     const feed2 = seedFeed({ name: 'Feed B', url: 'https://b.example.com', rss_url: 'https://b.example.com/rss' })

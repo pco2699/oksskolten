@@ -34,6 +34,27 @@ function clampLimit(value: number | undefined, fallback: number, max: number): n
   return Math.max(1, Math.min(Math.floor(value), max))
 }
 
+/** Largest id list a single tool call may act on. */
+const MAX_BATCH_IDS = 100
+/** Summarizing costs one LLM call per article, so cap it far lower. */
+const MAX_SUMMARIZE_IDS = 20
+
+/**
+ * Coerce a model-supplied id array into a bounded list of integers.
+ *
+ * Tool arguments come from an LLM, so the array can be absent, the wrong shape,
+ * or arbitrarily long — an uncapped `summarize_articles` call is an uncapped
+ * spend. Returns the accepted ids plus how many were dropped so the tool can
+ * tell the model it was truncated.
+ */
+function clampIdList(value: unknown, max: number): { ids: number[]; dropped: number } {
+  if (!Array.isArray(value)) return { ids: [], dropped: 0 }
+  const valid = value
+    .map(Number)
+    .filter((n) => Number.isInteger(n) && n > 0)
+  return { ids: valid.slice(0, max), dropped: Math.max(0, valid.length - max) }
+}
+
 // --- Neutral tool definition ---
 
 export interface ToolContext {
@@ -212,18 +233,18 @@ const markArticlesAsReadTool: ToolDef = {
   inputSchema: {
     type: 'object',
     properties: {
-      article_ids: { type: 'array', items: { type: 'number' }, description: 'List of article IDs' },
+      article_ids: { type: 'array', items: { type: 'number' }, description: `List of article IDs (max ${MAX_BATCH_IDS} per call)` },
     },
     required: ['article_ids'],
   },
   execute: async (input) => {
-    const ids = input.article_ids as number[]
-    if (!Array.isArray(ids) || ids.length === 0) return JSON.stringify({ success: true, count: 0 })
+    const { ids, dropped } = clampIdList(input.article_ids, MAX_BATCH_IDS)
+    if (ids.length === 0) return JSON.stringify({ success: true, count: 0 })
     let count = 0
     for (const id of ids) {
       if (markArticleSeen(id, true)) count++
     }
-    return JSON.stringify({ success: true, count })
+    return JSON.stringify({ success: true, count, ...(dropped > 0 ? { dropped, note: `Only the first ${MAX_BATCH_IDS} ids were processed. Call again for the rest.` } : {}) })
   },
 }
 
@@ -293,15 +314,16 @@ const summarizeArticlesTool: ToolDef = {
   inputSchema: {
     type: 'object',
     properties: {
-      article_ids: { type: 'array', items: { type: 'number' }, description: 'List of article IDs' },
+      article_ids: { type: 'array', items: { type: 'number' }, description: `List of article IDs (max ${MAX_SUMMARIZE_IDS} per call)` },
     },
     required: ['article_ids'],
   },
   execute: async (input) => {
-    const ids = input.article_ids as number[]
-    if (!Array.isArray(ids) || ids.length === 0) return JSON.stringify([])
+    const { ids, dropped } = clampIdList(input.article_ids, MAX_SUMMARIZE_IDS)
+    if (ids.length === 0) return JSON.stringify([])
 
-    const results: any[] = []
+    type SummaryResult = { id: number; summary?: string; cached?: boolean; error?: string }
+    const results: SummaryResult[] = []
     const CONCURRENCY = 3
     for (let i = 0; i < ids.length; i += CONCURRENCY) {
       const chunk = ids.slice(i, i + CONCURRENCY)
@@ -322,6 +344,9 @@ const summarizeArticlesTool: ToolDef = {
       results.push(...chunkResults)
     }
 
+    if (dropped > 0) {
+      return JSON.stringify({ results, dropped, note: `Only the first ${MAX_SUMMARIZE_IDS} ids were summarized. Call again for the rest.` })
+    }
     return JSON.stringify(results)
   },
 }

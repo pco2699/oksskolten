@@ -9,7 +9,9 @@ import {
   getDb,
 } from '../db.js'
 import { requireJson, getAuthUser } from '../auth.js'
-import { assertSafeUrl } from '../fetcher/ssrf.js'
+import { resolveUserDataPath } from '../paths.js'
+import { PREFERENCE_KEYS, isAllowedPreferenceValue } from '../../shared/preferences.js'
+import { assertSafeUrl, safeFetch } from '../fetcher/ssrf.js'
 import { extractByDotPath } from '../fetcher/article-images.js'
 import { parseOrBadRequest } from '../lib/validation.js'
 
@@ -22,69 +24,9 @@ const ProfileBody = z.object({
 const ProviderParams = z.object({ provider: z.string() })
 const ApiKeyBody = z.object({ apiKey: z.string().optional() })
 
-const PREF_KEYS = [
-  'appearance.color_theme',
-  'reading.date_mode',
-  'reading.auto_mark_read',
-  'reading.unread_indicator',
-  'reading.internal_links',
-  'reading.show_thumbnails',
-  'reading.show_feed_activity',
-  'reading.chat_position',
-  'reading.article_open_mode',
-  'reading.category_unread_only',
-  'reading.keyboard_navigation',
-  'reading.keybindings',
-  'appearance.mascot',
-  'appearance.highlight_theme',
-  'appearance.font_family',
-  'appearance.list_layout',
-  'chat.model',
-  'summary.model',
-  'summary.max_tokens',
-  'summary.reasoning',
-  'translate.model',
-  'translate.max_tokens',
-  'translate.reasoning',
-  'translate.target_lang',
-  'custom_themes',
-  'retention.enabled',
-  'retention.read_days',
-  'retention.unread_days',
-] as const
-type PrefKey = typeof PREF_KEYS[number]
-
-const PREF_ALLOWED: Record<PrefKey, string[] | null> = {
-  'appearance.color_theme': null,
-  'reading.date_mode': ['relative', 'absolute'],
-  'reading.auto_mark_read': ['on', 'off'],
-  'reading.unread_indicator': ['on', 'off'],
-  'reading.internal_links': ['on', 'off'],
-  'reading.show_thumbnails': ['on', 'off'],
-  'reading.show_feed_activity': ['on', 'off'],
-  'reading.chat_position': ['fab', 'inline'],
-  'reading.article_open_mode': ['page', 'overlay'],
-  'reading.category_unread_only': ['on', 'off'],
-  'reading.keyboard_navigation': ['on', 'off'],
-  'reading.keybindings': null,
-  'appearance.mascot': ['off', 'dream-puff', 'sleepy-giant'],
-  'appearance.highlight_theme': null,
-  'appearance.font_family': null,
-  'appearance.list_layout': ['list', 'card', 'magazine', 'compact'],
-  // Model ids are OpenRouter catalog entries, which change constantly — any string is allowed
-  'chat.model': null,
-  'summary.model': null,
-  'summary.max_tokens': null,
-  'summary.reasoning': ['on', 'off'],
-  'translate.model': null,
-  'translate.max_tokens': null,
-  'translate.reasoning': ['on', 'off'],
-  'translate.target_lang': ['ja', 'en', 'zh'],
-  'custom_themes': null,
-  'retention.enabled': ['on', 'off'],
-  'retention.read_days': null,
-  'retention.unread_days': null,
-}
+// Key list and allowed values come from shared/preferences.ts, which the
+// frontend hydration map reads from too.
+const PREF_KEYS = PREFERENCE_KEYS
 
 export async function settingsRoutes(api: FastifyInstance): Promise<void> {
   api.get('/api/settings/profile', async (request, reply) => {
@@ -186,8 +128,7 @@ export async function settingsRoutes(api: FastifyInstance): Promise<void> {
         updated = true
         continue
       }
-      const allowed = PREF_ALLOWED[key]
-      if (allowed && !allowed.includes(value)) {
+      if (!isAllowedPreferenceValue(key, value)) {
         reply.status(400).send({ error: `Invalid value for ${key}` })
         return
       }
@@ -263,8 +204,18 @@ export async function settingsRoutes(api: FastifyInstance): Promise<void> {
       }
       if (body['images.storage_path'] !== undefined) {
         const val = String(body['images.storage_path']).trim()
-        if (val === '') deleteSetting('images.storage_path')
-        else upsertSetting('images.storage_path', val)
+        if (val === '') {
+          deleteSetting('images.storage_path')
+        } else {
+          // Confined to DATA_DIR — this path is joined with a request-supplied
+          // filename by the image read/write endpoints.
+          const resolved = resolveUserDataPath(val)
+          if (!resolved) {
+            reply.status(400).send({ error: 'storage_path must stay inside the data directory' })
+            return
+          }
+          upsertSetting('images.storage_path', resolved)
+        }
       }
       if (body['images.max_size_mb'] !== undefined) {
         const val = String(body['images.max_size_mb']).trim()
@@ -416,7 +367,10 @@ export async function settingsRoutes(api: FastifyInstance): Promise<void> {
       const formData = new FormData()
       formData.append(fieldName, new Blob([png1x1], { type: 'image/png' }), 'test.png')
 
-      const res = await fetch(uploadUrl, {
+      // safeFetch, not fetch: a plain fetch follows redirects automatically, so
+      // an upload endpoint that 302s to a private address would be followed
+      // unchecked — and the configured auth headers sent along with it.
+      const res = await safeFetch(uploadUrl, {
         method: 'POST',
         headers,
         body: formData,
@@ -460,7 +414,8 @@ export async function settingsRoutes(api: FastifyInstance): Promise<void> {
     }
 
     try {
-      const res = await fetch(healthcheckUrl, {
+      // safeFetch re-validates each redirect hop; plain fetch would not.
+      const res = await safeFetch(healthcheckUrl, {
         method: 'GET',
         signal: AbortSignal.timeout(10_000),
       })
@@ -524,23 +479,27 @@ export async function settingsRoutes(api: FastifyInstance): Promise<void> {
   }
 
   api.get('/api/settings/api-keys/:provider', async (request, reply) => {
-    const { provider } = ProviderParams.parse(request.params)
-    const settingKey = PROVIDER_KEY_MAP[provider]
+    const params = parseOrBadRequest(ProviderParams, request.params, reply)
+    if (!params) return
+    const settingKey = PROVIDER_KEY_MAP[params.provider]
     if (!settingKey) {
-      reply.status(400).send({ error: `Unknown provider: ${provider}` })
+      reply.status(400).send({ error: `Unknown provider: ${params.provider}` })
       return
     }
     reply.send({ configured: !!getSetting(settingKey) })
   })
 
   api.post('/api/settings/api-keys/:provider', { preHandler: [requireJson] }, async (request, reply) => {
-    const { provider } = ProviderParams.parse(request.params)
-    const settingKey = PROVIDER_KEY_MAP[provider]
+    const params = parseOrBadRequest(ProviderParams, request.params, reply)
+    if (!params) return
+    const settingKey = PROVIDER_KEY_MAP[params.provider]
     if (!settingKey) {
-      reply.status(400).send({ error: `Unknown provider: ${provider}` })
+      reply.status(400).send({ error: `Unknown provider: ${params.provider}` })
       return
     }
-    const { apiKey } = ApiKeyBody.parse(request.body)
+    const body = parseOrBadRequest(ApiKeyBody, request.body, reply)
+    if (!body) return
+    const { apiKey } = body
     if (!apiKey || apiKey.trim() === '') {
       deleteSetting(settingKey)
       reply.send({ ok: true, configured: false })

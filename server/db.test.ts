@@ -564,8 +564,19 @@ describe('Articles', () => {
     const feed = seedFeed()
     seedArticle(feed.id, { url: 'https://example.com/%E8%A8%98%E4%BA%8B' })
 
+    // Keyed by the caller's string, not the normalized form: the fetcher filters
+    // with `existing.has(item.url)` on the raw feed URL, so returning the
+    // normalized key here would silently never match and re-fetch every tick.
     const existing = getExistingArticleUrls(['https://example.com/記事'])
-    expect(existing.has('https://example.com/%E8%A8%98%E4%BA%8B')).toBe(true)
+    expect(existing.has('https://example.com/記事')).toBe(true)
+  })
+
+  it('getExistingArticleUrls matches a bare origin stored with a trailing slash', () => {
+    const feed = seedFeed()
+    seedArticle(feed.id, { url: 'https://example.com/' })
+
+    const existing = getExistingArticleUrls(['https://example.com'])
+    expect(existing.has('https://example.com')).toBe(true)
   })
 
   it('getExistingArticleUrls with empty array', () => {

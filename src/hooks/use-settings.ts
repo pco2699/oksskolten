@@ -21,37 +21,14 @@ import { DEFAULT_KEY_BINDINGS, type KeyBindings } from './use-keyboard-navigatio
 import type { LayoutName } from '../data/layouts'
 import type { Theme } from '../data/themes'
 import { fetcher, apiPatch, authHeaders } from '../lib/fetcher'
+import { isAllowedPreferenceValue, type PreferenceKey, type Preferences } from '../../shared/preferences'
 
 /** Debounce delay (ms) before syncing settings to backend */
 const SETTINGS_SYNC_DEBOUNCE_MS = 500
 
-interface Prefs {
-  'appearance.color_theme': string | null
-  'reading.date_mode': string | null
-  'reading.auto_mark_read': string | null
-  'reading.unread_indicator': string | null
-  'reading.internal_links': string | null
-  'reading.show_thumbnails': string | null
-  'reading.show_feed_activity': string | null
-  'appearance.highlight_theme': string | null
-  'appearance.font_family': string | null
-  'reading.chat_position': string | null
-  'reading.article_open_mode': string | null
-  'reading.category_unread_only': string | null
-  'appearance.list_layout': string | null
-  'appearance.mascot': string | null
-  'reading.keyboard_navigation': string | null
-  'reading.keybindings': string | null
-  'chat.model': string | null
-  'summary.model': string | null
-  'summary.max_tokens': string | null
-  'summary.reasoning': string | null
-  'translate.model': string | null
-  'translate.max_tokens': string | null
-  'translate.reasoning': string | null
-  'translate.target_lang': string | null
-  'custom_themes': string | null
-}
+// Key set and per-key allowed values come from shared/preferences.ts, which the
+// server validates against — so a key can no longer exist on one side only.
+type Prefs = Preferences
 
 export function useSettings() {
   const { isDark, colorMode, setColorMode } = useDarkMode()
@@ -136,37 +113,27 @@ export function useSettings() {
     const dirty = dirtyKeysRef.current
     const backfill: Partial<Prefs> = {}
 
+    // Each entry says how to apply a stored value locally. Which values are
+    // *valid* is not restated here — it comes from the shared schema the server
+    // validates against, so the two can no longer disagree.
     const hydrationMap: Array<{
-      key: keyof Prefs
+      key: PreferenceKey
       setter: (v: any) => void
       backfillRef?: React.MutableRefObject<string>
-      validate?: (v: string) => boolean
     }> = [
       { key: 'appearance.color_theme', setter: setTheme, backfillRef: themeNameRef },
-      { key: 'reading.date_mode', setter: setDateMode, backfillRef: dateModeRef,
-        validate: v => v === 'relative' || v === 'absolute' },
-      { key: 'reading.auto_mark_read', setter: setAutoMarkRead, backfillRef: autoMarkReadRef,
-        validate: v => v === 'on' || v === 'off' },
-      { key: 'reading.unread_indicator', setter: setShowUnreadIndicator, backfillRef: showUnreadIndicatorRef,
-        validate: v => v === 'on' || v === 'off' },
-      { key: 'reading.internal_links', setter: setInternalLinks, backfillRef: internalLinksRef,
-        validate: v => v === 'on' || v === 'off' },
-      { key: 'reading.show_thumbnails', setter: setShowThumbnails, backfillRef: showThumbnailsRef,
-        validate: v => v === 'on' || v === 'off' },
-      { key: 'reading.show_feed_activity', setter: setShowFeedActivity, backfillRef: showFeedActivityRef,
-        validate: v => v === 'on' || v === 'off' },
-      { key: 'reading.chat_position', setter: setChatPosition, backfillRef: chatPositionRef,
-        validate: v => v === 'fab' || v === 'inline' },
-      { key: 'reading.article_open_mode', setter: setArticleOpenMode, backfillRef: articleOpenModeRef,
-        validate: v => v === 'page' || v === 'overlay' },
-      { key: 'reading.category_unread_only', setter: setCategoryUnreadOnly, backfillRef: categoryUnreadOnlyRef,
-        validate: v => v === 'on' || v === 'off' },
-      { key: 'appearance.list_layout', setter: setLayout, backfillRef: layoutRef,
-        validate: v => v === 'list' || v === 'card' || v === 'magazine' || v === 'compact' },
-      { key: 'appearance.mascot', setter: setMascot, backfillRef: mascotRef,
-        validate: v => v === 'off' || v === 'dream-puff' || v === 'sleepy-giant' },
-      { key: 'reading.keyboard_navigation', setter: setKeyboardNavigation, backfillRef: keyboardNavigationRef,
-        validate: v => v === 'on' || v === 'off' },
+      { key: 'reading.date_mode', setter: setDateMode, backfillRef: dateModeRef },
+      { key: 'reading.auto_mark_read', setter: setAutoMarkRead, backfillRef: autoMarkReadRef },
+      { key: 'reading.unread_indicator', setter: setShowUnreadIndicator, backfillRef: showUnreadIndicatorRef },
+      { key: 'reading.internal_links', setter: setInternalLinks, backfillRef: internalLinksRef },
+      { key: 'reading.show_thumbnails', setter: setShowThumbnails, backfillRef: showThumbnailsRef },
+      { key: 'reading.show_feed_activity', setter: setShowFeedActivity, backfillRef: showFeedActivityRef },
+      { key: 'reading.chat_position', setter: setChatPosition, backfillRef: chatPositionRef },
+      { key: 'reading.article_open_mode', setter: setArticleOpenMode, backfillRef: articleOpenModeRef },
+      { key: 'reading.category_unread_only', setter: setCategoryUnreadOnly, backfillRef: categoryUnreadOnlyRef },
+      { key: 'appearance.list_layout', setter: setLayout, backfillRef: layoutRef },
+      { key: 'appearance.mascot', setter: setMascot, backfillRef: mascotRef },
+      { key: 'reading.keyboard_navigation', setter: setKeyboardNavigation, backfillRef: keyboardNavigationRef },
       { key: 'reading.keybindings', setter: (v: string) => {
         // Backfill fields introduced after this value was stored (e.g. legacy 4-field
         // data from before `toggleRead` was added) so callers always see a full KeyBindings.
@@ -180,17 +147,15 @@ export function useSettings() {
       { key: 'translate.target_lang', setter: setTranslateTargetLangState },
       { key: 'summary.max_tokens', setter: setSummaryMaxTokensState },
       { key: 'translate.max_tokens', setter: setTranslateMaxTokensState },
-      { key: 'summary.reasoning', setter: setSummaryReasoningState,
-        validate: v => v === 'on' || v === 'off' },
-      { key: 'translate.reasoning', setter: setTranslateReasoningState,
-        validate: v => v === 'on' || v === 'off' },
+      { key: 'summary.reasoning', setter: setSummaryReasoningState },
+      { key: 'translate.reasoning', setter: setTranslateReasoningState },
     ]
 
-    for (const { key, setter, backfillRef, validate } of hydrationMap) {
+    for (const { key, setter, backfillRef } of hydrationMap) {
       if (dirty.has(key)) continue
       const value = prefs[key]
       if (value) {
-        if (!validate || validate(value)) setter(value)
+        if (isAllowedPreferenceValue(key, value)) setter(value)
         else if (backfillRef) backfill[key] = backfillRef.current
       } else if (backfillRef) {
         backfill[key] = backfillRef.current

@@ -25,6 +25,7 @@ interface MockObjectStore {
   add: (item: Record<string, unknown>) => { onsuccess: null; onerror: null }
   getAll: () => MockIDBRequest<MockRecord[]>
   clear: () => { onsuccess: null; onerror: null }
+  delete: (id: number) => { onsuccess: null; onerror: null }
 }
 
 interface MockIDBOpenRequest extends MockIDBRequest<MockIDBDatabase> {
@@ -65,6 +66,11 @@ function createMockIndexedDB() {
       },
       clear() {
         stores[storeName] = []
+        return { onsuccess: null, onerror: null }
+      },
+      delete(id: number) {
+        makeStore(storeName)
+        stores[storeName] = stores[storeName].filter(r => r.id !== id)
         return { onsuccess: null, onerror: null }
       },
     }

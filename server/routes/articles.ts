@@ -30,12 +30,12 @@ import { isSearchReady, syncArticleToSearch } from '../search/sync.js'
 import { requireJson } from '../auth.js'
 import { summarizeArticle, translateArticle, streamSummarizeArticle, streamTranslateArticle, fetchArticleContent } from '../fetcher.js'
 import type { AiTextResult } from '../fetcher.js'
-import { archiveArticleImages, isImageArchivingEnabled, deleteArticleImages } from '../fetcher/article-images.js'
+import { archiveArticleImages, isImageArchivingEnabled, deleteArticleImages, getImagesDir } from '../fetcher/article-images.js'
 import { getSetting } from '../db/settings.js'
 import { DEFAULT_LANGUAGE } from '../../shared/lang.js'
+import { MAX_BATCH_SEEN, MAX_CHECK_URLS } from '../../shared/limits.js'
 import path from 'node:path'
 import fs from 'node:fs'
-import { dataPath } from '../paths.js'
 import { NumericIdParams, parseOrBadRequest } from '../lib/validation.js'
 
 function getTranslateTargetLang(): string {
@@ -44,8 +44,6 @@ function getTranslateTargetLang(): string {
 
 const DEFAULT_ARTICLE_LIMIT = 20
 const MAX_ARTICLE_LIMIT = 100
-const MAX_CHECK_URLS = 200
-const MAX_BATCH_SEEN = 100
 const MAX_SEARCH_LIMIT = 50
 
 // Coerce to number, treating NaN as undefined to preserve existing behavior
@@ -68,6 +66,13 @@ const ArticlesQuery = z.object({
   offset: coerceOptionalNumber,
 })
 
+// An unparsable date would reach buildMeiliFilter and become `published_at >= NaN`,
+// which Meilisearch rejects — surfacing to the user as an empty result list
+// rather than a validation error. Reject it up front instead.
+const isoDate = z
+  .string()
+  .refine((v) => !Number.isNaN(Date.parse(v)), { message: 'must be a valid ISO 8601 datetime' })
+
 const SearchQuery = z.object({
   q: z.string().min(1, 'q is required'),
   feed_id: coerceOptionalNumber,
@@ -75,8 +80,8 @@ const SearchQuery = z.object({
   unread: z.string().optional(),
   liked: z.string().optional(),
   bookmarked: z.string().optional(),
-  since: z.string().optional(),
-  until: z.string().optional(),
+  since: isoDate.optional(),
+  until: isoDate.optional(),
   limit: coerceOptionalNumber,
   offset: coerceOptionalNumber,
 })
@@ -146,7 +151,8 @@ interface AiHandlerConfig {
 
 function createAiHandler(config: AiHandlerConfig) {
   return async (request: FastifyRequest, reply: FastifyReply) => {
-    const params = NumericIdParams.parse(request.params)
+    const params = parseOrBadRequest(NumericIdParams, request.params, reply)
+    if (!params) return
     const article = getArticleById(params.id)
     if (!article) {
       reply.status(404).send({ error: 'Article not found' })
@@ -170,7 +176,9 @@ function createAiHandler(config: AiHandlerConfig) {
       return
     }
 
-    const { stream } = StreamQuery.parse(request.query)
+    const streamQuery = parseOrBadRequest(StreamQuery, request.query, reply)
+    if (!streamQuery) return
+    const { stream } = streamQuery
 
     try {
       if (stream === '1') {
@@ -214,7 +222,8 @@ function formatUsage(result: AiTextResult) {
 
 export async function articleRoutes(api: FastifyInstance): Promise<void> {
   api.get('/api/articles', async (request, reply) => {
-    const query = ArticlesQuery.parse(request.query)
+    const query = parseOrBadRequest(ArticlesQuery, request.query, reply)
+    if (!query) return
     const limit = Math.min(Math.max(query.limit || DEFAULT_ARTICLE_LIMIT, 1), MAX_ARTICLE_LIMIT)
     const offset = Math.max(query.offset || 0, 0)
     const feedId = query.feed_id ?? undefined
@@ -279,8 +288,11 @@ export async function articleRoutes(api: FastifyInstance): Promise<void> {
       const hasMore = offset + hits.length < estimatedTotalHits
       reply.send({ articles, has_more: hasMore })
     } catch (err) {
+      // A backend failure is not "no results" — returning 200 with an empty
+      // list made a broken search index indistinguishable from a query that
+      // genuinely matched nothing.
       log.error('Meilisearch query failed:', err)
-      reply.send({ articles: [] })
+      reply.status(503).send({ error: 'Search is temporarily unavailable' })
     }
   })
 
@@ -583,7 +595,9 @@ export async function articleRoutes(api: FastifyInstance): Promise<void> {
   api.get(
     '/api/articles/images/:filename',
     async (request, reply) => {
-      const { filename } = FilenameParams.parse(request.params)
+      const fileParams = parseOrBadRequest(FilenameParams, request.params, reply)
+      if (!fileParams) return
+      const { filename } = fileParams
 
       // Sanitize filename to prevent path traversal
       const sanitized = path.basename(filename)
@@ -592,8 +606,14 @@ export async function articleRoutes(api: FastifyInstance): Promise<void> {
         return
       }
 
-      const storagePath = getSetting('images.storage_path') || dataPath('articles', 'images')
-      const filepath = path.join(storagePath, sanitized)
+      // Shared accessor: confines a user-configured storage path to the
+      // allowed roots, and returns null if the stored value is not permitted.
+      const imagesDir = getImagesDir()
+      if (!imagesDir) {
+        reply.status(404).send({ error: 'Image not found' })
+        return
+      }
+      const filepath = path.join(imagesDir, sanitized)
 
       if (!fs.existsSync(filepath)) {
         reply.status(404).send({ error: 'Image not found' })

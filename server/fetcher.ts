@@ -210,6 +210,76 @@ interface RetryArticle {
 
 type ArticleTask = NewArticle | RetryArticle
 
+/** Result of pulling one feed's RSS and turning it into pending article tasks. */
+type FeedFetchOutcome =
+  | { status: 'tasks'; tasks: NewArticle[] }
+  | { status: 'not-modified' }
+  | { status: 'error' }
+
+/**
+ * Fetch one feed's RSS, update its cache headers / schedule / error state, and
+ * return the articles that are not stored yet.
+ *
+ * Shared by `fetchSingleFeed` (one feed, on demand) and `fetchAllFeeds` (the
+ * cron sweep). These two used to carry independent copies of this logic, which
+ * is how the URL-dedup fix reached one and not the other.
+ */
+async function collectFeedTasks(feed: Feed, opts?: { skipCache?: boolean }): Promise<FeedFetchOutcome> {
+  let rssResult: FetchRssResult
+  try {
+    // Bypass the HTTP cache if this feed still has stale garbage-extracted
+    // articles. RSS XML is often unchanged for old items, so a 304 / cache hit
+    // would skip the refresh path and the broken articles would never get a
+    // chance to be repaired.
+    const skipCache = opts?.skipCache || countStaleArticlesByFeed(feed.id, MIN_EXTRACTED_LENGTH) > 0
+    rssResult = await fetchAndParseRss(feed, { ...opts, skipCache })
+    updateFeedError(feed.id, null)
+    updateFeedCacheHeaders(feed.id, rssResult.etag, rssResult.lastModified, rssResult.contentHash)
+  } catch (err) {
+    if (err instanceof RateLimitError) {
+      log.warn(`Feed ${feed.name}: ${err.message}`)
+      updateFeedRateLimit(feed.id, err.retryAfterSeconds)
+      return { status: 'error' }
+    }
+    const msg = errorMessage(err)
+    log.error(`Feed ${feed.name}: ${msg}`)
+    updateFeedError(feed.id, msg)
+    return { status: 'error' }
+  }
+
+  if (rssResult.notModified) {
+    // Reschedule using the stored interval (or default)
+    const interval = feed.check_interval ?? DEFAULT_INTERVAL
+    updateFeedSchedule(feed.id, sqliteFuture(interval), interval)
+    log.info(`Feed ${feed.name}: not modified (304)`)
+    return { status: 'not-modified' }
+  }
+
+  // Compute and store the adaptive interval
+  const empirical = computeEmpiricalInterval(rssResult.items)
+  const interval = computeInterval(rssResult.httpCacheSeconds, rssResult.rssTtlSeconds, empirical)
+  updateFeedSchedule(feed.id, sqliteFuture(interval), interval)
+
+  const existing = getExistingArticleUrls(rssResult.items.map(i => i.url))
+  refreshStaleArticles(feed.id, rssResult.items)
+
+  const tasks: NewArticle[] = rssResult.items
+    // `existing` is keyed by the URLs passed in above, so raw feed URLs match.
+    .filter(item => !existing.has(item.url))
+    .map(item => ({
+      kind: 'new' as const,
+      feed_id: feed.id,
+      title: item.title,
+      url: item.url,
+      published_at: item.published_at,
+      requires_js_challenge: !!feed.requires_js_challenge,
+      skip_full_text_fetch: !!feed.skip_full_text_fetch,
+      excerpt: item.excerpt,
+    }))
+
+  return { status: 'tasks', tasks }
+}
+
 /** Returns true if the retry article still has an error after processing. */
 async function processArticle(task: ArticleTask): Promise<boolean> {
   const articleUrl = task.kind === 'new' ? task.url : task.article.url
@@ -268,59 +338,9 @@ export async function fetchSingleFeed(
 ): Promise<void> {
   const semaphore = new Semaphore(CONCURRENCY)
 
-  let rssResult: FetchRssResult
-  try {
-    // Bypass HTTP cache if this feed still has stale garbage-extracted
-    // articles. RSS XML is often unchanged for old items, so a 304 / cache
-    // hit would skip the refresh path and the broken articles would never
-    // get a chance to be repaired.
-    const skipCache = opts?.skipCache || countStaleArticlesByFeed(feed.id, MIN_EXTRACTED_LENGTH) > 0
-    rssResult = await fetchAndParseRss(feed, { ...opts, skipCache })
-    updateFeedError(feed.id, null)
-    updateFeedCacheHeaders(feed.id, rssResult.etag, rssResult.lastModified, rssResult.contentHash)
-  } catch (err) {
-    if (err instanceof RateLimitError) {
-      log.warn(`Feed ${feed.name}: ${err.message}`)
-      updateFeedRateLimit(feed.id, err.retryAfterSeconds)
-      return
-    }
-    const msg = errorMessage(err)
-    log.error(`Feed ${feed.name}: ${msg}`)
-    updateFeedError(feed.id, msg)
-    return
-  }
-
-  if (rssResult.notModified) {
-    // Reschedule using stored interval (or default)
-    const interval = feed.check_interval ?? DEFAULT_INTERVAL
-    updateFeedSchedule(feed.id, sqliteFuture(interval), interval)
-    log.info(`Feed ${feed.name}: not modified (304)`)
-    return
-  }
-
-  // Compute and store adaptive interval
-  {
-    const empirical = computeEmpiricalInterval(rssResult.items)
-    const interval = computeInterval(rssResult.httpCacheSeconds, rssResult.rssTtlSeconds, empirical)
-    updateFeedSchedule(feed.id, sqliteFuture(interval), interval)
-  }
-
-  const urls = rssResult.items.map(i => i.url)
-  const existing = getExistingArticleUrls(urls)
-  refreshStaleArticles(feed.id, rssResult.items)
-
-  const tasks: ArticleTask[] = rssResult.items
-    .filter(item => !existing.has(item.url))
-    .map(item => ({
-      kind: 'new' as const,
-      feed_id: feed.id,
-      title: item.title,
-      url: item.url,
-      published_at: item.published_at,
-      requires_js_challenge: !!feed.requires_js_challenge,
-      skip_full_text_fetch: !!feed.skip_full_text_fetch,
-      excerpt: item.excerpt,
-    }))
+  const outcome = await collectFeedTasks(feed, opts)
+  if (outcome.status !== 'tasks') return
+  const tasks = outcome.tasks
 
   if (tasks.length === 0) {
     log.info(`Feed ${feed.name}: no new articles`)
@@ -369,7 +389,31 @@ export async function fetchSingleFeed(
 
 // --- Main entry point ---
 
-export async function fetchAllFeeds(
+/**
+ * In-flight sweep, if any. `node-cron` fires on schedule regardless of whether
+ * the previous run finished, so a sweep that outlives its interval would
+ * otherwise overlap itself — double-fetching feeds and racing on article
+ * inserts. Callers join the running sweep instead of starting a second one.
+ */
+let activeSweep: Promise<void> | null = null
+
+export function isFetchAllRunning(): boolean {
+  return activeSweep !== null
+}
+
+export function fetchAllFeeds(
+  onProgress?: (event: FetchProgressEvent) => void,
+): Promise<void> {
+  if (activeSweep) {
+    log.info('Feed sweep already in progress, joining the running one')
+    return activeSweep
+  }
+  const run = fetchAllFeedsInner(onProgress).finally(() => { activeSweep = null })
+  activeSweep = run
+  return run
+}
+
+async function fetchAllFeedsInner(
   onProgress?: (event: FetchProgressEvent) => void,
 ): Promise<void> {
   const feeds = getEnabledFeeds()
@@ -384,56 +428,14 @@ export async function fetchAllFeeds(
   await Promise.all(
     feeds.map(feed =>
       semaphore.run(async () => {
-        try {
-          const skipCache = countStaleArticlesByFeed(feed.id, MIN_EXTRACTED_LENGTH) > 0
-          const rssResult = await fetchAndParseRss(feed, { skipCache })
-          updateFeedError(feed.id, null)
-          updateFeedCacheHeaders(feed.id, rssResult.etag, rssResult.lastModified, rssResult.contentHash)
-
-          if (rssResult.notModified) {
-            const interval = feed.check_interval ?? DEFAULT_INTERVAL
-            updateFeedSchedule(feed.id, sqliteFuture(interval), interval)
-            log.info(`Feed ${feed.name}: not modified (304)`)
-            feedNewCounts.set(feed.id, 0)
-            return
-          }
-
-          // Compute and store adaptive interval
-          {
-            const empirical = computeEmpiricalInterval(rssResult.items)
-            const interval = computeInterval(rssResult.httpCacheSeconds, rssResult.rssTtlSeconds, empirical)
-            updateFeedSchedule(feed.id, sqliteFuture(interval), interval)
-          }
-
-          const urls = rssResult.items.map(i => i.url)
-          const existing = getExistingArticleUrls(urls)
-          refreshStaleArticles(feed.id, rssResult.items)
-
-          const newItems: ArticleTask[] = rssResult.items
-            .filter(item => !existing.has(item.url))
-            .map(item => ({
-              kind: 'new' as const,
-              feed_id: feed.id,
-              title: item.title,
-              url: item.url,
-              published_at: item.published_at,
-              requires_js_challenge: !!feed.requires_js_challenge,
-              skip_full_text_fetch: !!feed.skip_full_text_fetch,
-              excerpt: item.excerpt,
-            }))
-
-          allTasks.push(...newItems)
-          feedNewCounts.set(feed.id, newItems.length)
-        } catch (err) {
-          if (err instanceof RateLimitError) {
-            log.warn(`Feed ${feed.name}: ${err.message}`)
-            updateFeedRateLimit(feed.id, err.retryAfterSeconds)
-            return
-          }
-          const msg = errorMessage(err)
-          log.error(`Feed ${feed.name}: ${msg}`)
-          updateFeedError(feed.id, msg)
+        const outcome = await collectFeedTasks(feed)
+        if (outcome.status === 'not-modified') {
+          feedNewCounts.set(feed.id, 0)
+          return
         }
+        if (outcome.status === 'error') return
+        allTasks.push(...outcome.tasks)
+        feedNewCounts.set(feed.id, outcome.tasks.length)
       }),
     ),
   )

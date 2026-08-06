@@ -7,7 +7,7 @@ import jwt from '@fastify/jwt'
 import rateLimit from '@fastify/rate-limit'
 import multipart from '@fastify/multipart'
 import cron, { type ScheduledTask } from 'node-cron'
-import { runMigrations, getSetting, upsertSetting, getOrCreateJwtSecret, ensureClipFeed, recalculateScores, purgeExpiredArticles, shrinkMemory } from './db.js'
+import { runMigrations, runDataMigration, backfillNormalizedArticleUrls, getSetting, upsertSetting, getOrCreateJwtSecret, ensureClipFeed, recalculateScores, purgeExpiredArticles, shrinkMemory } from './db.js'
 import { logger } from './logger.js'
 import { findProjectRoot } from './paths.js'
 
@@ -33,6 +33,10 @@ const projectRoot = findProjectRoot(__dirname)
 
 // --- Migrations ---
 runMigrations()
+
+// Repair article URLs written before `insertArticle` normalized them. Needs the
+// WHATWG URL parser, so it cannot live in a .sql file.
+runDataMigration('0012_normalize_article_urls', () => { backfillNormalizedArticleUrls() })
 
 // --- Ensure virtual feed for clipped articles exists ---
 ensureClipFeed()

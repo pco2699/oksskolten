@@ -52,6 +52,23 @@ export function deleteApiKey(id: number): boolean {
   return result.changes > 0
 }
 
+/**
+ * How stale `last_used_at` may get before it is written again.
+ *
+ * This column is displayed in Settings, so minute-level accuracy is plenty —
+ * and it is on the hot path of every authenticated API request, where a
+ * synchronous SQLite write per request is real overhead.
+ */
+const LAST_USED_WRITE_INTERVAL_MS = 60_000
+
+/** id → epoch ms of the last `last_used_at` write. */
+const lastUsedWrites = new Map<number, number>()
+
+/** @internal Test-only helper to clear the last_used_at throttle. */
+export function _resetLastUsedThrottle(): void {
+  lastUsedWrites.clear()
+}
+
 export function validateApiKey(key: string): { id: number; scopes: string } | null {
   const keyHash = hashKey(key)
   const row = getDb()
@@ -60,10 +77,14 @@ export function validateApiKey(key: string): { id: number; scopes: string } | nu
 
   if (!row) return null
 
-  // Update last_used_at (fire-and-forget)
-  getDb()
-    .prepare("UPDATE api_keys SET last_used_at = datetime('now') WHERE id = ?")
-    .run(row.id)
+  const now = Date.now()
+  const lastWrite = lastUsedWrites.get(row.id) ?? 0
+  if (now - lastWrite >= LAST_USED_WRITE_INTERVAL_MS) {
+    lastUsedWrites.set(row.id, now)
+    getDb()
+      .prepare("UPDATE api_keys SET last_used_at = datetime('now') WHERE id = ?")
+      .run(row.id)
+  }
 
   return { id: row.id, scopes: row.scopes }
 }

@@ -6,14 +6,30 @@ import { USER_AGENT } from './http.js'
 import { getSetting } from '../db/settings.js'
 import { updateArticleContent, markImagesArchived, clearImagesArchived } from '../db/articles.js'
 import { logger } from '../logger.js'
-import { dataPath } from '../paths.js'
+import { dataPath, resolveUserDataPath } from '../paths.js'
 
 const log = logger.child('fetcher')
 
-// Default images directory, can be overridden by settings
-function getImagesDir(): string {
+/**
+ * Images directory, overridable via the `images.storage_path` setting.
+ *
+ * Returns null when a custom path is configured but not permitted — the
+ * override is re-checked on read as well as on write, so a value stored before
+ * that validation existed cannot reach outside the allowed roots.
+ *
+ * Null rather than a fallback on purpose: silently redirecting to the default
+ * directory would point reads, writes and *deletes* at a store the operator did
+ * not name. A misconfigured path should do nothing, not something else.
+ */
+export function getImagesDir(): string | null {
   const custom = getSetting('images.storage_path')
-  return custom || dataPath('articles', 'images')
+  if (!custom) return dataPath('articles', 'images')
+  const confined = resolveUserDataPath(custom)
+  if (!confined) {
+    log.warn(`images.storage_path is outside the allowed storage roots, ignoring: ${custom}`)
+    return null
+  }
+  return confined
 }
 
 function getMaxSizeBytes(): number {
@@ -136,9 +152,14 @@ export async function archiveArticleImages(
     return { rewrittenText: fullText, downloaded: 0, errors: 0 }
   }
 
+  const localDir = isRemoteMode ? null : getImagesDir()
   if (!isRemoteMode) {
-    const imagesDir = getImagesDir()
-    fs.mkdirSync(imagesDir, { recursive: true })
+    if (!localDir) {
+      log.error('Image archiving skipped: images.storage_path is not an allowed directory')
+      clearImagesArchived(articleId)
+      return { rewrittenText: fullText, downloaded: 0, errors: 0 }
+    }
+    fs.mkdirSync(localDir, { recursive: true })
   }
 
   // Match markdown images: ![alt](url)
@@ -191,9 +212,8 @@ export async function archiveArticleImages(
         }
         // If upload fails, keep original URL
       } else {
-        // Local mode
-        const imagesDir = getImagesDir()
-        const filepath = path.join(imagesDir, filename)
+        // Local mode — localDir is non-null here (checked above).
+        const filepath = path.join(localDir!, filename)
         fs.writeFileSync(filepath, buffer)
         downloaded++
         const localUrl = `/api/articles/images/${filename}`
@@ -223,7 +243,7 @@ export async function archiveArticleImages(
  */
 export function deleteArticleImages(articleId: number): number {
   const imagesDir = getImagesDir()
-  if (!fs.existsSync(imagesDir)) return 0
+  if (!imagesDir || !fs.existsSync(imagesDir)) return 0
 
   const prefix = `${articleId}_`
   const files = fs.readdirSync(imagesDir).filter(f => f.startsWith(prefix))

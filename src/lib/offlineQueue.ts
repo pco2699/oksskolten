@@ -1,3 +1,5 @@
+import { MAX_BATCH_SEEN, chunk } from '../../shared/limits'
+
 const DB_NAME = 'reader-offline'
 const STORE_NAME = 'read-queue'
 const DB_VERSION = 1
@@ -54,23 +56,35 @@ async function doFlush(): Promise<void> {
 
   if (items.length === 0) return
 
-  const ids = [...new Set(items.map(i => i.articleId))]
-
-  // Attempt to send to server
   const { authHeaders } = await import('./fetcher')
-  const res = await fetch('/api/articles/batch-seen', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...authHeaders() },
-    body: JSON.stringify({ ids }),
-  })
 
-  if (!res.ok) throw new Error('flush failed')
+  // Send in server-sized batches. A single oversized request used to 400 on
+  // every attempt, so the queue never drained and everything queued behind it
+  // was stranded too.
+  const sent: number[] = []
+  let failed = false
+  for (const batch of chunk(items, MAX_BATCH_SEEN)) {
+    const ids = [...new Set(batch.map(i => i.articleId))]
+    const res = await fetch('/api/articles/batch-seen', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...authHeaders() },
+      body: JSON.stringify({ ids }),
+    })
+    if (!res.ok) { failed = true; break }
+    sent.push(...batch.map(i => i.id))
+  }
 
-  // Clear the queue on success
-  const tx = db.transaction(STORE_NAME, 'readwrite')
-  tx.objectStore(STORE_NAME).clear()
-  await new Promise<void>((resolve, reject) => {
-    tx.oncomplete = () => resolve()
-    tx.onerror = () => reject(tx.error)
-  })
+  // Delete only what was acknowledged — clearing the whole store would drop
+  // items queued while this flush was in flight.
+  if (sent.length > 0) {
+    const tx = db.transaction(STORE_NAME, 'readwrite')
+    const store = tx.objectStore(STORE_NAME)
+    for (const id of sent) store.delete(id)
+    await new Promise<void>((resolve, reject) => {
+      tx.oncomplete = () => resolve()
+      tx.onerror = () => reject(tx.error)
+    })
+  }
+
+  if (failed) throw new Error('flush failed')
 }

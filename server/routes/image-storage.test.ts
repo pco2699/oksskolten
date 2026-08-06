@@ -1,7 +1,9 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
+import path from 'node:path'
 import { setupTestDb } from '../__tests__/helpers/testDb.js'
 import { buildApp } from '../__tests__/helpers/buildApp.js'
 import { upsertSetting, getSetting } from '../db.js'
+import { DATA_DIR } from '../paths.js'
 import type { FastifyInstance } from 'fastify'
 
 // ---------------------------------------------------------------------------
@@ -74,7 +76,7 @@ describe('GET /api/settings/image-storage', () => {
       headers: json,
       payload: {
         'images.enabled': '1',
-        'images.storage_path': '/tmp/images',
+        'images.storage_path': 'images',
         'images.max_size_mb': '20',
       },
     })
@@ -87,7 +89,8 @@ describe('GET /api/settings/image-storage', () => {
     expect(res.statusCode).toBe(200)
     const body = res.json()
     expect(body['images.enabled']).toBe('1')
-    expect(body['images.storage_path']).toBe('/tmp/images')
+    // Stored resolved against DATA_DIR.
+    expect(body['images.storage_path']).toBe(path.join(DATA_DIR, 'images'))
     expect(body['images.max_size_mb']).toBe('20')
   })
 })
@@ -115,11 +118,29 @@ describe('PATCH /api/settings/image-storage', () => {
       method: 'PATCH',
       url: '/api/settings/image-storage',
       headers: json,
-      payload: { 'images.storage_path': '/custom/path' },
+      payload: { 'images.storage_path': 'custom/path' },
     })
 
     expect(res.statusCode).toBe(200)
-    expect(res.json()['images.storage_path']).toBe('/custom/path')
+    expect(res.json()['images.storage_path']).toBe(path.join(DATA_DIR, 'custom/path'))
+  })
+
+  // The storage path is joined with a request-supplied filename by the image
+  // endpoints, so an unconstrained value is arbitrary host file access.
+  it.each([
+    ['/etc', 'absolute path outside the data dir'],
+    ['../../etc', 'traversal out of the data dir'],
+  ])('rejects images.storage_path %s (%s)', async (storagePath) => {
+    const res = await app.inject({
+      method: 'PATCH',
+      url: '/api/settings/image-storage',
+      headers: json,
+      payload: { 'images.storage_path': storagePath },
+    })
+
+    expect(res.statusCode).toBe(400)
+    expect(res.json().error).toMatch(/data directory/)
+    expect(getSetting('images.storage_path')).toBeUndefined()
   })
 
   it('validates images.max_size_mb range (1-100)', async () => {

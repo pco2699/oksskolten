@@ -14,6 +14,9 @@ import {
   recalculateScores,
   getRetryArticles,
   getRetryStats,
+  getArticleByUrl,
+  getExistingArticleUrls,
+  backfillNormalizedArticleUrls,
 } from '../db.js'
 import { createFeed, createCategory, getDb } from '../db.js'
 
@@ -899,5 +902,83 @@ describe('getRetryStats', () => {
     expect(stats.eligible).toBe(1)
     expect(stats.backoff_waiting).toBe(1)
     expect(stats.exceeded).toBe(1)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// URL normalization
+// ---------------------------------------------------------------------------
+
+describe('article URL normalization', () => {
+  it('stores URLs in normalized form so lookups find them again', () => {
+    const feed = seedFeed()
+    const id = insertArticle({
+      feed_id: feed.id,
+      title: 'Bare origin',
+      url: 'https://example.com',
+      published_at: '2025-01-01T00:00:00Z',
+    })
+
+    // new URL().href appends the root slash; the row must be findable by the
+    // URL the client reconstructs from the article path.
+    const row = getDb().prepare('SELECT url FROM articles WHERE id = ?').get(id) as { url: string }
+    expect(row.url).toBe('https://example.com/')
+    expect(getArticleByUrl('https://example.com')?.id).toBe(id)
+  })
+
+  it('makes a raw-Unicode URL retrievable after insert', () => {
+    const feed = seedFeed()
+    const id = insertArticle({
+      feed_id: feed.id,
+      title: 'Unicode path',
+      url: 'https://example.com/記事',
+      published_at: '2025-01-01T00:00:00Z',
+    })
+
+    expect(getArticleByUrl('https://example.com/記事')?.id).toBe(id)
+    expect(getExistingArticleUrls(['https://example.com/記事']).has('https://example.com/記事')).toBe(true)
+  })
+})
+
+describe('backfillNormalizedArticleUrls', () => {
+  /** Insert bypassing insertArticle, to simulate rows written before normalization. */
+  function insertRaw(feedId: number, url: string, title = 'Legacy'): number {
+    const info = getDb()
+      .prepare('INSERT INTO articles (feed_id, title, url, published_at) VALUES (?, ?, ?, ?)')
+      .run(feedId, title, url, '2025-01-01T00:00:00Z')
+    return info.lastInsertRowid as number
+  }
+
+  it('rewrites legacy rows to their normalized form', () => {
+    const feed = seedFeed()
+    const id = insertRaw(feed.id, 'https://example.com/記事')
+
+    expect(getArticleByUrl('https://example.com/記事')).toBeUndefined()
+
+    const result = backfillNormalizedArticleUrls()
+
+    expect(result.updated).toBe(1)
+    expect(result.deduped).toBe(0)
+    expect(getArticleByUrl('https://example.com/記事')?.id).toBe(id)
+  })
+
+  it('collapses rows that normalize to the same URL, keeping the lower id', () => {
+    const feed = seedFeed()
+    const keep = insertRaw(feed.id, 'https://example.com/%E8%A8%98%E4%BA%8B', 'Original')
+    const dupe = insertRaw(feed.id, 'https://example.com/記事', 'Duplicate')
+
+    const result = backfillNormalizedArticleUrls()
+
+    expect(result.deduped).toBe(1)
+    expect(getArticleById(dupe)).toBeUndefined()
+    expect(getArticleById(keep)?.title).toBe('Original')
+  })
+
+  it('is a no-op when every URL is already normalized', () => {
+    const feed = seedFeed()
+    seedArticle(feed.id, { url: 'https://example.com/a' })
+    seedArticle(feed.id, { url: 'https://example.com/b' })
+
+    expect(backfillNormalizedArticleUrls()).toEqual({ updated: 0, deduped: 0 })
   })
 })
