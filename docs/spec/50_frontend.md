@@ -95,6 +95,21 @@ Pull-to-refresh calls `startFeedFetch(feedId)` on individual feed pages to fetch
 Revalidating `/api/feeds` only works while something is subscribed to that key. On the article **page** route the sidebar is unmounted, so a read marked from there has no revalidator to run and the cached counts would stay stale (the global config sets `revalidateIfStale: false`). Two things cover that: `adjustFeedUnread()` in `src/lib/feedCounts.ts` writes the ±1 straight into the cached feed list, and `FeedList` subscribes with `revalidateOnMount: true` so the server value is refetched as soon as the sidebar comes back.
 
 
+### Sidebar Feed Filtering
+
+The sidebar feed list can hide feeds that have nothing left to read.
+
+| Item | Detail |
+|---|---|
+| Preference | `reading.hide_zero_unread_feeds` (on/off, **default: on**), editable in Settings → Reading |
+| Effect when on | A feed whose `unread_count` is 0 is not rendered in the sidebar feed list |
+| Exception — selected feed | The feed matching the `/feeds/:feedId` route stays visible even at 0 unread, so reading the last unread article does not pull the entry out from under the reader. It drops out on the next navigation |
+| Exception — disabled feeds | Disabled feeds always stay visible; they carry no unread count and hiding them would leave no way to re-enable or delete them |
+| Categories | Category rows are never hidden, even when all of their feeds are. They stay navigable and remain valid drag-and-drop targets |
+| Unaffected | Unread totals (All badge, category badges), category actions (Fetch, Mark All Read), drag and drop, multi-select and bulk actions all still operate on the full feed list — fetching a category must reach the fully-read feeds too. The clip feed nav entry is looked up in the unfiltered list |
+
+The filter is pure and lives in `src/lib/feedVisibility.ts` (`isFeedVisible` / `filterVisibleFeeds`). `FeedList` groups the complete feed list by category first and hands that grouping to `useFeedActions`, then narrows a second copy for rendering only.
+
 ### Feed Metrics
 
 Displays update frequency and activity level for feeds.

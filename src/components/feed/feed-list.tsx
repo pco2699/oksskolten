@@ -26,6 +26,7 @@ import { CommandPalette } from '../command-palette'
 import { useGlobalShortcuts } from '../../hooks/use-global-shortcuts'
 import { useAppLayout } from '../../app'
 import { extractDomain } from '../../lib/url'
+import { filterVisibleFeeds } from '../../lib/feedVisibility'
 import type { FeedWithCounts, Category } from '../../../shared/types'
 
 function isFeedInactive(feed: FeedWithCounts): boolean {
@@ -115,7 +116,14 @@ export function FeedList({ isOpen, onClose, onBackdropClose, onCollapse, onMarkA
 
   const clipFeedId = useClipFeedId()
 
-  // Group feeds by category (exclude clip feed from regular list)
+  const { settings } = useAppLayout()
+  const showFeedActivity = settings.showFeedActivity
+  const hideZeroUnread = settings.hideZeroUnreadFeeds === 'on'
+
+  // Group feeds by category (exclude clip feed from regular list).
+  // This grouping stays complete: category actions (fetch, mark all read) and
+  // the category badges must cover every feed, including the ones the sidebar
+  // filter hides.
   const { categorized, uncategorized, clipFeedData } = useMemo(() => {
     const catMap = new Map<number, FeedWithCounts[]>()
     const uncat: FeedWithCounts[] = []
@@ -136,16 +144,31 @@ export function FeedList({ isOpen, onClose, onBackdropClose, onCollapse, onMarkA
     return { categorized: catMap, uncategorized: uncat, clipFeedData: clip }
   }, [feeds])
 
+  // The same grouping narrowed to what the list actually renders. Feeds with
+  // nothing left to read drop out while the setting is on; everything else
+  // (unread totals, drag and drop, bulk and category actions) keeps working off
+  // the complete grouping above.
+  const { visibleCategorized, visibleUncategorized } = useMemo(() => {
+    if (!hideZeroUnread) return { visibleCategorized: categorized, visibleUncategorized: uncategorized }
+    const options = { hideZeroUnread, selectedFeedId }
+    const catMap = new Map<number, FeedWithCounts[]>()
+    for (const [catId, catFeeds] of categorized) catMap.set(catId, filterVisibleFeeds(catFeeds, options))
+    return {
+      visibleCategorized: catMap,
+      visibleUncategorized: filterVisibleFeeds(uncategorized, options),
+    }
+  }, [categorized, uncategorized, hideZeroUnread, selectedFeedId])
+
   // Flat ordered list of feed IDs matching render order (for shift-click range selection)
   const orderedFeedIds = useMemo(() => {
     const ids: number[] = []
     for (const cat of categories) {
-      const catFeeds = categorized.get(cat.id) ?? []
+      const catFeeds = visibleCategorized.get(cat.id) ?? []
       for (const f of catFeeds) ids.push(f.id)
     }
-    for (const f of uncategorized) ids.push(f.id)
+    for (const f of visibleUncategorized) ids.push(f.id)
     return ids
-  }, [categories, categorized, uncategorized])
+  }, [categories, visibleCategorized, visibleUncategorized])
 
   const {
     selectedFeedIds: multiSelectedIds,
@@ -214,9 +237,6 @@ export function FeedList({ isOpen, onClose, onBackdropClose, onCollapse, onMarkA
       if (feedId && ids.includes(Number(feedId))) void navigate('/all')
     },
   })
-
-  const { settings } = useAppLayout()
-  const showFeedActivity = settings.showFeedActivity
 
   const totalUnread = feeds.reduce((sum, f) => sum + (f.disabled || f.type === 'clip' ? 0 : f.unread_count), 0)
 
@@ -453,7 +473,7 @@ export function FeedList({ isOpen, onClose, onBackdropClose, onCollapse, onMarkA
             })()}
           </button>
         </CategoryContextMenu>
-        {!isCollapsed && categoryFeeds.map(feed => renderFeedItem(feed, true))}
+        {!isCollapsed && (visibleCategorized.get(category.id) ?? []).map(feed => renderFeedItem(feed, true))}
       </div>
     )
   }
@@ -522,8 +542,8 @@ export function FeedList({ isOpen, onClose, onBackdropClose, onCollapse, onMarkA
             onDrop={e => handleDrop(e, null)}
             className={`rounded-lg transition-colors ${dragOverTarget === 'uncategorized' ? 'bg-hover-sidebar' : ''}`}
           >
-            {feedsData && uncategorized.length > 0
-              ? uncategorized.map(feed => renderFeedItem(feed))
+            {feedsData && visibleUncategorized.length > 0
+              ? visibleUncategorized.map(feed => renderFeedItem(feed))
               : isDragging && (
                 <div className="px-2 py-2 text-xs text-muted text-center border border-dashed border-border rounded-lg mx-2 my-1">
                   {t('category.uncategorized')}

@@ -23,6 +23,7 @@ export const PREFERENCE_SCHEMA = {
   'reading.chat_position': ['fab', 'inline'],
   'reading.article_open_mode': ['page', 'overlay'],
   'reading.category_unread_only': ['on', 'off'],
+  'reading.hide_zero_unread_feeds': ['on', 'off'],
   'reading.keyboard_navigation': ['on', 'off'],
   'reading.keybindings': null,
   // Model ids are OpenRouter catalog entries, which change constantly.
