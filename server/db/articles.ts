@@ -627,10 +627,10 @@ export function backfillNormalizedArticleUrls(): { updated: number; deduped: num
   if (toUpdate.length === 0 && toDelete.length === 0) return { updated: 0, deduped: 0 }
 
   getDb().transaction(() => {
-    const update = getDb().prepare('UPDATE articles SET url = ? WHERE id = ?')
-    for (const row of toUpdate) update.run(row.url, row.id)
     const del = getDb().prepare('DELETE FROM articles WHERE id = ?')
     for (const id of toDelete) del.run(id)
+    const update = getDb().prepare('UPDATE articles SET url = ? WHERE id = ?')
+    for (const row of toUpdate) update.run(row.url, row.id)
   })()
 
   // Duplicates are gone from SQLite but still indexed; drop them from search too.
