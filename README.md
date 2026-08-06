@@ -64,6 +64,7 @@ Because Oksskolten always has the complete text, AI summarization and translatio
 - **PWA** — Offline reading, background sync, and add-to-home-screen support
 - **Multi-Auth** — Password, Passkey (WebAuthn), and GitHub OAuth — each independently configurable
 - **Smart Feed Management** — Auto-discovery, CSS selector-based feeds (via RSS Bridge), bot bypass (FlareSolverr), and automatic disabling of dead feeds
+- **Focused Sidebar** — Feeds with no unread articles are hidden from the sidebar by default, so the list is only what is left to read. The feed you are currently reading stays put even after you finish it. Turn it off in Settings → Reading
 - **Article Clipping** — Save any URL as an article, with full content extraction
 - **Theming** — 14 built-in color themes + custom theme import via JSON, 9 article fonts, 8 code highlighting styles
 - **Single Container** — API, SPA, and cron scheduler all run in one Docker container

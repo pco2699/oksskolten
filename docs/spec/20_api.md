@@ -884,6 +884,7 @@ If `account_name` is not set, the auth email address is saved as the initial val
   "reading.internal_links": "off",
   "reading.show_thumbnails": "on",
   "reading.show_feed_activity": "on",
+  "reading.hide_zero_unread_feeds": "on",
   "reading.chat_position": "fab",
   "reading.article_open_mode": "page",
   "appearance.highlight_theme": "github-dark",
@@ -911,6 +912,8 @@ Unset items are `null`.
 | `reading.internal_links` | `"on"` / `"off"` |
 | `reading.show_thumbnails` | `"on"` / `"off"` |
 | `reading.show_feed_activity` | `"on"` / `"off"` |
+| `reading.category_unread_only` | `"on"` / `"off"` (default off) |
+| `reading.hide_zero_unread_feeds` | `"on"` / `"off"` (default on — hides sidebar feeds whose unread count is 0) |
 | `reading.chat_position` | `"fab"` / `"inline"` |
 | `reading.article_open_mode` | `"page"` / `"overlay"` |
 | `appearance.highlight_theme` | Any string (theme name). Empty string to delete |

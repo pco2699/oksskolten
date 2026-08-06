@@ -385,6 +385,14 @@ const dict = {
   },
   'settings.categoryUnreadOnlyOn': { ja: 'オン', en: 'On', zh: '开'},
   'settings.categoryUnreadOnlyOff': { ja: 'オフ', en: 'Off', zh: '关'},
+  'settings.hideZeroUnreadFeeds': { ja: '未読ゼロのフィードを隠す', en: 'Hide Feeds With No Unread', zh: '隐藏无未读的订阅源'},
+  'settings.hideZeroUnreadFeedsDesc': {
+    ja: 'サイドバーのフィード一覧から未読が 0 件のフィードを隠します。表示中のフィードと無効化されたフィードは常に表示されます',
+    en: 'Hide feeds with zero unread articles from the sidebar feed list. The feed you are reading and disabled feeds always stay visible',
+    zh: '在侧边栏订阅源列表中隐藏未读数为 0 的订阅源。当前正在阅读的订阅源和已停用的订阅源始终可见'
+  },
+  'settings.hideZeroUnreadFeedsOn': { ja: 'オン', en: 'On', zh: '开'},
+  'settings.hideZeroUnreadFeedsOff': { ja: 'オフ', en: 'Off', zh: '关'},
 
   // Language
   'settings.language': { ja: '言語', en: 'Language', zh: '语言'},

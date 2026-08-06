@@ -111,6 +111,10 @@ const mockSettings = {
   setShowThumbnails: vi.fn(),
   showFeedActivity: 'on' as 'on' | 'off',
   setShowFeedActivity: vi.fn(),
+  // Off in the shared mock so the existing cases keep exercising the unfiltered
+  // list; the tests below flip it on explicitly.
+  hideZeroUnreadFeeds: 'off' as 'on' | 'off',
+  setHideZeroUnreadFeeds: vi.fn(),
   highlightTheme: 'github-dark' as const,
   setHighlightTheme: vi.fn(),
   articleFont: 'sans' as const,
@@ -460,5 +464,96 @@ describe('FeedList', () => {
     // The clip feed unread badge should show 3
     const clipsButton = screen.getByText('Clips').closest('button')!
     expect(clipsButton.textContent).toContain('3')
+  })
+
+  describe('hideZeroUnreadFeeds', () => {
+    function withHideOn(fn: () => void) {
+      const original = mockSettings.hideZeroUnreadFeeds
+      mockSettings.hideZeroUnreadFeeds = 'on'
+      try { fn() } finally { mockSettings.hideZeroUnreadFeeds = original }
+    }
+
+    it('hides feeds with zero unread articles when on', () => {
+      withHideOn(() => {
+        const feeds = [
+          makeFeed({ id: 1, name: 'Has Unread', unread_count: 4, category_id: null }),
+          makeFeed({ id: 2, name: 'All Read', unread_count: 0, category_id: null }),
+        ]
+        renderFeedList(
+          {},
+          { feeds, bookmark_count: 0, like_count: 0, clip_feed_id: null },
+          { categories: [] },
+        )
+        expect(screen.getByText('Has Unread')).toBeTruthy()
+        expect(screen.queryByText('All Read')).toBeNull()
+      })
+    })
+
+    it('shows zero-unread feeds when off', () => {
+      const feeds = [makeFeed({ id: 2, name: 'All Read', unread_count: 0, category_id: null })]
+      renderFeedList(
+        {},
+        { feeds, bookmark_count: 0, like_count: 0, clip_feed_id: null },
+        { categories: [] },
+      )
+      expect(screen.getByText('All Read')).toBeTruthy()
+    })
+
+    it('keeps the selected feed visible after its unread count drops to zero', () => {
+      withHideOn(() => {
+        const feeds = [
+          makeFeed({ id: 5, name: 'Reading Now', unread_count: 0, category_id: null }),
+          makeFeed({ id: 6, name: 'Other Read Feed', unread_count: 0, category_id: null }),
+        ]
+        renderFeedList(
+          {},
+          { feeds, bookmark_count: 0, like_count: 0, clip_feed_id: null },
+          { categories: [] },
+          '/feeds/5',
+        )
+        expect(screen.getByText('Reading Now')).toBeTruthy()
+        expect(screen.queryByText('Other Read Feed')).toBeNull()
+      })
+    })
+
+    it('keeps disabled feeds visible so they can be re-enabled', () => {
+      withHideOn(() => {
+        const feeds = [makeFeed({ id: 1, name: 'Broken Feed', disabled: 1, unread_count: 0, category_id: null })]
+        renderFeedList(
+          {},
+          { feeds, bookmark_count: 0, like_count: 0, clip_feed_id: null },
+          { categories: [] },
+        )
+        expect(screen.getByText((_c, el) =>
+          el?.tagName === 'BUTTON' && !!el.textContent?.includes('Broken Feed'),
+        )).toBeTruthy()
+      })
+    })
+
+    it('keeps categories visible even when all their feeds are hidden', () => {
+      withHideOn(() => {
+        const cat = makeCategory({ id: 10, name: 'Tech' })
+        const feeds = [makeFeed({ id: 1, name: 'Read Feed', unread_count: 0, category_id: 10 })]
+        renderFeedList(
+          {},
+          { feeds, bookmark_count: 0, like_count: 0, clip_feed_id: null },
+          { categories: [cat] },
+        )
+        expect(screen.getByText('Tech')).toBeTruthy()
+        expect(screen.queryByText('Read Feed')).toBeNull()
+      })
+    })
+
+    it('keeps the clip feed nav entry regardless of the filter', () => {
+      withHideOn(() => {
+        const feeds = [makeFeed({ id: 99, name: 'Clip Feed', type: 'clip', unread_count: 0 })]
+        renderFeedList(
+          {},
+          { feeds, bookmark_count: 0, like_count: 0, clip_feed_id: 99 },
+          { categories: [] },
+        )
+        expect(screen.getByText('Clips')).toBeTruthy()
+      })
+    })
   })
 })

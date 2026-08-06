@@ -15,6 +15,7 @@ export function ReadingSection() {
     indicatorStyle,
     internalLinks, setInternalLinks,
     categoryUnreadOnly, setCategoryUnreadOnly,
+    hideZeroUnreadFeeds, setHideZeroUnreadFeeds,
     showThumbnails, setShowThumbnails,
     showFeedActivity, setShowFeedActivity,
     chatPosition, setChatPosition,
@@ -378,6 +379,20 @@ export function ReadingSection() {
           ]}
           value={categoryUnreadOnly}
           onChange={setCategoryUnreadOnly}
+        />
+      </div>
+
+      <div className="mt-6">
+        <p className="text-sm text-text mb-1">{t('settings.hideZeroUnreadFeeds')}</p>
+        <p className="text-xs text-muted mb-3">{t('settings.hideZeroUnreadFeedsDesc')}</p>
+        <RadioGroup
+          name="hideZeroUnreadFeeds"
+          options={[
+            { value: 'on' as const, label: t('settings.hideZeroUnreadFeedsOn') },
+            { value: 'off' as const, label: t('settings.hideZeroUnreadFeedsOff') },
+          ]}
+          value={hideZeroUnreadFeeds}
+          onChange={setHideZeroUnreadFeeds}
         />
       </div>
 
