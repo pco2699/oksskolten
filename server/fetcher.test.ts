@@ -2880,3 +2880,98 @@ describe('skip_full_text_fetch', () => {
     expect(requested).toContain('https://example.com/normal')
   })
 })
+
+// ==========================================================================
+// YouTube videos
+// ==========================================================================
+
+describe('fetchSingleFeed — YouTube videos', () => {
+  let fetchSingleFeed: typeof import('./fetcher.js').fetchSingleFeed
+
+  const VIDEO_URL = 'https://www.youtube.com/watch?v=dQw4w9WgXcQ'
+
+  const playerResponse = {
+    playabilityStatus: { status: 'OK' },
+    videoDetails: {
+      title: 'Never Gonna Give You Up',
+      author: 'Rick Astley',
+      shortDescription: 'The official video.',
+      thumbnail: { thumbnails: [{ url: 'https://i.ytimg.com/vi/dQw4w9WgXcQ/maxresdefault.jpg', width: 1280 }] },
+    },
+    captions: {
+      playerCaptionsTracklistRenderer: {
+        captionTracks: [{ baseUrl: 'https://www.youtube.com/api/timedtext?v=dQw4w9WgXcQ', languageCode: 'en' }],
+      },
+    },
+  }
+
+  const transcript = {
+    events: [
+      { tStartMs: 0, segs: [{ utf8: 'We are no strangers to love' }] },
+      { tStartMs: 4000, segs: [{ utf8: 'You know the rules and so do I' }] },
+    ],
+  }
+
+  /** YouTube's channel feed: an Atom entry whose only text is media:description. */
+  function youtubeFeedXml(): string {
+    return `<?xml version="1.0" encoding="UTF-8"?>
+<feed xmlns:media="http://search.yahoo.com/mrss/" xmlns="http://www.w3.org/2005/Atom">
+  <title>Rick Astley</title>
+  <entry>
+    <title>Never Gonna Give You Up</title>
+    <link rel="alternate" href="${VIDEO_URL}" />
+    <published>2025-01-01T00:00:00Z</published>
+    <media:group>
+      <media:title>Never Gonna Give You Up</media:title>
+      <media:description>Description straight from the channel feed.</media:description>
+    </media:group>
+  </entry>
+</feed>`
+  }
+
+  beforeEach(async () => {
+    const mod = await import('./fetcher.js')
+    fetchSingleFeed = mod.fetchSingleFeed
+  })
+
+  it('builds the body from the description and captions instead of scraping', async () => {
+    const feed = seedFeed()
+    const requested: string[] = []
+
+    mockFetch.mockImplementation((url: string | URL) => {
+      const u = url.toString()
+      requested.push(u)
+      if (u === feed.rss_url) return Promise.resolve(mockResponse(youtubeFeedXml(), { headers: { 'content-type': 'application/atom+xml' } }))
+      if (u.includes('/youtubei/v1/player')) return Promise.resolve(mockResponse(JSON.stringify(playerResponse), { headers: { 'content-type': 'application/json' } }))
+      if (u.includes('/api/timedtext')) return Promise.resolve(mockResponse(JSON.stringify(transcript), { headers: { 'content-type': 'application/json' } }))
+      if (u.includes('/oembed')) return Promise.resolve(mockResponse(JSON.stringify({ title: 'Never Gonna Give You Up' }), { headers: { 'content-type': 'application/json' } }))
+      return Promise.resolve(mockResponse('', { status: 404 }))
+    })
+
+    await fetchSingleFeed(feed)
+
+    const article = getArticleByUrl(VIDEO_URL)!
+    expect(article.full_text).toContain('## Description')
+    expect(article.full_text).toContain('The official video.')
+    expect(article.full_text).toContain('## Transcript')
+    expect(article.full_text).toContain('We are no strangers to love')
+    expect(article.og_image).toBe('https://i.ytimg.com/vi/dQw4w9WgXcQ/maxresdefault.jpg')
+    // The watch page is never requested — scraping it is what produced block pages.
+    expect(requested).not.toContain(VIDEO_URL)
+  })
+
+  it('falls back to the feed description when the video APIs are refused', async () => {
+    const feed = seedFeed()
+
+    mockFetch.mockImplementation((url: string | URL) => {
+      const u = url.toString()
+      if (u === feed.rss_url) return Promise.resolve(mockResponse(youtubeFeedXml(), { headers: { 'content-type': 'application/atom+xml' } }))
+      return Promise.resolve(mockResponse('', { status: 403 }))
+    })
+
+    await fetchSingleFeed(feed)
+
+    const article = getArticleByUrl(VIDEO_URL)!
+    expect(article.full_text).toContain('Description straight from the channel feed.')
+  })
+})

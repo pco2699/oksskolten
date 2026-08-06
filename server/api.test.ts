@@ -28,6 +28,11 @@ beforeEach(async () => {
 
 // --- Helpers ---
 
+/** Body long enough to clear the summarizer's minimum-length check. */
+function articleBody(text = 'Long article content.'): string {
+  return text + ' ' + 'The quick brown fox jumps over the lazy dog. '.repeat(10)
+}
+
 function seedFeed(overrides: Partial<Parameters<typeof createFeed>[0]> = {}) {
   return createFeed({
     name: 'Test Feed',
@@ -678,7 +683,7 @@ describe('POST /api/articles/:id/summarize', () => {
   it('returns cached summary when available', async () => {
     const feed = seedFeed()
     const artId = seedArticle(feed.id, {
-      full_text: 'Some article text',
+      full_text: articleBody(),
       summary: 'Cached summary',
     })
 
@@ -717,9 +722,25 @@ describe('POST /api/articles/:id/summarize', () => {
     expect(res.statusCode).toBe(404)
   })
 
+  it('returns 400 with fetch_status when the body is a bot-check page', async () => {
+    const feed = seedFeed()
+    const artId = seedArticle(feed.id, {
+      full_text: articleBody('Our systems have detected unusual traffic from your computer network.'),
+    })
+
+    const res = await app.inject({
+      method: 'POST',
+      url: `/api/articles/${artId}/summarize`,
+      headers: json,
+      payload: {},
+    })
+    expect(res.statusCode).toBe(400)
+    expect(res.json().fetch_status).toBe('bot_check')
+  })
+
   it('generates summary via AI when not cached', async () => {
     const feed = seedFeed()
-    const artId = seedArticle(feed.id, { full_text: 'Long article content' })
+    const artId = seedArticle(feed.id, { full_text: articleBody() })
 
     const res = await app.inject({
       method: 'POST',

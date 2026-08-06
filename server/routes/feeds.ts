@@ -26,7 +26,7 @@ import {
 } from '../db.js'
 import { requireJson } from '../auth.js'
 import { fetchSingleFeed, discoverRssUrl } from '../fetcher.js'
-import { isBotBlockPage } from '../fetcher/content.js'
+import { isBotBlockPage } from '../lib/blocked-body.js'
 import { queryRssBridge, inferCssSelectorBridge } from '../rss-bridge.js'
 import { parseOpml, generateOpml } from '../opml.js'
 import type { ParsedFeed } from '../opml.js'

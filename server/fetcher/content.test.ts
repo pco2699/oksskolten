@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { parseHtml } from './contentWorker.js'
-import { extractAnchoredContentHtml, isBotBlockPage, stripHeavyTags } from './content.js'
+import { extractAnchoredContentHtml, stripHeavyTags } from './content.js'
 import { convertHtmlToMarkdown, markdownToExcerpt } from './markdown-utils.js'
 
 // ---------------------------------------------------------------------------
@@ -387,39 +387,6 @@ describe('stripHeavyTags', () => {
     expect(stripped).not.toContain('Nav')
     expect(stripped).not.toContain('Aside')
     expect(stripped).not.toContain('Footer')
-  })
-})
-
-describe('isBotBlockPage', () => {
-  it.each([
-    'Your submission has been received',
-    'Something went wrong while submitting the form',
-    'Please verify you are a human',
-    'Checking your browser before accessing',
-    'Enable JavaScript and cookies to continue',
-    'Just a moment...',
-    'Attention Required! | Cloudflare',
-    'Access Denied - You do not have permission',
-  ])('detects bot-block pattern: %s', (text) => {
-    expect(isBotBlockPage(text)).toBe(true)
-  })
-
-  it('is case-insensitive', () => {
-    expect(isBotBlockPage('CHECKING YOUR BROWSER')).toBe(true)
-    expect(isBotBlockPage('access DENIED')).toBe(true)
-  })
-
-  it('returns false for normal article text', () => {
-    expect(isBotBlockPage('This is a normal blog post about JavaScript frameworks.')).toBe(false)
-  })
-
-  it('returns false for empty string', () => {
-    expect(isBotBlockPage('')).toBe(false)
-  })
-
-  it('detects pattern embedded in larger HTML text', () => {
-    const html = '<div class="wrapper"><h1>Security Check</h1><p>Please verify you are a human to continue browsing.</p></div>'
-    expect(isBotBlockPage(html)).toBe(true)
   })
 })
 

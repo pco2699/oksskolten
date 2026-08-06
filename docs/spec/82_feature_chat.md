@@ -70,7 +70,7 @@ Tool definitions are managed in a neutral `ToolDef` format in `server/chat/tools
 | Tool Name | Description | Input |
 |---|---|---|
 | `search_articles` | Search articles (Meilisearch full-text search, feed, category, date range, unread/liked/bookmarked) | `{ query?, feed_id?, category_id?, unread?, liked?, bookmarked?, since?, until?, limit? }` |
-| `get_article` | Get article details (including full_text, full_text_ja) | `{ article_id }` |
+| `get_article` | Get article details (including full_text, full_text_ja). Adds `fetch_status` / `fetch_status_detail` when the stored body is a fetch-failure page | `{ article_id }` |
 | `get_similar_articles` | Search for articles similar to a given article via Meilisearch | `{ article_id, limit? }` |
 | `get_user_preferences` | Get user reading preferences (top feeds, categories, recent likes/bookmarks, per-category read rate, ignored feeds) | `{}` |
 | `get_recent_activity` | Get user's recent activity in chronological order (read/liked/bookmarked) | `{ type?, limit? }` |
@@ -81,7 +81,26 @@ Tool definitions are managed in a neutral `ToolDef` format in `server/chat/tools
 | `toggle_like` | Toggle an article's like status | `{ article_id }` |
 | `toggle_bookmark` | Toggle an article's bookmark status | `{ article_id }` |
 | `summarize_article` | Summarize an article (checks cache before execution) | `{ article_id }` |
+| `summarize_articles` | Summarize up to 20 articles (checks cache per article) | `{ article_ids }` |
 | `translate_article` | Translate an article (checks cache before execution) | `{ article_id }` |
+
+#### Refusing fetch-failure pages
+
+A page fetch intercepted by a bot check, a cookie-consent screen, or a login wall still yields extractable prose, and stored in `full_text` it is indistinguishable from an article. Summarizing it produced confident descriptions of pages such as "YouTube's unusual-traffic confirmation screen" — a plausible lie the caller could not tell apart from success.
+
+`summarize_article`, `summarize_articles`, and `translate_article` therefore classify the stored body first (`detectBlockedBody`, `server/lib/blocked-body.ts`) and return an error instead of a summary:
+
+```json
+{ "id": 4550, "error": "Stored body is a bot-check page, not article content", "fetch_status": "bot_check" }
+```
+
+- `fetch_status` is one of `bot_check`, `consent_wall`, `login_wall`, `error_page`, `too_short`.
+- The check runs **before** the cached summary/translation, because anything cached for such an article was generated from the same block page.
+- `too_short` (body under `MIN_EXTRACTED_LENGTH`, 200 chars) applies to summarization only — there is nothing to summarize in a body shorter than the summary, while a short body translates fine.
+- Markers are matched only in the first 2000 characters, so an article that merely quotes a CAPTCHA page is not flagged.
+- `get_article` still returns the body, but labels it with `fetch_status` / `fetch_status_detail` so an agent does not read it as the article.
+
+The same classifier drives the fetch pipeline's bot-block detection, so the fetcher and the tools agree on what counts as a failed fetch.
 
 The MCP server (`server/chat/mcp-server.ts`) starts with stdio transport when executed directly, and is connected to by Claude Code. Tool registration itself lives in `server/chat/mcp-factory.ts`, shared with the HTTP endpoint (`server/routes/mcp.ts`) — both transports expose the exact same tool set.
 

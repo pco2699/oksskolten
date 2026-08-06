@@ -37,6 +37,11 @@ function seedFeed(overrides: Partial<Parameters<typeof createFeed>[0]> = {}) {
   })
 }
 
+/** Body long enough to clear the summarizer's minimum-length check. */
+function articleBody(text = 'Some article text.'): string {
+  return text + ' ' + 'The quick brown fox jumps over the lazy dog. '.repeat(10)
+}
+
 function seedArticle(feedId: number, overrides: Partial<Parameters<typeof insertArticle>[0]> = {}) {
   return insertArticle({
     feed_id: feedId,
@@ -296,10 +301,31 @@ describe('toggle_bookmark', () => {
   })
 })
 
+describe('get_article fetch_status', () => {
+  it('labels a body that is really a bot-check page', async () => {
+    const feed = seedFeed()
+    const id = seedArticle(feed.id, {
+      full_text: articleBody('Sign in to confirm you\u2019re not a bot'),
+    })
+
+    const result = JSON.parse(await executeTool('get_article', { article_id: id }))
+    expect(result.fetch_status).toBe('bot_check')
+    expect(result.fetch_status_detail).toMatch(/not article content/)
+  })
+
+  it('has no fetch_status for a genuine body', async () => {
+    const feed = seedFeed()
+    const id = seedArticle(feed.id, { full_text: articleBody() })
+
+    const result = JSON.parse(await executeTool('get_article', { article_id: id }))
+    expect(result.fetch_status).toBeUndefined()
+  })
+})
+
 describe('summarize_article', () => {
   it('returns cached summary if available', async () => {
     const feed = seedFeed()
-    const id = seedArticle(feed.id, { full_text: 'text', summary: 'Existing summary' })
+    const id = seedArticle(feed.id, { full_text: articleBody(), summary: 'Existing summary' })
 
     const result = JSON.parse(await executeTool('summarize_article', { article_id: id }))
     expect(result.summary).toBe('Existing summary')
@@ -308,7 +334,7 @@ describe('summarize_article', () => {
 
   it('generates summary when not cached', async () => {
     const feed = seedFeed()
-    const id = seedArticle(feed.id, { full_text: 'Some article text' })
+    const id = seedArticle(feed.id, { full_text: articleBody() })
 
     const result = JSON.parse(await executeTool('summarize_article', { article_id: id }))
     expect(result.summary).toBe('Mocked summary')
@@ -325,19 +351,69 @@ describe('summarize_article', () => {
     const result = JSON.parse(await executeTool('summarize_article', { article_id: id }))
     expect(result.error).toBe('No full text available')
   })
+
+  it('refuses to summarize a bot-check page instead of describing it', async () => {
+    const feed = seedFeed()
+    const id = seedArticle(feed.id, {
+      full_text: articleBody('Our systems have detected unusual traffic from your computer network.'),
+    })
+
+    const result = JSON.parse(await executeTool('summarize_article', { article_id: id }))
+    expect(result.summary).toBeUndefined()
+    expect(result.fetch_status).toBe('bot_check')
+    expect(result.error).toMatch(/bot-check page/)
+    // Nothing is persisted, so a later refetch can still produce a real summary
+    expect(getArticleById(id)!.summary).toBeNull()
+  })
+
+  it('refuses a summary that was cached from a bot-check page', async () => {
+    const feed = seedFeed()
+    const id = seedArticle(feed.id, {
+      full_text: articleBody('Before you continue to YouTube'),
+      summary: 'An article about YouTube detecting unusual traffic.',
+    })
+
+    const result = JSON.parse(await executeTool('summarize_article', { article_id: id }))
+    expect(result.summary).toBeUndefined()
+    expect(result.fetch_status).toBe('consent_wall')
+  })
+
+  it('refuses a body too short to summarize', async () => {
+    const feed = seedFeed()
+    const id = seedArticle(feed.id, { full_text: 'Sorry.' })
+
+    const result = JSON.parse(await executeTool('summarize_article', { article_id: id }))
+    expect(result.summary).toBeUndefined()
+    expect(result.fetch_status).toBe('too_short')
+  })
 })
 
 describe('summarize_articles', () => {
   it('returns cached and new summaries', async () => {
     const feed = seedFeed()
-    const id1 = seedArticle(feed.id, { url: 'https://example.com/s1', full_text: 'text 1', summary: 'Cached 1' })
-    const id2 = seedArticle(feed.id, { url: 'https://example.com/s2', full_text: 'text 2' })
+    const id1 = seedArticle(feed.id, { url: 'https://example.com/s1', full_text: articleBody('Text 1.'), summary: 'Cached 1' })
+    const id2 = seedArticle(feed.id, { url: 'https://example.com/s2', full_text: articleBody('Text 2.') })
 
     const result = JSON.parse(await executeTool('summarize_articles', { article_ids: [id1, id2] }))
     expect(result).toHaveLength(2)
     expect(result.find((r: any) => r.id === id1).summary).toBe('Cached 1')
     expect(result.find((r: any) => r.id === id1).cached).toBe(true)
     expect(result.find((r: any) => r.id === id2).summary).toBe('Mocked summary')
+  })
+
+  it('reports blocked articles per id without summarizing them', async () => {
+    const feed = seedFeed()
+    const ok = seedArticle(feed.id, { url: 'https://example.com/ok', full_text: articleBody('Real post.') })
+    const blocked = seedArticle(feed.id, {
+      url: 'https://example.com/blocked',
+      full_text: articleBody('Our systems have detected unusual traffic from your computer network.'),
+    })
+
+    const result = JSON.parse(await executeTool('summarize_articles', { article_ids: [ok, blocked] }))
+    expect(result.find((r: any) => r.id === ok).summary).toBe('Mocked summary')
+    const blockedResult = result.find((r: any) => r.id === blocked)
+    expect(blockedResult.summary).toBeUndefined()
+    expect(blockedResult.fetch_status).toBe('bot_check')
   })
 
   it('handles empty array', async () => {
@@ -347,6 +423,26 @@ describe('summarize_articles', () => {
 })
 
 describe('translate_article', () => {
+  it('refuses to translate a bot-check page', async () => {
+    const feed = seedFeed()
+    const id = seedArticle(feed.id, {
+      full_text: articleBody('Our systems have detected unusual traffic from your computer network.'),
+      lang: 'en',
+    })
+
+    const result = JSON.parse(await executeTool('translate_article', { article_id: id }))
+    expect(result.full_text_translated).toBeUndefined()
+    expect(result.fetch_status).toBe('bot_check')
+  })
+
+  it('translates a short body — no length floor applies', async () => {
+    const feed = seedFeed()
+    const id = seedArticle(feed.id, { full_text: 'Texte court.', lang: 'fr' })
+
+    const result = JSON.parse(await executeTool('translate_article', { article_id: id }))
+    expect(result.full_text_translated).toBe('モック翻訳テキスト')
+  })
+
   it('returns cached translation if available', async () => {
     const feed = seedFeed()
     const id = seedArticle(feed.id, { full_text: 'text', lang: 'en' })

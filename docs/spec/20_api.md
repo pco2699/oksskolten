@@ -552,6 +552,8 @@ Maximum 100 items. Only updates articles where `seen_at IS NULL`.
 
 Returns the cached summary if one already exists. Returns `400` if `full_text` is NULL.
 
+Returns `400` with `{ "error": ..., "fetch_status": ... }` when the stored `full_text` is not article content but the page the fetch actually landed on — a bot check, a cookie-consent screen, a login wall, an error shell, or a body under `MIN_EXTRACTED_LENGTH` (200 chars). Summarizing such a body produces a confident description of the interstitial that the caller cannot tell apart from a real summary, so it is refused instead. `fetch_status` is one of `bot_check`, `consent_wall`, `login_wall`, `error_page`, `too_short`. The check runs **before** the cache, because a summary stored for such an article was generated from the same block page. Detection lives in `server/lib/blocked-body.ts`, shared with the fetch pipeline and the MCP tools.
+
 Query parameter `stream=1` for SSE streaming response:
 
 ```
@@ -572,7 +574,7 @@ Batch response (without `stream` parameter):
 
 Translates the article into the user's configured language (`general.language` setting). Returns the cached translation if `full_text_translated` exists and `translated_lang` matches the current language. If the language setting changes, stale translations are treated as absent and re-translated on next request.
 
-Returns `400` if `full_text` is NULL. Returns `400` if the article is already in the user's language.
+Returns `400` if `full_text` is NULL. Returns `400` if the article is already in the user's language. Returns `400` with `fetch_status` when the stored body is a bot check / consent screen / login wall / error page, as with summarize — the length floor (`too_short`) does **not** apply here, since a short body still translates fine.
 
 Query parameter `stream=1` for SSE streaming response (same format as summarize).
 

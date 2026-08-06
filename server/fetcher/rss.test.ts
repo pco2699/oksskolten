@@ -187,6 +187,55 @@ describe('fetchAndParseRss', () => {
     expect(items[0].url).toBe('https://example.com/atom-1')
   })
 
+  it('reads the YouTube channel feed description out of media:group', async () => {
+    const youtubeXml = `<?xml version="1.0" encoding="UTF-8"?>
+<feed xmlns:media="http://search.yahoo.com/mrss/" xmlns="http://www.w3.org/2005/Atom">
+  <title>Channel</title>
+  <entry>
+    <title>Video title</title>
+    <link rel="alternate" href="https://www.youtube.com/watch?v=dQw4w9WgXcQ" />
+    <published>2025-01-01T00:00:00Z</published>
+    <media:group>
+      <media:description>Everything the channel wrote in the description box.</media:description>
+    </media:group>
+  </entry>
+</feed>`
+
+    mockSafeFetch.mockResolvedValue(mockResponse(youtubeXml))
+
+    const { items } = await fetchAndParseRss({
+      id: 1, name: 'test', url: 'https://www.youtube.com',
+      rss_url: 'https://www.youtube.com/feeds/videos.xml?channel_id=UC38IQsAvIsxxjztdMZQtwHA',
+    } as any)
+
+    // A YouTube entry has no <content> or <summary> — without media:description
+    // it would reach the fetch pipeline with nothing to fall back on.
+    expect(items[0].excerpt).toBe('Everything the channel wrote in the description box.')
+  })
+
+  it('reads media:group descriptions through the fast-xml-parser fallback too', async () => {
+    const youtubeXml = `<?xml version="1.0" encoding="UTF-8"?>
+<feed xmlns:media="http://search.yahoo.com/mrss/" xmlns="http://www.w3.org/2005/Atom">
+  <entry>
+    <title>Video title</title>
+    <link rel="alternate" href="https://www.youtube.com/watch?v=dQw4w9WgXcQ" />
+    <media:group>
+      <media:description>Description via fast-xml-parser.</media:description>
+    </media:group>
+  </entry>
+</feed>`
+
+    feedsmithShouldFail = true
+    mockSafeFetch.mockResolvedValue(mockResponse(youtubeXml))
+
+    const { items } = await fetchAndParseRss({
+      id: 1, name: 'test', url: 'https://www.youtube.com',
+      rss_url: 'https://www.youtube.com/feeds/videos.xml?channel_id=UC38IQsAvIsxxjztdMZQtwHA',
+    } as any)
+
+    expect(items[0].excerpt).toBe('Description via fast-xml-parser.')
+  })
+
   it('falls back to fast-xml-parser when feedsmith fails', async () => {
     const rssXml = `<?xml version="1.0"?>
 <rss version="2.0">
