@@ -1,5 +1,9 @@
 # Changelog
 
+## [v0.5.10](https://github.com/pco2699/oksskolten/compare/v0.5.9...v0.5.10) - 2026-08-07
+### Others
+- Use the median article gap for the adaptive interval, not the mean by @pco2699 in https://github.com/pco2699/oksskolten/pull/27
+
 ## [v0.5.9](https://github.com/pco2699/oksskolten/compare/v0.5.8...v0.5.9) - 2026-08-07
 ### Others
 - Add score distribution baseline measurement for recommendation by @pco2699 in https://github.com/pco2699/oksskolten/pull/22
