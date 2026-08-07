@@ -51,8 +51,8 @@ export const PRE_CLEAN_SELECTORS: string[] = [
   // Hatena Diary entry chrome. Both have to go before Readability rather than in
   // POST_CLEAN_SELECTORS: Readability strips class attributes from its output, so
   // the `footer` partial pattern can no longer see `class="sectionfooter"` by then.
-  '.sectionfooter', // "Permalink | 記事への反応(33) | 14:12"
-  '.sanchor', // "■" marker prefixed to the entry heading
+  '.sectionfooter', // entry footer: permalink, reply count, timestamp
+  '.sanchor', // square marker prefixed to the entry heading (the title itself is kept)
 ]
 
 // ---------------------------------------------------------------------------
