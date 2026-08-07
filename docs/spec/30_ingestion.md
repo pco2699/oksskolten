@@ -20,6 +20,10 @@ Oksskolten **fetches HTML directly from the original URL for every article** and
 
 Cron runs at 5-minute intervals (`*/5 * * * *`) and processes only feeds whose `next_check_at` has passed.
 
+**Scheduler requirements.** A cron expression without a seconds field matches a window exactly one second wide, so the scheduler has to sample that second reliably. node-cron 3 did not: it polled by chaining `setTimeout(check, 1000)`, giving a period of 1000ms *plus* the check and any event-loop lag, with no re-alignment to the wall clock. On the live server that drifted about +0.32s per 5-minute tick, and each time the drift crossed a second boundary the firing was skipped outright — roughly 5-9% of feed sweeps never ran. Its `recoverMissedExecutions` option is not a fix: the one-second lookback re-examines the second that just fired and the guard compares against a millisecond-truncated `lastExecution`, so enabling it makes *every* slot fire twice about a second apart.
+
+node-cron 4 replaced the polling scheduler with one that computes the next boundary from the wall clock; measured firing offsets hold at +0.006–0.015s with no drift and no double firing, and it logs a warning when blocking work does cost a tick. All cron registrations pass `noOverlap: true`, which skips a firing while the previous one is still running — relevant for the feed sweep, which fans out over every feed and has been measured at up to 36 seconds. This is distinct from `activeFetchPromise`, which exists so shutdown can wait for an in-flight sweep before closing the database.
+
 ```
 1. SELECT * FROM feeds WHERE disabled = 0 AND type = 'rss'
      AND (next_check_at IS NULL OR next_check_at <= strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))
