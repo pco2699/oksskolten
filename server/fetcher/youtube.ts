@@ -53,7 +53,12 @@ export interface TranscriptSegment {
 }
 
 export interface YouTubeContent {
-  fullText: string
+  /**
+   * Body built from the description and captions, or null when the video
+   * carries neither. Null is a successful outcome, not a failure — see
+   * `fetchYouTubeContent`.
+   */
+  fullText: string | null
   title: string | null
   ogImage: string | null
   /** Language of the transcript that was used, if any. */
@@ -423,7 +428,16 @@ function transcriptLabel(track: YouTubeCaptionTrack): string {
 
 /**
  * Build an article body for a YouTube video URL.
- * Returns null when neither a description nor captions could be retrieved.
+ *
+ * The two outcomes are deliberately distinguished by whether the InnerTube
+ * player call succeeded, because only it can report a video's text:
+ *
+ * - **null** — the player refused us (bot gate, dead client version) or the
+ *   URL is not a video. What the video contains is unknown, so the caller
+ *   keeps the article retryable.
+ * - **content with `fullText: null`** — the player answered and reported an
+ *   empty description and no caption tracks. That is a final answer; retrying
+ *   only re-asks a question YouTube has already resolved.
  */
 export async function fetchYouTubeContent(
   url: string,
@@ -433,27 +447,41 @@ export async function fetchYouTubeContent(
   if (!videoId) return null
 
   const [player, oembed] = await Promise.all([fetchPlayerMetadata(videoId), fetchOEmbed(videoId)])
-  if (!player && !oembed) return null
+  // The player response is the only source that can say what a video contains.
+  // oEmbed has no description field at all — it answers 200 with a title and a
+  // thumbnail for every public video — so it can never serve as evidence that a
+  // video is textless, only that it exists. Without the player, report a
+  // failure and keep the article retryable rather than concluding "no text"
+  // from a source that could not have told us either way.
+  if (!player) return null
 
   const preferredLanguages = options?.preferredLanguages?.length ? options.preferredLanguages : ['en']
-  const track = pickCaptionTrack(player?.captionTracks ?? [], preferredLanguages)
+  const track = pickCaptionTrack(player.captionTracks, preferredLanguages)
   const segments = track ? await fetchTranscript(track) : []
   const transcript = formatTranscript(segments)
 
-  const description = player?.description ?? null
-  if (!description && !transcript) {
-    log.info(`no description or captions available for ${videoId}`)
-    return null
+  const description = player.description
+  const hasText = !!description || !!transcript
+  if (!hasText) {
+    // The player answered, so this is YouTube's own account of the video: an
+    // empty description box and no caption tracks. Fall through with a null
+    // body so the caller records a completed fetch — the reader shows the
+    // embedded player instead. Title and thumbnail below are still worth
+    // keeping. Reaching here requires a successful player call; a refused one
+    // returned null above.
+    log.info(`video ${videoId} has an empty description and no caption tracks`)
   }
 
   return {
-    fullText: buildYouTubeBody({
-      description,
-      transcript,
-      transcriptLabel: track && transcript ? transcriptLabel(track) : null,
-    }),
-    title: player?.title ?? oembed?.title ?? null,
-    ogImage: player?.thumbnail ?? oembed?.thumbnail ?? `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`,
+    fullText: hasText
+      ? buildYouTubeBody({
+        description,
+        transcript,
+        transcriptLabel: track && transcript ? transcriptLabel(track) : null,
+      })
+      : null,
+    title: player.title ?? oembed?.title ?? null,
+    ogImage: player.thumbnail ?? oembed?.thumbnail ?? `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`,
     transcriptLanguage: track && transcript ? track.languageCode : null,
   }
 }
