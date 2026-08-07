@@ -1,5 +1,11 @@
 # Changelog
 
+## [v0.5.9](https://github.com/pco2699/oksskolten/compare/v0.5.8...v0.5.9) - 2026-08-07
+### Others
+- Add score distribution baseline measurement for recommendation by @pco2699 in https://github.com/pco2699/oksskolten/pull/22
+- Let retries fall back to RSS content, and stop mislabelling blocked YouTube fetches by @pco2699 in https://github.com/pco2699/oksskolten/pull/24
+- Upgrade node-cron to 4.6.0 so scheduled ticks stop being silently dropped by @pco2699 in https://github.com/pco2699/oksskolten/pull/26
+
 ## [v0.5.9](https://github.com/pco2699/oksskolten/compare/v0.5.8...v0.5.9) - 2026-08-06
 ### Others
 - Add score distribution baseline measurement for recommendation by @pco2699 in https://github.com/pco2699/oksskolten/pull/22
