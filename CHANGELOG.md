@@ -1,5 +1,9 @@
 # Changelog
 
+## [v0.5.11](https://github.com/pco2699/oksskolten/compare/v0.5.10...v0.5.11) - 2026-08-07
+### Others
+- Extract the entry body, not the reaction thread, on Hatena anonymous diary by @pco2699 in https://github.com/pco2699/oksskolten/pull/29
+
 ## [v0.5.10](https://github.com/pco2699/oksskolten/compare/v0.5.9...v0.5.10) - 2026-08-07
 ### Others
 - Use the median article gap for the adaptive interval, not the mean by @pco2699 in https://github.com/pco2699/oksskolten/pull/27
