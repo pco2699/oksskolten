@@ -69,12 +69,26 @@ export function computeEmpiricalInterval(items: RssItem[]): number {
   if (daysSinceLatest >= 14) return MAX_INTERVAL / 2     // 2h
   if (daysSinceLatest >= 7)  return MAX_INTERVAL / 4     // 1h
 
-  // < 7 days: half the average interval between articles
+  // < 7 days: half the *median* gap between consecutive articles.
+  //
+  // The median rather than the mean, because `published_at` is the article's
+  // own publication date, which for a ranking or forum feed is not when the
+  // item entered the feed. A years-old post that suddenly trends, or a dormant
+  // thread that gets a reply, arrives carrying its original date. Averaging
+  // across the window lets one such item dictate the schedule: Hatena's
+  // technology hotentry carried a 14-day-old entry among 30 otherwise same-day
+  // ones, which pushed the mean gap to 11.7 hours and pinned the feed at the
+  // 4-hour ceiling — while it was actually publishing about every 20 minutes.
+  // The median of the same payload is 27 minutes. A genuinely slow feed has a
+  // large median too, so it still backs off.
   if (dates.length >= 2) {
-    const totalSpan = dates[0] - dates[dates.length - 1]
-    const avgIntervalMs = totalSpan / (dates.length - 1)
-    const halfAvgSec = Math.floor(avgIntervalMs / 2000)
-    return Math.max(MIN_INTERVAL, halfAvgSec)
+    const gaps: number[] = []
+    for (let i = 0; i < dates.length - 1; i++) gaps.push(dates[i] - dates[i + 1])
+    gaps.sort((a, b) => a - b)
+    const mid = Math.floor(gaps.length / 2)
+    const medianGapMs = gaps.length % 2 === 0 ? (gaps[mid - 1] + gaps[mid]) / 2 : gaps[mid]
+    const halfMedianSec = Math.floor(medianGapMs / 2000)
+    return Math.max(MIN_INTERVAL, halfMedianSec)
   }
 
   return MAX_INTERVAL / 4  // single article → 1h

@@ -135,13 +135,36 @@ describe('computeEmpiricalInterval', () => {
     expect(computeEmpiricalInterval(items)).toBe(MAX_INTERVAL / 4)
   })
 
-  it('returns half average interval for active feeds (<7 days)', () => {
-    // Articles every 2 days: avg = 2 days, half = 1 day = 86400s
+  it('returns half the median interval for active feeds (<7 days)', () => {
+    // Articles every 2 days: median gap = 2 days, half = 1 day = 86400s
     const items = makeItems([1, 3, 5])
     const result = computeEmpiricalInterval(items)
     // Half of 2 days ≈ 86400s (raw, unclamped — clamping is done in computeInterval)
     expect(result).toBeGreaterThan(80000)
     expect(result).toBeLessThan(90000)
+  })
+
+  it('is not dragged out by a single old item resurfacing', () => {
+    // The shape that pinned Hatena's hotentry feeds at the 4-hour ceiling: a
+    // stream of same-day items plus one entry whose publication date is two
+    // weeks back, because a ranking feed carries the article's own date rather
+    // than the moment it entered the ranking. The mean gap here is over 2 days;
+    // the median is 1 hour, which is what the feed actually does.
+    const hoursAgo = [0.5, 1.5, 2.5, 3.5, 4.5, 5.5, 6.5, 7.5]
+    const items = hoursAgo.map((h, i) => ({
+      title: `Post ${i}`,
+      url: `https://example.com/${i}`,
+      published_at: new Date(Date.now() - h * 60 * 60 * 1000).toISOString(),
+    }))
+    items.push({
+      title: 'Resurfaced',
+      url: 'https://example.com/old',
+      published_at: new Date(Date.now() - 14 * 24 * 60 * 60 * 1000).toISOString(),
+    })
+
+    const result = computeEmpiricalInterval(items)
+    // Half of a 1-hour median gap, not half of the ~2.5-day mean.
+    expect(result).toBe(30 * 60)
   })
 
   it('returns MAX_INTERVAL/4 for single recent article', () => {
