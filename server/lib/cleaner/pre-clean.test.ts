@@ -79,6 +79,33 @@ describe('preClean', () => {
       const doc = preCleanHtml('<body><canvas></canvas><p>text</p></body>', 'https://example.com')
       expect(doc.querySelectorAll('canvas')).toHaveLength(0)
     })
+
+    it('removes Hatena trackback lists, keeping the entry body', () => {
+      const doc = preCleanHtml(
+        `<body><div class="section"><p>entry body</p></div>
+         <div class="refererlist"><ul><li><p>a reply</p></li></ul></div></body>`,
+        'https://anond.hatelabo.jp/20260807141232',
+      )
+      expect(doc.querySelectorAll('.refererlist')).toHaveLength(0)
+      expect(doc.body.textContent).not.toContain('a reply')
+      expect(doc.body.textContent).toContain('entry body')
+    })
+
+    it('removes the Hatena entry footer and heading marker', () => {
+      const doc = preCleanHtml(
+        `<body><div class="section">
+           <h3><a href="/20260807141232"><span class="sanchor">■</span></a>title</h3>
+           <p>entry body</p>
+           <p class="sectionfooter"><a href="/20260807141232">Permalink</a> | 14:12</p>
+         </div></body>`,
+        'https://anond.hatelabo.jp/20260807141232',
+      )
+      expect(doc.body.textContent).not.toContain('Permalink')
+      expect(doc.body.textContent).not.toContain('■')
+      expect(doc.body.textContent).toContain('entry body')
+      // The marker is a prefix inside the heading — the title itself must survive.
+      expect(doc.querySelector('h3')?.textContent).toContain('title')
+    })
   })
 
   describe('preserves content elements', () => {

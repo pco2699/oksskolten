@@ -38,6 +38,21 @@ export const PRE_CLEAN_SELECTORS: string[] = [
 
   // Embeds that are never content
   'instaread-player',
+
+  // Trackback / reaction threads (Hatena Diary family, including
+  // anond.hatelabo.jp). These sit as a sibling of the entry body and routinely
+  // dwarf it — a five-line entry with a long reply thread gives Readability a
+  // region with dozens of <p> elements next to one with five, so it scores the
+  // replies above the entry and returns them instead of the article. Removing
+  // this pre-Readability is what keeps the entry from losing that contest;
+  // post-clean runs too late, after the wrong region has already been chosen.
+  '.refererlist',
+
+  // Hatena Diary entry chrome. Both have to go before Readability rather than in
+  // POST_CLEAN_SELECTORS: Readability strips class attributes from its output, so
+  // the `footer` partial pattern can no longer see `class="sectionfooter"` by then.
+  '.sectionfooter', // "Permalink | 記事への反応(33) | 14:12"
+  '.sanchor', // "■" marker prefixed to the entry heading
 ]
 
 // ---------------------------------------------------------------------------
