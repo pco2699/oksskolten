@@ -164,7 +164,24 @@ if (fs.existsSync(distDir)) {
 
 // --- Cron ---
 const cronTasks: ScheduledTask[] = []
+/**
+ * The feed fetch currently in flight, so shutdown can let it finish before the
+ * database is closed. This is shutdown coordination, not an overlap guard —
+ * `noOverlap` below is what keeps two sweeps from running at once.
+ */
 let activeFetchPromise: Promise<void> | null = null
+
+/**
+ * `noOverlap` makes the scheduler skip a firing while the previous one is still
+ * running, rather than starting a second copy alongside it. A feed sweep is the
+ * one job here long enough for that to matter — it fans out over every feed and
+ * has been measured at up to 36 seconds — and running two concurrently would
+ * double the outbound requests and race on the same article rows.
+ *
+ * Prior to node-cron 4 there was no overlap protection at all; nothing enforced
+ * it, and the 5-minute schedule simply happened to outrun the work.
+ */
+const CRON_OPTIONS = { noOverlap: true } as const
 
 const CRON_SCHEDULE = process.env.CRON_SCHEDULE || '*/5 * * * *'
 cronTasks.push(cron.schedule(CRON_SCHEDULE, async () => {
@@ -179,7 +196,7 @@ cronTasks.push(cron.schedule(CRON_SCHEDULE, async () => {
   activeFetchPromise = p
   await p
   activeFetchPromise = null
-}))
+}, CRON_OPTIONS))
 
 // --- Score recalculation ---
 // Decoupled from feed fetch so the schedule can be tuned independently.
@@ -198,7 +215,7 @@ cronTasks.push(cron.schedule(SCORE_RECALC_SCHEDULE, async () => {
   } catch (err) {
     log.error('[cron] Score recalculation error:', err)
   }
-}))
+}, CRON_OPTIONS))
 
 // --- SQLite memory shrink ---
 // Periodic shrink_memory + wal_checkpoint to prevent libsql native heap accumulation.
@@ -235,7 +252,7 @@ cronTasks.push(cron.schedule('0 */6 * * *', async () => {
   } catch (err) {
     log.error('[cron] Search index rebuild error:', err)
   }
-}))
+}, CRON_OPTIONS))
 
 // --- Retention policy ---
 // Daily cleanup of old articles based on user-configured retention settings.
@@ -286,8 +303,10 @@ async function shutdown(signal: string) {
 
   app.log.info(`${signal} received, shutting down gracefully…`)
 
-  // 1. Stop cron — prevent new jobs from starting
-  for (const task of cronTasks) task.stop()
+  // 1. Stop cron — prevent new jobs from starting. `stop()` may return a
+  // promise (node-cron 4 lets a task settle before it reports stopped), so wait
+  // for all of them rather than racing ahead into `app.close()`.
+  await Promise.all(cronTasks.map(task => task.stop()))
 
   // 2. Close Fastify — stop accepting new requests, finish in-flight ones
   await app.close()
