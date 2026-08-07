@@ -344,6 +344,39 @@ exports[`cleaning pipeline — snapshot tests > snapshot: image-heavy (en) 1`] =
     </article>"
 `;
 
+exports[`cleaning pipeline — snapshot tests > snapshot: jp-anond (ja) 1`] = `
+"
+    
+
+    
+      <h2><a href="https://anond.hatelabo.jp/20260807"><span>2026-08-07</span></a></h2>
+      
+  
+
+  
+
+  <p><a href="https://anond.hatelabo.jp/keyword/%E3%82%B3%E3%83%B3%E3%83%93%E3%83%8B">コンビニ</a>の新作スイーツが当たりだった話。</p>
+	<p>いつもは<a href="https://anond.hatelabo.jp/keyword/%E3%83%97%E3%83%AA%E3%83%B3">プリン</a>ばかり買っている。</p>
+	<p>今日は気分を変えて<a href="https://anond.hatelabo.jp/keyword/%E3%82%BC%E3%83%AA%E3%83%BC">ゼリー</a>を選んでみた。</p>
+	<p>想像より果肉が多くて驚いた。</p>
+	<p>また明日も同じものを買うと思う。</p>
+
+  
+
+  
+
+  
+
+  
+  
+
+      
+    
+
+    
+  "
+`;
+
 exports[`cleaning pipeline — snapshot tests > snapshot: jp-blog (ja) 1`] = `
 "
         <p>TypeScriptの型システムは非常に強力で、JavaScriptに静的型付けを追加します。この記事では、TypeScriptの高度な型機能について詳しく解説します。</p>

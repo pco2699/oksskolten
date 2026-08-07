@@ -214,7 +214,13 @@ fetchFullText(articleUrl, cleanerConfig?)
 ├─ 2. Phase 1: pre-clean (safe removal before Readability)
 │     preClean(doc, cleanerConfig)
 │     ├─ Remove script, style, noscript, [hidden], [aria-hidden="true"], etc.
-│     └─ Delete elements that are definitely noise using ~20 safe CSS selectors
+│     ├─ Delete elements that are definitely noise using ~20 safe CSS selectors
+│     └─ Remove reaction/trackback threads (.refererlist) and entry chrome
+│        (.sectionfooter, .sanchor) on the Hatena Diary family, incl. anond.hatelabo.jp
+│        * Must happen here, not in post-clean, for two reasons: a short entry with a
+│          long reply thread gives Readability a higher-scoring region than the body,
+│          so it returns the replies instead of the article; and Readability strips
+│          class attributes, so post-clean's class patterns can no longer see them
 │     * Fail-open: on exception, continue with original HTML
 │
 ├─ 3. Phase 2: Readability body extraction
