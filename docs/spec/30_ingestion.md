@@ -45,7 +45,7 @@ node-cron 4 replaced the polling scheduler with one that computes the next bound
        - HTTP Cache-Control: max-age / Expires headers
        - RSS <ttl> element (minutes converted to seconds)
        - Empirical (CommaFeed method: step-down based on article update frequency)
-         No updates for 30+ days -> 4h / 14-30 days -> 2h / 7-14 days -> 1h / <7 days -> half the average article interval
+         No updates for 30+ days -> 4h / 14-30 days -> 2h / 7-14 days -> 1h / <7 days -> half the MEDIAN gap between consecutive articles
        - Take the maximum of the 3 signals, clamped to 15min-4hours
        - Save feeds.next_check_at = now + interval, feeds.check_interval = interval
        - On notModified, reuse the previous check_interval (interval is never shortened)
@@ -84,6 +84,12 @@ node-cron 4 replaced the polling scheduler with one that computes the next bound
 8. Feeds with error_count >= 5 are updated to disabled = 1
 9. Remaining work continues in the next Cron cycle
 ```
+
+**Why the empirical signal uses the median gap, not the mean.** `published_at` is the article's *own* publication date, which for a ranking or forum feed is not the moment the item entered the feed. A years-old post that suddenly trends, or a dormant thread that gets a reply, arrives carrying its original date. Averaging across the item window lets a single such entry dictate the schedule for the whole feed.
+
+This was not hypothetical. Hatena's technology hotentry carried one 14-day-old entry among 30 otherwise same-day items, which pushed the mean gap to 11.7 hours and pinned the feed at the 4-hour ceiling — while it was in fact publishing roughly every 20 minutes, and Hatena's own response advertised `Cache-Control: max-age=300`. The median of that same payload is 27 minutes. Across the live feed set, 27 of 37 feeds sat at the 4-hour maximum, including several producing 200+ articles every three days.
+
+The median is unaffected by a handful of outliers while remaining large for a feed that is genuinely slow, so quiet feeds still back off to the ceiling. Note the three signals are combined with `max()`, so a short `Cache-Control: max-age` only raises the floor on polling frequency and can never pull an over-long empirical estimate back down — which is why the empirical figure has to be right on its own.
 
 ### RSS Parsing and URL Extraction Flow
 
