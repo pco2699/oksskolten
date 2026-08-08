@@ -1,8 +1,8 @@
 export function formatDate(iso: string | null, locale: string): string {
   if (!iso) return ''
   const d = new Date(iso)
-  const opts: Intl.DateTimeFormatOptions = { month: 'short', day: 'numeric' }
-  if (d.getFullYear() !== new Date().getFullYear()) {
+  const opts: Intl.DateTimeFormatOptions = { month: 'short', day: 'numeric', timeZone: 'UTC' }
+  if (d.getUTCFullYear() !== new Date().getUTCFullYear()) {
     opts.year = 'numeric'
   }
   return d.toLocaleDateString(locale, opts)
@@ -26,5 +26,5 @@ export function formatRelativeDate(iso: string | null, locale: string, opts?: { 
 export function formatDetailDate(iso: string | null, locale: string): string {
   if (!iso) return ''
   const d = new Date(iso)
-  return d.toLocaleDateString(locale, { month: 'short', day: 'numeric', year: 'numeric' })
+  return d.toLocaleDateString(locale, { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' })
 }
