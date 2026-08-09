@@ -392,6 +392,8 @@ export const ArticleList = forwardRef<ArticleListHandle, object>(function Articl
             layout,
             isFeatured: layout === 'magazine' && index === 0,
             onClick: handleOverlayOpen,
+            onToggleBookmark: () => { void toggleArticleField(article, 'bookmarked_at') },
+            onToggleLike: () => { void toggleArticleField(article, 'liked_at') },
             ...displayConfig,
           }
           const isKbFocused = focusedItemId === String(article.id)

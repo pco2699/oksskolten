@@ -1,4 +1,5 @@
 import { useState, memo } from 'react'
+import { Bookmark, ThumbsUp } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { useI18n } from '../../lib/i18n'
 import { isReadInSession } from '../../lib/readTracker'
@@ -19,6 +20,8 @@ interface ArticleCardProps extends ArticleDisplayConfig {
   layout?: LayoutName
   isFeatured?: boolean
   onClick?: (e: React.MouseEvent<HTMLAnchorElement>) => void
+  onToggleBookmark?: () => void
+  onToggleLike?: () => void
 }
 
 function Thumbnail({ src, articleUrl, className }: { src: string | null; articleUrl: string; className?: string }) {
@@ -123,7 +126,7 @@ function useCardBase(article: ArticleListItem, dateMode: 'relative' | 'absolute'
 }
 
 /** List layout — classic single-column (current default) */
-function ListCard({ article, dateMode, indicatorStyle, showUnreadIndicator, showThumbnails, onClick }: ArticleCardProps) {
+function ListCard({ article, dateMode, indicatorStyle, showUnreadIndicator, showThumbnails, onClick, onToggleBookmark, onToggleLike }: ArticleCardProps) {
   const { isUnread, domain, dateText, href, handleClick, originalUrl } = useCardBase(article, dateMode, onClick)
   const showIndicator = isUnread && showUnreadIndicator
 
@@ -132,7 +135,7 @@ function ListCard({ article, dateMode, indicatorStyle, showUnreadIndicator, show
       href={href}
       data-original-url={originalUrl}
       onClick={handleClick}
-      className={`article-card block w-full text-left border-b border-border py-3 md:py-5 px-4 md:px-6 transition-[background-color,transform,box-shadow,border-color] duration-100 hover:bg-hover hover:-translate-y-px hover:shadow-sm select-none no-underline text-inherit ${
+      className={`article-card group block w-full text-left border-b border-border py-3 md:py-5 px-4 md:px-6 transition-[background-color,transform,box-shadow,border-color] duration-100 hover:bg-hover hover:-translate-y-px hover:shadow-sm select-none no-underline text-inherit ${
         indicatorStyle === 'line'
           ? `border-l-2 transition-[border-color] duration-500 ${showIndicator ? 'border-l-accent' : 'border-l-transparent'}`
           : ''
@@ -172,6 +175,30 @@ function ListCard({ article, dateMode, indicatorStyle, showUnreadIndicator, show
               </>
             )}
             <span className="shrink-0">{dateText}</span>
+            {(onToggleBookmark || onToggleLike) && (
+              <div className="ml-auto flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity duration-150 [@media(hover:none)]:opacity-100">
+                {onToggleBookmark && (
+                  <button
+                    type="button"
+                    onClick={(e) => { e.stopPropagation(); e.preventDefault(); onToggleBookmark() }}
+                    className={`p-1 rounded transition-colors ${article.bookmarked_at ? 'text-accent' : 'text-muted hover:text-accent'}`}
+                    title={article.bookmarked_at ? 'Remove bookmark' : 'Save for later'}
+                  >
+                    <Bookmark className="w-3.5 h-3.5" fill={article.bookmarked_at ? 'currentColor' : 'none'} />
+                  </button>
+                )}
+                {onToggleLike && (
+                  <button
+                    type="button"
+                    onClick={(e) => { e.stopPropagation(); e.preventDefault(); onToggleLike() }}
+                    className={`p-1 rounded transition-colors ${article.liked_at ? 'text-accent' : 'text-muted hover:text-accent'}`}
+                    title={article.liked_at ? 'Remove like' : 'Like'}
+                  >
+                    <ThumbsUp className="w-3.5 h-3.5" fill={article.liked_at ? 'currentColor' : 'none'} />
+                  </button>
+                )}
+              </div>
+            )}
           </div>
         </div>
         {showThumbnails && <Thumbnail src={article.og_image} articleUrl={article.url} className="w-16 h-16 md:w-28 md:h-20" />}
