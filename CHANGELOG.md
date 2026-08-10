@@ -1,5 +1,10 @@
 # Changelog
 
+## [v0.5.13](https://github.com/pco2699/oksskolten/compare/v0.5.12...v0.5.13) - 2026-08-10
+### Others
+- fix: distinguish collection counts from unread with CountBadge by @pco2699 in https://github.com/pco2699/oksskolten/pull/34
+- feat(list): add bookmark and like toggle buttons to list layout cards (PCO-7) by @pco2699 in https://github.com/pco2699/oksskolten/pull/35
+
 ## [v0.5.12](https://github.com/pco2699/oksskolten/compare/v0.5.11...v0.5.12) - 2026-08-08
 ### Others
 - Fix timezone bug in dateFormat causing dates to shift backward by @pco2699 in https://github.com/pco2699/oksskolten/pull/32
