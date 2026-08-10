@@ -307,7 +307,12 @@ describe('FeedList', () => {
       { feeds: [], bookmark_count: 12, like_count: 0, clip_feed_id: null },
       { categories: [] },
     )
-    expect(screen.getByText('12')).toBeTruthy()
+    const badge = screen.getByText('12')
+    expect(badge).toBeTruthy()
+    // CountBadge is muted (collection total), not an unread accent badge
+    expect(badge.className).toContain('text-muted')
+    expect(badge.className).not.toContain('text-accent')
+    expect((badge as HTMLElement).style.backgroundColor).toBe('')
   })
 
   it('shows like count badge', () => {
@@ -316,7 +321,12 @@ describe('FeedList', () => {
       { feeds: [], bookmark_count: 0, like_count: 4, clip_feed_id: null },
       { categories: [] },
     )
-    expect(screen.getByText('4')).toBeTruthy()
+    const badge = screen.getByText('4')
+    expect(badge).toBeTruthy()
+    // CountBadge is muted (collection total), not an unread accent badge
+    expect(badge.className).toContain('text-muted')
+    expect(badge.className).not.toContain('text-accent')
+    expect((badge as HTMLElement).style.backgroundColor).toBe('')
   })
 
   it('shows clips entry when clip_feed_id is set', () => {
@@ -453,17 +463,20 @@ describe('FeedList', () => {
     expect(catButton.className).toContain('text-accent')
   })
 
-  it('shows unread badge on clip feed nav entry', () => {
-    const feeds = [makeFeed({ id: 99, name: 'Clip Feed', type: 'clip', unread_count: 3 })]
+  it('shows clip article count badge', () => {
+    const feeds = [makeFeed({ id: 99, name: 'Clip Feed', type: 'clip', article_count: 7, unread_count: 3 })]
     renderFeedList(
       {},
       { feeds, bookmark_count: 0, like_count: 0, clip_feed_id: 99 },
       { categories: [] },
     )
     expect(screen.getByText('Clips')).toBeTruthy()
-    // The clip feed unread badge should show 3
-    const clipsButton = screen.getByText('Clips').closest('button')!
-    expect(clipsButton.textContent).toContain('3')
+    // Clips shows article_count (collection size), not unread_count
+    const badge = screen.getByText('7')
+    expect(badge).toBeTruthy()
+    expect(badge.className).toContain('text-muted')
+    expect(badge.className).not.toContain('text-accent')
+    expect((badge as HTMLElement).style.backgroundColor).toBe('')
   })
 
   describe('hideZeroUnreadFeeds', () => {

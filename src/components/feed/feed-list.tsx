@@ -57,7 +57,7 @@ function UnreadBadge({ count }: { count: number }) {
 function CountBadge({ count }: { count: number }) {
   if (count <= 0) return null
   return (
-    <span className="text-[11px] text-muted rounded-full px-1.5 leading-relaxed ml-2 shrink-0">
+    <span className="text-[11px] text-muted rounded-full px-1.5 leading-relaxed ml-2 shrink-0 tabular-nums">
       {count}
     </span>
   )
@@ -518,7 +518,7 @@ export function FeedList({ isOpen, onClose, onBackdropClose, onCollapse, onMarkA
           <SidebarNavItem icon={ThumbsUp} label={t('feeds.likes')} selected={isLikes} onClick={() => { void navigate('/likes'); onClose() }} badge={(feedsData?.like_count ?? 0) > 0 ? <CountBadge count={feedsData!.like_count} /> : undefined} />
 
           {clipFeedId && (
-            <SidebarNavItem icon={Paperclip} label={t('feeds.clips')} selected={isClips} onClick={() => { void navigate('/clips'); onClose() }} badge={clipFeedData && clipFeedData.unread_count > 0 ? <CountBadge count={clipFeedData.unread_count} /> : undefined} />
+            <SidebarNavItem icon={Paperclip} label={t('feeds.clips')} selected={isClips} onClick={() => { void navigate('/clips'); onClose() }} badge={clipFeedData && clipFeedData.article_count > 0 ? <CountBadge count={clipFeedData.article_count} /> : undefined} />
           )}
 
           <SidebarNavItem icon={Clock} label={t('feeds.history')} selected={isHistory} onClick={() => { void navigate('/history'); onClose() }} />
