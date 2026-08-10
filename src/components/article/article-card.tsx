@@ -128,6 +128,7 @@ function useCardBase(article: ArticleListItem, dateMode: 'relative' | 'absolute'
 /** List layout — classic single-column (current default) */
 function ListCard({ article, dateMode, indicatorStyle, showUnreadIndicator, showThumbnails, onClick, onToggleBookmark, onToggleLike }: ArticleCardProps) {
   const { isUnread, domain, dateText, href, handleClick, originalUrl } = useCardBase(article, dateMode, onClick)
+  const { t } = useI18n()
   const showIndicator = isUnread && showUnreadIndicator
 
   return (
@@ -176,13 +177,15 @@ function ListCard({ article, dateMode, indicatorStyle, showUnreadIndicator, show
             )}
             <span className="shrink-0">{dateText}</span>
             {(onToggleBookmark || onToggleLike) && (
-              <div className="ml-auto flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity duration-150 [@media(hover:none)]:opacity-100">
+              <div className="ml-auto flex items-center gap-0.5 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity duration-150 [@media(hover:none)]:opacity-100">
                 {onToggleBookmark && (
                   <button
                     type="button"
                     onClick={(e) => { e.stopPropagation(); e.preventDefault(); onToggleBookmark() }}
-                    className={`p-1 rounded transition-colors ${article.bookmarked_at ? 'text-accent' : 'text-muted hover:text-accent'}`}
-                    title={article.bookmarked_at ? 'Remove bookmark' : 'Save for later'}
+                    className={`p-1 rounded transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent ${article.bookmarked_at ? 'text-accent' : 'text-muted hover:text-accent'}`}
+                    aria-pressed={!!article.bookmarked_at}
+                    aria-label={article.bookmarked_at ? t('article.removeBookmark') : t('article.addBookmark')}
+                    title={article.bookmarked_at ? t('article.removeBookmark') : t('article.addBookmark')}
                   >
                     <Bookmark className="w-3.5 h-3.5" fill={article.bookmarked_at ? 'currentColor' : 'none'} />
                   </button>
@@ -191,8 +194,10 @@ function ListCard({ article, dateMode, indicatorStyle, showUnreadIndicator, show
                   <button
                     type="button"
                     onClick={(e) => { e.stopPropagation(); e.preventDefault(); onToggleLike() }}
-                    className={`p-1 rounded transition-colors ${article.liked_at ? 'text-accent' : 'text-muted hover:text-accent'}`}
-                    title={article.liked_at ? 'Remove like' : 'Like'}
+                    className={`p-1 rounded transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent ${article.liked_at ? 'text-accent' : 'text-muted hover:text-accent'}`}
+                    aria-pressed={!!article.liked_at}
+                    aria-label={article.liked_at ? t('article.removeLike') : t('article.addLike')}
+                    title={article.liked_at ? t('article.removeLike') : t('article.addLike')}
                   >
                     <ThumbsUp className="w-3.5 h-3.5" fill={article.liked_at ? 'currentColor' : 'none'} />
                   </button>
