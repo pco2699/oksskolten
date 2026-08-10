@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useCallback, useImperativeHandle, forwardRef, useMemo } from 'react'
+import { memo, useState, useRef, useEffect, useCallback, useImperativeHandle, forwardRef, useMemo } from 'react'
 import { useLocation, useNavigate, useParams } from 'react-router-dom'
 import useSWR from 'swr'
 import useSWRInfinite from 'swr/infinite'
@@ -8,7 +8,7 @@ import { useI18n } from '../../lib/i18n'
 import { useIsTouchDevice } from '../../hooks/use-is-touch-device'
 import { useInfiniteScroll } from '../../hooks/use-infinite-scroll'
 import { useMarkReadOnScroll } from '../../hooks/use-mark-read-on-scroll'
-import { useOptimisticArticleToggle } from '../../hooks/use-optimistic-article-toggle'
+import { useOptimisticArticleToggle, type ToggleField } from '../../hooks/use-optimistic-article-toggle'
 import { useClipFeedId } from '../../hooks/use-clip-feed-id'
 import { useAppLayout } from '../../app'
 import { ArticleCard, type ArticleDisplayConfig } from './article-card'
@@ -39,6 +39,41 @@ interface ArticlesResponse {
 }
 
 const PAGE_SIZE = 20
+
+interface CardItemProps extends ArticleDisplayConfig {
+  article: ArticleListItem
+  layout: LayoutName
+  isFeatured: boolean
+  onClick?: (e: React.MouseEvent<HTMLAnchorElement>) => void
+  isTouchDevice: boolean
+  toggleArticleField: (article: Pick<ArticleListItem, 'id' | 'url'> & Partial<Record<ToggleField, string | null>>, field: ToggleField) => void
+}
+
+const CardItem = memo(function CardItem({ article, layout, isFeatured, onClick, isTouchDevice, toggleArticleField, ...displayConfig }: CardItemProps) {
+  const onToggleBookmark = useCallback(() => {
+    void toggleArticleField(article, 'bookmarked_at')
+  }, [article, toggleArticleField])
+
+  const onToggleLike = useCallback(() => {
+    void toggleArticleField(article, 'liked_at')
+  }, [article, toggleArticleField])
+
+  const isList = layout === 'list'
+  const cardProps = {
+    article,
+    layout,
+    isFeatured,
+    onClick,
+    onToggleBookmark: isList ? onToggleBookmark : undefined,
+    onToggleLike: isList ? onToggleLike : undefined,
+    ...displayConfig,
+  }
+
+  if (isTouchDevice) {
+    return <SwipeableArticleCard {...cardProps} />
+  }
+  return <ArticleCard {...cardProps} />
+})
 
 export interface ArticleListHandle {
   revalidate: () => void
@@ -387,13 +422,6 @@ export const ArticleList = forwardRef<ArticleListHandle, object>(function Articl
             e.preventDefault()
             setOverlayUrl(article.url)
           } : undefined
-          const cardProps = {
-            article: effectiveArticle,
-            layout,
-            isFeatured: layout === 'magazine' && index === 0,
-            onClick: handleOverlayOpen,
-            ...displayConfig,
-          }
           const isKbFocused = focusedItemId === String(article.id)
           return (
             <div
@@ -412,11 +440,15 @@ export const ArticleList = forwardRef<ArticleListHandle, object>(function Articl
                 }
               }}
             >
-              {isTouchDevice ? (
-                <SwipeableArticleCard {...cardProps} />
-              ) : (
-                <ArticleCard {...cardProps} />
-              )}
+              <CardItem
+                article={effectiveArticle}
+                layout={layout}
+                isFeatured={layout === 'magazine' && index === 0}
+                onClick={handleOverlayOpen}
+                isTouchDevice={isTouchDevice}
+                toggleArticleField={toggleArticleField}
+                {...displayConfig}
+              />
             </div>
           )
         })}
