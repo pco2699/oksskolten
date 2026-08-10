@@ -1,5 +1,9 @@
 # Changelog
 
+## [v0.5.12](https://github.com/pco2699/oksskolten/compare/v0.5.11...v0.5.12) - 2026-08-08
+### Others
+- Fix timezone bug in dateFormat causing dates to shift backward by @pco2699 in https://github.com/pco2699/oksskolten/pull/32
+
 ## [v0.5.11](https://github.com/pco2699/oksskolten/compare/v0.5.10...v0.5.11) - 2026-08-07
 ### Others
 - Extract the entry body, not the reaction thread, on Hatena anonymous diary by @pco2699 in https://github.com/pco2699/oksskolten/pull/29
