@@ -352,8 +352,12 @@ export function markArticlesSeen(ids: number[]): { updated: number } {
  * original "mark everything unread" behavior.
  */
 export function markAllSeenByFeed(feedId: number, olderThanHours?: number): { updated: number } {
+  // `published_at` is stored as `new Date().toISOString()` (e.g. `2026-08-10T05:00:00.000Z`),
+  // while `datetime('now', ?)` produces `2026-08-10 07:02:00` (space separator, no ms, no Z).
+  // A plain TEXT comparison is byte-order sensitive to that formatting difference, so
+  // `julianday()` is used on both sides to compare them as actual point-in-time values.
   const cutoffClause = olderThanHours !== undefined
-    ? `AND published_at IS NOT NULL AND published_at <= datetime('now', ?)`
+    ? `AND published_at IS NOT NULL AND julianday(published_at) <= julianday('now', ?)`
     : ''
   const cutoffParams = olderThanHours !== undefined ? [`-${olderThanHours} hours`] : []
 

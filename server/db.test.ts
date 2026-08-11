@@ -387,6 +387,30 @@ describe('Articles', () => {
     expect(getArticleById(newId)!.seen_at).toBeNull()
   })
 
+  it('markAllSeenByFeed with olderThanHours handles the same-calendar-date boundary correctly', () => {
+    // Regression test for a format mismatch: `published_at` is stored as
+    // `new Date().toISOString()` (`T` separator, milliseconds, `Z` suffix), while
+    // `datetime('now', ?)` produces a plain `YYYY-MM-DD HH:MM:SS` string. A naive TEXT
+    // comparison between the two is byte-order sensitive to that formatting difference
+    // whenever both timestamps fall on the same calendar date (the `T` vs. space
+    // separator decides the comparison instead of the actual time), silently missing
+    // articles that should have matched. Use julianday()-based comparison instead.
+    const feed = seedFeed()
+    const barelyOverId = seedArticle(feed.id, {
+      url: 'https://example.com/barely-over',
+      published_at: new Date(Date.now() - 26 * 3600 * 1000).toISOString(),
+    })
+    const barelyUnderId = seedArticle(feed.id, {
+      url: 'https://example.com/barely-under',
+      published_at: new Date(Date.now() - 2 * 3600 * 1000).toISOString(),
+    })
+
+    const result = markAllSeenByFeed(feed.id, 24)
+    expect(result.updated).toBe(1)
+    expect(getArticleById(barelyOverId)!.seen_at).not.toBeNull()
+    expect(getArticleById(barelyUnderId)!.seen_at).toBeNull()
+  })
+
   it('markAllSeenByFeed with olderThanHours skips articles with no published_at', () => {
     const feed = seedFeed()
     const id = seedArticle(feed.id, { published_at: null })
