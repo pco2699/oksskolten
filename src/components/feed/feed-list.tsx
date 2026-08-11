@@ -392,7 +392,7 @@ export function FeedList({ isOpen, onClose, onBackdropClose, onCollapse, onMarkA
         feedType={feed.type}
         categories={categories}
         onRename={() => handleStartRenameFeed(feed)}
-        onMarkAllRead={() => handleMarkAllReadFeed(feed)}
+        onMarkAllRead={(olderThan) => handleMarkAllReadFeed(feed, olderThan)}
         onDelete={() => handleDeleteFeed(feed)}
         onMoveToCategory={(catId) => handleMoveToCategory(feed, catId)}
         onFetch={() => handleFetchFeed(feed)}

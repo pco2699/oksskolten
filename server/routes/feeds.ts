@@ -52,6 +52,13 @@ const DiscoverTitleQuery = z.object({
   url: httpOrHttpsUrl,
 })
 
+// Age filter for bulk mark-as-read: mark only articles published at least this long ago.
+const OLDER_THAN_HOURS = { '1d': 24, '1w': 24 * 7 } as const
+
+const MarkAllSeenBody = z.object({
+  older_than: z.enum(['1d', '1w']).optional(),
+})
+
 const CreateFeedBody = z
   .object({
     url: httpOrHttpsUrl,
@@ -405,7 +412,10 @@ export async function feedRoutes(api: FastifyInstance): Promise<void> {
     async (request, reply) => {
       const params = parseOrBadRequest(NumericIdParams, request.params, reply)
       if (!params) return
-      const result = markAllSeenByFeed(params.id)
+      const body = parseOrBadRequest(MarkAllSeenBody, request.body ?? {}, reply)
+      if (!body) return
+      const olderThanHours = body.older_than ? OLDER_THAN_HOURS[body.older_than] : undefined
+      const result = markAllSeenByFeed(params.id, olderThanHours)
       reply.send(result)
     },
   )

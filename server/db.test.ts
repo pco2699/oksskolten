@@ -376,6 +376,26 @@ describe('Articles', () => {
     expect(articles.every(a => a.seen_at !== null)).toBe(true)
   })
 
+  it('markAllSeenByFeed with olderThanHours only marks articles published before the cutoff', () => {
+    const feed = seedFeed()
+    const oldId = seedArticle(feed.id, { url: 'https://example.com/old', published_at: '2020-01-01T00:00:00Z' })
+    const newId = seedArticle(feed.id, { url: 'https://example.com/new', published_at: new Date().toISOString() })
+
+    const result = markAllSeenByFeed(feed.id, 24)
+    expect(result.updated).toBe(1)
+    expect(getArticleById(oldId)!.seen_at).not.toBeNull()
+    expect(getArticleById(newId)!.seen_at).toBeNull()
+  })
+
+  it('markAllSeenByFeed with olderThanHours skips articles with no published_at', () => {
+    const feed = seedFeed()
+    const id = seedArticle(feed.id, { published_at: null })
+
+    const result = markAllSeenByFeed(feed.id, 24)
+    expect(result.updated).toBe(0)
+    expect(getArticleById(id)!.seen_at).toBeNull()
+  })
+
   it('recordArticleRead sets read_at and seen_at', () => {
     const feed = seedFeed()
     const id = seedArticle(feed.id)

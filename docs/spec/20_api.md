@@ -768,6 +768,13 @@ Returns `404` if the feed does not exist.
 
 **POST /api/feeds/:id/mark-all-seen** — Mark all articles in a feed as seen
 
+Optionally restrict to articles older than a given age via `older_than` (`"1d"` or `"1w"`). Articles with no `published_at` are never matched by an age filter. Omitting the body (or `older_than`) marks every unread article in the feed, unchanged from before.
+
+```json
+// Request (optional)
+{ "older_than": "1d" }
+```
+
 ```json
 // Response: 200
 { "updated": 5 }
