@@ -163,7 +163,7 @@ export function ArticleDetail({ articleUrl, enableZapNavigation = false }: Artic
 
   if (error) {
     return (
-      <div className="max-w-2xl md:max-w-3xl mx-auto px-6 md:px-10 py-12 text-center">
+      <div className="max-w-3xl md:max-w-4xl mx-auto px-6 md:px-10 py-12 text-center">
         <p className="text-muted">{t('article.notFound')}</p>
       </div>
     )
@@ -171,7 +171,7 @@ export function ArticleDetail({ articleUrl, enableZapNavigation = false }: Artic
 
   if (!article) {
     return (
-      <div className="max-w-2xl md:max-w-3xl mx-auto px-6 md:px-10 py-8 space-y-4">
+      <div className="max-w-3xl md:max-w-4xl mx-auto px-6 md:px-10 py-8 space-y-4">
         <Skeleton className="h-8 w-3/4" />
         <Skeleton className="h-4 w-1/4" />
         <Skeleton className="h-4 w-1/6 mt-4" />
@@ -197,10 +197,17 @@ export function ArticleDetail({ articleUrl, enableZapNavigation = false }: Artic
           onToggleRead={toggleReadState}
         />
       )}
-      <article ref={articleRef} className="article-card max-w-2xl md:max-w-3xl mx-auto px-6 md:px-10 py-8">
+      <article ref={articleRef} className="article-card max-w-3xl md:max-w-4xl mx-auto px-6 md:px-10 py-8">
       {/* Title */}
       <h1 className="mb-1.5 text-[28px] font-bold leading-[1.3] break-words [overflow-wrap:anywhere]">
-        {article.title}
+        <a
+          href={article.url}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-text no-underline hover:underline"
+        >
+          {article.title}
+        </a>
       </h1>
 
       {/* Date */}
