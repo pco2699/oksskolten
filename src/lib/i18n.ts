@@ -44,6 +44,8 @@ const dict = {
   'feeds.editSave': { ja: '保存', en: 'Save', zh: '保存'},
   'feeds.editSuccess': { ja: '${name} を更新しました', en: 'Updated ${name}', zh: '已更新 ${name}'},
   'feeds.markAllRead': { ja: 'すべて既読にする', en: 'Mark all as read', zh: '全部标为已读'},
+  'feeds.markAllReadOlderThan1d': { ja: '1日以上前を既読にする', en: 'Older than 1 day', zh: '标记1天前的为已读'},
+  'feeds.markAllReadOlderThan1w': { ja: '1週間以上前を既読にする', en: 'Older than 1 week', zh: '标记1周前的为已读'},
   'feeds.delete': { ja: '削除', en: 'Delete', zh: '删除'},
   'feeds.deleteFeed': { ja: 'フィードを削除', en: 'Delete Feed', zh: '删除订阅源'},
   'feeds.reEnableFeed': { ja: 'フィードを再有効化', en: 'Re-enable Feed', zh: '重新启用订阅源'},

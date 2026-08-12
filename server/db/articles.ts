@@ -343,12 +343,31 @@ export function markArticlesSeen(ids: number[]): { updated: number } {
   return { updated: result.changes }
 }
 
-export function markAllSeenByFeed(feedId: number): { updated: number } {
+/**
+ * Mark unread articles in a feed as seen.
+ *
+ * When `olderThanHours` is given, only articles published at least that many
+ * hours ago are affected; articles with no `published_at` are never matched
+ * by an age filter since their age is unknown. Omitting it preserves the
+ * original "mark everything unread" behavior.
+ */
+export function markAllSeenByFeed(feedId: number, olderThanHours?: number): { updated: number } {
+  // `published_at` is stored as `new Date().toISOString()` (e.g. `2026-08-10T05:00:00.000Z`),
+  // while `datetime('now', ?)` produces `2026-08-10 07:02:00` (space separator, no ms, no Z).
+  // A plain TEXT comparison is byte-order sensitive to that formatting difference, so
+  // `julianday()` is used on both sides to compare them as actual point-in-time values.
+  const cutoffClause = olderThanHours !== undefined
+    ? `AND published_at IS NOT NULL AND julianday(published_at) <= julianday('now', ?)`
+    : ''
+  const cutoffParams = olderThanHours !== undefined ? [`-${olderThanHours} hours`] : []
+
   // Collect affected IDs before update for search sync
   const affectedIds = (getDb().prepare(
-    'SELECT id FROM active_articles WHERE feed_id = ? AND seen_at IS NULL',
-  ).all(feedId) as { id: number }[]).map(r => r.id)
-  const result = getDb().prepare("UPDATE articles SET seen_at = datetime('now') WHERE feed_id = ? AND seen_at IS NULL AND purged_at IS NULL").run(feedId)
+    `SELECT id FROM active_articles WHERE feed_id = ? AND seen_at IS NULL ${cutoffClause}`,
+  ).all(feedId, ...cutoffParams) as { id: number }[]).map(r => r.id)
+  const result = getDb().prepare(
+    `UPDATE articles SET seen_at = datetime('now') WHERE feed_id = ? AND seen_at IS NULL AND purged_at IS NULL ${cutoffClause}`,
+  ).run(feedId, ...cutoffParams)
   if (affectedIds.length > 0) {
     syncArticleFiltersToSearch(affectedIds.map(id => ({ id, is_unread: false })))
   }

@@ -61,8 +61,12 @@ export function useFeedActions({
     setRenaming({ type: 'category', category, name: category.name })
   }
 
-  async function handleMarkAllReadFeed(feed: FeedWithCounts) {
-    await apiPost(`/api/feeds/${feed.id}/mark-all-seen`)
+  async function handleMarkAllReadFeed(feed: FeedWithCounts, olderThan?: '1d' | '1w') {
+    if (olderThan) {
+      await apiPost(`/api/feeds/${feed.id}/mark-all-seen`, { older_than: olderThan })
+    } else {
+      await apiPost(`/api/feeds/${feed.id}/mark-all-seen`)
+    }
     void mutateFeeds()
     onMarkAllRead?.()
   }

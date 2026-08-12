@@ -51,10 +51,14 @@ export function useFeedBulkActions({
     }
   }, [getSelectedFeeds, mutateFeeds, clearSelection])
 
-  const handleBulkMarkAllRead = useCallback(async () => {
+  const handleBulkMarkAllRead = useCallback(async (olderThan?: '1d' | '1w') => {
     const selected = getSelectedFeeds()
     clearSelection()
-    await Promise.all(selected.map(f => apiPost(`/api/feeds/${f.id}/mark-all-seen`)))
+    await Promise.all(selected.map(f =>
+      olderThan
+        ? apiPost(`/api/feeds/${f.id}/mark-all-seen`, { older_than: olderThan })
+        : apiPost(`/api/feeds/${f.id}/mark-all-seen`),
+    ))
     void mutateFeeds()
     onMarkAllRead?.()
   }, [getSelectedFeeds, mutateFeeds, clearSelection, onMarkAllRead])

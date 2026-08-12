@@ -17,7 +17,7 @@ interface FeedMenuProps {
   feedType?: 'rss' | 'clip'
   categories?: Array<{ id: number; name: string }>
   onRename: () => void
-  onMarkAllRead: () => void
+  onMarkAllRead: (olderThan?: '1d' | '1w') => void
   onDelete: () => void
   onMoveToCategory?: (categoryId: number | null) => void
   onFetch?: () => void
@@ -56,10 +56,23 @@ export function FeedContextMenu({
             {t('feeds.edit')}
           </ContextMenuItem>
         )}
-        <ContextMenuItem onSelect={onMarkAllRead}>
-          <CheckCheck size={16} strokeWidth={1.5} />
-          {t('feeds.markAllRead')}
-        </ContextMenuItem>
+        <ContextMenuSub>
+          <ContextMenuSubTrigger>
+            <CheckCheck size={16} strokeWidth={1.5} />
+            {t('feeds.markAllRead')}
+          </ContextMenuSubTrigger>
+          <ContextMenuSubContent>
+            <ContextMenuItem onSelect={() => onMarkAllRead()}>
+              {t('feeds.all')}
+            </ContextMenuItem>
+            <ContextMenuItem onSelect={() => onMarkAllRead('1d')}>
+              {t('feeds.markAllReadOlderThan1d')}
+            </ContextMenuItem>
+            <ContextMenuItem onSelect={() => onMarkAllRead('1w')}>
+              {t('feeds.markAllReadOlderThan1w')}
+            </ContextMenuItem>
+          </ContextMenuSubContent>
+        </ContextMenuSub>
 
         {!isClip && onMoveToCategory && (
           <ContextMenuSub>
@@ -113,7 +126,7 @@ interface MultiSelectMenuProps {
   selectedCount: number
   categories: Array<{ id: number; name: string }>
   onMoveToCategory: (categoryId: number | null) => void
-  onMarkAllRead: () => void
+  onMarkAllRead: (olderThan?: '1d' | '1w') => void
   onFetch: () => void
   onDelete: () => void
 }
@@ -155,10 +168,23 @@ export function MultiSelectContextMenu({
             ))}
           </ContextMenuSubContent>
         </ContextMenuSub>
-        <ContextMenuItem onSelect={onMarkAllRead}>
-          <CheckCheck size={16} strokeWidth={1.5} />
-          {t('feeds.bulkMarkAllRead')}
-        </ContextMenuItem>
+        <ContextMenuSub>
+          <ContextMenuSubTrigger>
+            <CheckCheck size={16} strokeWidth={1.5} />
+            {t('feeds.bulkMarkAllRead')}
+          </ContextMenuSubTrigger>
+          <ContextMenuSubContent>
+            <ContextMenuItem onSelect={() => onMarkAllRead()}>
+              {t('feeds.all')}
+            </ContextMenuItem>
+            <ContextMenuItem onSelect={() => onMarkAllRead('1d')}>
+              {t('feeds.markAllReadOlderThan1d')}
+            </ContextMenuItem>
+            <ContextMenuItem onSelect={() => onMarkAllRead('1w')}>
+              {t('feeds.markAllReadOlderThan1w')}
+            </ContextMenuItem>
+          </ContextMenuSubContent>
+        </ContextMenuSub>
         <ContextMenuItem onSelect={onFetch}>
           <RefreshCw size={16} strokeWidth={1.5} />
           {t('feeds.bulkFetch')}

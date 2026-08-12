@@ -192,6 +192,61 @@ describe('POST /api/feeds/:id/mark-all-seen', () => {
     expect(res.statusCode).toBe(200)
     expect(res.json().updated).toBe(2)
   })
+
+  it('with older_than=1d only marks articles published more than a day ago', async () => {
+    const feed = seedFeed()
+    const oldArticle = seedArticle(feed.id, { url: 'https://example.com/old', published_at: '2020-01-01T00:00:00Z' })
+    const newArticle = seedArticle(feed.id, { url: 'https://example.com/new', published_at: new Date().toISOString() })
+
+    const res = await app.inject({
+      method: 'POST',
+      url: `/api/feeds/${feed.id}/mark-all-seen`,
+      headers: json,
+      payload: { older_than: '1d' },
+    })
+    expect(res.statusCode).toBe(200)
+    expect(res.json().updated).toBe(1)
+
+    const articlesRes = await app.inject({ method: 'GET', url: `/api/articles?feed_id=${feed.id}` })
+    const articles = articlesRes.json().articles as { id: number; seen_at: string | null }[]
+    expect(articles.find(a => a.id === oldArticle)!.seen_at).not.toBeNull()
+    expect(articles.find(a => a.id === newArticle)!.seen_at).toBeNull()
+  })
+
+  it('with older_than=1w only marks articles published more than a week ago', async () => {
+    const feed = seedFeed()
+    const oldArticle = seedArticle(feed.id, { url: 'https://example.com/old-week', published_at: '2020-01-01T00:00:00Z' })
+    const recentArticle = seedArticle(feed.id, {
+      url: 'https://example.com/recent',
+      published_at: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(), // 2 days ago
+    })
+
+    const res = await app.inject({
+      method: 'POST',
+      url: `/api/feeds/${feed.id}/mark-all-seen`,
+      headers: json,
+      payload: { older_than: '1w' },
+    })
+    expect(res.statusCode).toBe(200)
+    expect(res.json().updated).toBe(1)
+
+    const articlesRes = await app.inject({ method: 'GET', url: `/api/articles?feed_id=${feed.id}` })
+    const articles = articlesRes.json().articles as { id: number; seen_at: string | null }[]
+    expect(articles.find(a => a.id === oldArticle)!.seen_at).not.toBeNull()
+    expect(articles.find(a => a.id === recentArticle)!.seen_at).toBeNull()
+  })
+
+  it('rejects an invalid older_than value', async () => {
+    const feed = seedFeed()
+
+    const res = await app.inject({
+      method: 'POST',
+      url: `/api/feeds/${feed.id}/mark-all-seen`,
+      headers: json,
+      payload: { older_than: '1y' },
+    })
+    expect(res.statusCode).toBe(400)
+  })
 })
 
 // ==========================================================================
