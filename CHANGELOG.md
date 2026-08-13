@@ -1,5 +1,9 @@
 # Changelog
 
+## [v0.5.14](https://github.com/pco2699/oksskolten/compare/v0.5.13...v0.5.14) - 2026-08-12
+### Others
+- feat(feeds): add age filter to mark-all-seen by @pco2699 in https://github.com/pco2699/oksskolten/pull/37
+
 ## [v0.5.13](https://github.com/pco2699/oksskolten/compare/v0.5.12...v0.5.13) - 2026-08-10
 ### Others
 - fix: distinguish collection counts from unread with CountBadge by @pco2699 in https://github.com/pco2699/oksskolten/pull/34
