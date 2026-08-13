@@ -1,5 +1,9 @@
 # Changelog
 
+## [v0.5.15](https://github.com/pco2699/oksskolten/compare/v0.5.14...v0.5.15) - 2026-08-13
+### Others
+- fix: use julianday() to compare published_at against datetime('now', ...) by @pco2699 in https://github.com/pco2699/oksskolten/pull/40
+
 ## [v0.5.14](https://github.com/pco2699/oksskolten/compare/v0.5.13...v0.5.14) - 2026-08-12
 ### Others
 - feat(feeds): add age filter to mark-all-seen by @pco2699 in https://github.com/pco2699/oksskolten/pull/37
