@@ -527,6 +527,34 @@ describe('get_user_preferences', () => {
     expect(tech.total).toBe(2)
     expect(tech.read_rate).toBe(0)
   })
+
+  it('excludes an article on the 30-day cutoff\'s calendar date but chronologically outside the window (PCO-34)', async () => {
+    // Regression test for a format mismatch: `published_at` is stored as
+    // `new Date().toISOString()` (`T` separator, milliseconds, `Z` suffix), while
+    // `datetime('now', '-30 days')` produces a plain `YYYY-MM-DD HH:MM:SS` string. A naive
+    // TEXT comparison is byte-order sensitive to that formatting difference whenever both
+    // timestamps fall on the same calendar date — 'T' (0x54) always sorts after ' ' (0x20)
+    // once the date portion matches, so the comparison ignores the actual time of day.
+    //
+    // This article is published at 00:00:00.000Z on the cutoff's calendar date — i.e.
+    // genuinely older than 30 days, since midnight is earlier than the cutoff's
+    // time-of-day for any test run not started at exactly midnight UTC. The old
+    // byte-comparison always counted such an article as "within the last 30 days" purely
+    // because of the separator; julianday()-based comparison correctly excludes it.
+    const { createCategory, getDb } = await import('../db.js')
+    const cat = createCategory('Tech')
+    const feed = seedFeed({ category_id: cat.id })
+
+    const { d: cutoffDate } = getDb().prepare("SELECT date('now', '-30 days') AS d").get() as { d: string }
+    seedArticle(feed.id, { url: 'https://example.com/boundary-outside', published_at: `${cutoffDate}T00:00:00.000Z` })
+    // Control article, unambiguously inside the window
+    seedArticle(feed.id, { url: 'https://example.com/boundary-inside', published_at: new Date().toISOString() })
+
+    const result = JSON.parse(await executeTool('get_user_preferences', {}))
+    const tech = result.category_read_rates.find((c: any) => c.name === 'Tech')
+    expect(tech).toBeDefined()
+    expect(tech.total).toBe(1)
+  })
 })
 
 describe('get_recent_activity', () => {

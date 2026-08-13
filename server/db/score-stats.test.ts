@@ -174,6 +174,30 @@ describe('collectScoreBaseline candidate windows', () => {
     expect(byHours.get(720)?.articles).toBe(3)
   })
 
+  it('excludes an article on the window cutoff\'s calendar date but chronologically outside it (PCO-34)', () => {
+    // Regression test for a format mismatch: `published_at` is stored as
+    // `new Date().toISOString()` (`T` separator, milliseconds, `Z` suffix), while
+    // `datetime('now', ?)` produces a plain `YYYY-MM-DD HH:MM:SS` string. A naive TEXT
+    // comparison is byte-order sensitive to that formatting difference whenever both
+    // timestamps fall on the same calendar date — 'T' (0x54) always sorts after ' ' (0x20)
+    // once the date portion matches, so the comparison ignores the actual time of day.
+    //
+    // This article is published at 00:00:00.000Z on the 720-hour (30-day) window's cutoff
+    // calendar date — i.e. genuinely outside the window, since midnight is earlier than the
+    // cutoff's time-of-day for any test run not started at exactly midnight UTC. The old
+    // byte-comparison always counted such an article as within the window purely because of
+    // the separator; julianday()-based comparison correctly excludes it.
+    const feed = seedFeed()
+    const { d: cutoffDate } = getDb().prepare("SELECT date('now', '-30 days') AS d").get() as { d: string }
+    seedArticle(feed.id, { published_at: `${cutoffDate}T00:00:00.000Z` })
+    seedArticle(feed.id, { published_at: daysAgo(0) })
+
+    const windows = collectScoreBaseline().candidate_windows
+    const byHours = new Map(windows.map(w => [w.hours, w]))
+
+    expect(byHours.get(720)?.articles).toBe(1)
+  })
+
   it('reports how much of a window is unrankable', () => {
     const feed = seedFeed()
     seedArticle(feed.id, { published_at: daysAgo(0) })

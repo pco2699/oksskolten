@@ -227,6 +227,12 @@ function collectEngagement(total: number): EngagementBucket[] {
 }
 
 function collectCandidateWindows(): CandidateWindow[] {
+  // `published_at` is stored as `new Date().toISOString()` (`T` separator, milliseconds,
+  // `Z` suffix), while `fetched_at` and `datetime('now', ?)` use the plain
+  // `YYYY-MM-DD HH:MM:SS` shape SQLite's own `datetime()` produces. A naive TEXT comparison
+  // is byte-order sensitive to that formatting difference whenever both timestamps fall on
+  // the same calendar date, so `julianday()` is used on both sides to compare them as actual
+  // point-in-time values (see PCO-34, and PCO-28 for the same fix in markAllSeenByFeed).
   const stmt = getDb().prepare(`
     SELECT
       COUNT(*) AS articles,
@@ -234,7 +240,7 @@ function collectCandidateWindows(): CandidateWindow[] {
       SUM(CASE WHEN ${STORED_SCORE} <= 0 THEN 1 ELSE 0 END) AS zero_score,
       COUNT(DISTINCT ${STORED_SCORE}) AS distinct_scores
     FROM active_articles
-    WHERE COALESCE(published_at, fetched_at) >= datetime('now', ?)
+    WHERE julianday(COALESCE(published_at, fetched_at)) >= julianday('now', ?)
   `)
   return CANDIDATE_WINDOW_HOURS.map(hours => {
     const row = stmt.get(`-${hours} hours`) as Omit<CandidateWindow, 'hours' | 'zero_score_share'>
