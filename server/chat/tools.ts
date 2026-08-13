@@ -473,6 +473,12 @@ const getUserPreferencesTool: ToolDef = {
     `).all()
 
     // Category read rates (last 30 days) — quantifies interest intensity per category
+    // `published_at` is stored as `new Date().toISOString()` (`T` separator, milliseconds,
+    // `Z` suffix), while `datetime('now', ?)` produces a plain `YYYY-MM-DD HH:MM:SS` string.
+    // A naive TEXT comparison is byte-order sensitive to that formatting difference whenever
+    // both timestamps fall on the same calendar date, so `julianday()` is used on both sides
+    // to compare them as actual point-in-time values (see PCO-34, and PCO-28 for the same fix
+    // in markAllSeenByFeed).
     const categoryReadRates = db.prepare(`
       SELECT c.name,
              COUNT(*) AS total,
@@ -482,7 +488,7 @@ const getUserPreferencesTool: ToolDef = {
       JOIN feeds f ON a.feed_id = f.id
       JOIN categories c ON f.category_id = c.id
       WHERE f.type != 'clip'
-        AND a.published_at > datetime('now', '-30 days')
+        AND julianday(a.published_at) > julianday('now', '-30 days')
       GROUP BY c.id
       ORDER BY read_rate DESC
     `).all()
@@ -492,7 +498,7 @@ const getUserPreferencesTool: ToolDef = {
       SELECT f.name, COUNT(*) AS unread_articles
       FROM active_articles a
       JOIN feeds f ON a.feed_id = f.id
-      WHERE a.published_at > datetime('now', '-30 days')
+      WHERE julianday(a.published_at) > julianday('now', '-30 days')
         AND a.read_at IS NULL
         AND f.type != 'clip'
       GROUP BY f.id
