@@ -6,6 +6,10 @@ import App from './app'
 import './index.css'
 import { flushOfflineQueue } from './lib/offlineQueue'
 import { translate } from './lib/i18n'
+// Capture the browser's beforeinstallprompt event at startup (before the
+// lazily-loaded settings page mounts) so its install button can trigger the
+// native install dialog at any time.
+import './hooks/use-install-prompt'
 
 const updateSW = registerSW({
   immediate: true,
