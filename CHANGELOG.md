@@ -1,5 +1,7 @@
 # Changelog
 
+## [v0.5.16](https://github.com/pco2699/oksskolten/compare/v0.5.15...v0.5.16) - 2026-08-18
+
 ## [v0.5.15](https://github.com/pco2699/oksskolten/compare/v0.5.14...v0.5.15) - 2026-08-13
 ### Others
 - fix: use julianday() to compare published_at against datetime('now', ...) by @pco2699 in https://github.com/pco2699/oksskolten/pull/40
