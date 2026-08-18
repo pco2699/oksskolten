@@ -66,6 +66,7 @@ export default defineConfig(({ mode }) => {
           theme_color: '#ffffff',
           background_color: '#4D6782',
           display: 'standalone',
+          prefer_related_applications: false,
           scope: '/',
           start_url: '/all',
           icons: [
