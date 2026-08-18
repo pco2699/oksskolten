@@ -27,11 +27,16 @@ vi.mock('../../pages/login-page', () => ({
 }))
 
 import { AuthGate } from './auth-gate'
-import { setAuthToken, AUTH_LOGOUT_EVENT } from '../../lib/auth'
+import { setAuthToken, getAuthToken, AUTH_LOGOUT_EVENT } from '../../lib/auth'
+import { ApiError } from '../../lib/api-base'
 
 describe('AuthGate', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    // clearAllMocks() does not reset a mock's return value, only its call
+    // history, so re-establish the default explicitly to avoid leaking a
+    // per-test override (e.g. mockReturnValue(null)) into later tests.
+    vi.mocked(getAuthToken).mockReturnValue('test-token')
     swrReturn = { data: undefined, error: undefined, isLoading: true }
     // Ensure no oauth_code in URL
     window.history.replaceState({}, '', '/')
@@ -54,8 +59,10 @@ describe('AuthGate', () => {
     expect(screen.queryByTestId('login-page')).toBeNull()
   })
 
-  it('shows LoginPage when auth error', () => {
-    swrReturn = { data: undefined, error: new Error('Unauthorized'), isLoading: false }
+  it('shows LoginPage on a genuine 401 while online', () => {
+    // getAuthToken mock returns 'test-token' by default, i.e. we have a
+    // session token but the server says it is no longer valid.
+    swrReturn = { data: undefined, error: new ApiError('Unauthorized', 401, {}), isLoading: false }
     render(<AuthGate><div>App Content</div></AuthGate>)
 
     expect(screen.getByTestId('login-page')).toBeTruthy()
@@ -69,8 +76,27 @@ describe('AuthGate', () => {
     expect(screen.getByTestId('login-page')).toBeTruthy()
   })
 
+  it('renders children on network failure when a session token exists (offline PWA)', () => {
+    // A dropped connection makes fetch() reject with a plain error that has
+    // no HTTP status attached, unlike ApiError.
+    swrReturn = { data: undefined, error: new TypeError('Failed to fetch'), isLoading: false }
+    render(<AuthGate><div>App Content</div></AuthGate>)
+
+    expect(screen.getByText('App Content')).toBeTruthy()
+    expect(screen.queryByTestId('login-page')).toBeNull()
+  })
+
+  it('shows LoginPage on network failure when there is no session token', () => {
+    vi.mocked(getAuthToken).mockReturnValue(null)
+    swrReturn = { data: undefined, error: new TypeError('Failed to fetch'), isLoading: false }
+    render(<AuthGate><div>App Content</div></AuthGate>)
+
+    expect(screen.getByTestId('login-page')).toBeTruthy()
+    expect(screen.queryByText('App Content')).toBeNull()
+  })
+
   it('calls setAuthToken and mutate on login', async () => {
-    swrReturn = { data: undefined, error: new Error('Unauthorized'), isLoading: false }
+    swrReturn = { data: undefined, error: new ApiError('Unauthorized', 401, {}), isLoading: false }
     render(<AuthGate><div>App Content</div></AuthGate>)
 
     const loginBtn = screen.getByText('Login')
