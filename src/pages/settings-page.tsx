@@ -8,6 +8,7 @@ import { PasskeySettings } from '../components/settings/passkey-settings'
 import { GitHubOAuthSettings } from '../components/settings/github-oauth-settings'
 import { ApiTokenSettings } from '../components/settings/api-token-settings'
 import { ImageStorageSettings } from '../components/settings/image-storage-settings'
+import { InstallSettings } from '../components/settings/install-settings'
 import { GeneralTab } from './settings/general-tab'
 const AppearanceTab = lazy(() => import('./settings/appearance-tab').then(m => ({ default: m.AppearanceTab })))
 import { IntegrationTab } from './settings/integration-tab'
@@ -149,6 +150,8 @@ function AboutTab() {
           {showBuildDate && <p>{t('about.buildDate')}: {new Date(buildDate).toLocaleString()}</p>}
         </div>
       )}
+
+      <InstallSettings />
 
       <div className="flex gap-4 mt-4">
         <a

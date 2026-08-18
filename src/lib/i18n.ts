@@ -275,6 +275,13 @@ const dict = {
   'settings.saving': { ja: '保存中...', en: 'Saving...', zh: '保存中...'},
   'settings.saved': { ja: '保存しました', en: 'Saved', zh: '已保存'},
 
+  // Install (PWA)
+  'install.title': { ja: 'アプリをインストール', en: 'Install app', zh: '安装应用'},
+  'install.desc': { ja: 'ホーム画面からワンタップで起動できるアプリとしてインストールします', en: 'Install as an app you can launch from your home screen in one tap', zh: '安装为应用，从主屏幕一键启动'},
+  'install.button': { ja: 'インストール', en: 'Install', zh: '安装'},
+  'install.installed': { ja: 'インストール済み', en: 'Installed', zh: '已安装'},
+  'install.iosHint': { ja: 'iPhone/iPad では共有メニューの「ホーム画面に追加」からインストールできます', en: 'On iPhone/iPad, install via Share → Add to Home Screen', zh: '在 iPhone/iPad 上，通过「分享 → 添加到主屏幕」安装'},
+
   // Reading
   'settings.imageStorage': { ja: '画像保存', en: 'Image Storage', zh: '图片存储'},
   'imageStorage.title': { ja: '画像ストレージ設定', en: 'Image Storage Settings', zh: '图片存储设置'},
