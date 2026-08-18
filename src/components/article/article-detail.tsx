@@ -200,7 +200,14 @@ export function ArticleDetail({ articleUrl, enableZapNavigation = false }: Artic
       <article ref={articleRef} className="article-card max-w-2xl md:max-w-3xl mx-auto px-6 md:px-10 py-8">
       {/* Title */}
       <h1 className="mb-1.5 text-[28px] font-bold leading-[1.3] break-words [overflow-wrap:anywhere]">
-        {article.title}
+        <a
+          href={article.url}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-text no-underline hover:underline"
+        >
+          {article.title}
+        </a>
       </h1>
 
       {/* Date */}

@@ -162,7 +162,6 @@ const dict = {
   'article.noContent': { ja: 'コンテンツがありません', en: 'No content available', zh: '暂无内容'},
   'article.jaTranslation': { ja: '日本語訳', en: 'Japanese', zh: '日语'},
   'article.original': { ja: '原文', en: 'Original', zh: '原文'},
-  'article.sourceArticle': { ja: '元記事', en: 'Source Article', zh: '原文链接'},
   'article.summarize': { ja: '要約', en: 'Summarize', zh: '摘要'},
   'article.askQuestion': { ja: '質問', en: 'Ask', zh: '提问'},
   'article.readMore': { ja: '続きを読む', en: 'Read more', zh: '阅读更多'},
