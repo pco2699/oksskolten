@@ -281,6 +281,7 @@ const dict = {
   'install.button': { ja: 'インストール', en: 'Install', zh: '安装'},
   'install.installed': { ja: 'インストール済み', en: 'Installed', zh: '已安装'},
   'install.iosHint': { ja: 'iPhone/iPad では共有メニューの「ホーム画面に追加」からインストールできます', en: 'On iPhone/iPad, install via Share → Add to Home Screen', zh: '在 iPhone/iPad 上，通过「分享 → 添加到主屏幕」安装'},
+  'install.manualHint': { ja: 'インストールボタンが出ない場合は、ブラウザのメニューから「アプリをインストール」（ホーム画面に追加）を選んでください。インストール済みの場合はここに表示されません', en: "If no install button appears, use your browser menu → Install app (Add to Home screen). It also stays hidden once the app is installed", zh: '如果没有出现安装按钮，请从浏览器菜单选择「安装应用」（添加到主屏幕）。应用已安装时也不会显示'},
 
   // Reading
   'settings.imageStorage': { ja: '画像保存', en: 'Image Storage', zh: '图片存储'},

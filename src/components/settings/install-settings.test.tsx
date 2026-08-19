@@ -46,9 +46,25 @@ afterAll(() => {
 })
 
 describe('InstallSettings', () => {
-  it('renders nothing when not installable on non-iOS', () => {
-    const { container } = renderComponent()
-    expect(container.innerHTML).toBe('')
+  it('shows the manual hint when not installable on non-iOS', () => {
+    renderComponent()
+    expect(
+      screen.getByText(
+        'If no install button appears, use your browser menu \u2192 Install app (Add to Home screen). It also stays hidden once the app is installed',
+      ),
+    ).toBeTruthy()
+  })
+
+  it('shows the installed badge when the browser reports the PWA as installed', async () => {
+    stubNavigator({
+      platform: 'Linux armv8l',
+      userAgent: 'Mozilla/5.0 (Linux; Android 14)',
+      getInstalledRelatedApps: vi
+        .fn()
+        .mockResolvedValue([{ platform: 'webapp', url: '/manifest.webmanifest' }]),
+    } as Partial<Navigator>)
+    renderComponent()
+    await waitFor(() => expect(screen.getByText('Installed')).toBeTruthy())
   })
 
   it('renders the install button when installable', () => {

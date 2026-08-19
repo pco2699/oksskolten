@@ -77,6 +77,32 @@ describe('useInstallPrompt', () => {
     expect(result.current.isInstalled).toBe(false)
   })
 
+  it('defers the browser prompt so the event stays usable', () => {
+    renderHook(() => useInstallPrompt())
+    const event = new Event('beforeinstallprompt', { cancelable: true })
+    Object.assign(event, {
+      prompt: vi.fn().mockResolvedValue(undefined),
+      userChoice: Promise.resolve({ outcome: 'accepted' }),
+    })
+    act(() => {
+      window.dispatchEvent(event)
+    })
+    expect(event.defaultPrevented).toBe(true)
+  })
+
+  it('reports installed when the browser lists this PWA as a related app', async () => {
+    const getInstalledRelatedApps = vi
+      .fn()
+      .mockResolvedValue([{ platform: 'webapp', url: '/manifest.webmanifest' }])
+    Object.defineProperty(window.navigator, 'getInstalledRelatedApps', {
+      value: getInstalledRelatedApps,
+      configurable: true,
+    })
+    const { result } = renderHook(() => useInstallPrompt())
+    await waitFor(() => expect(result.current.isInstalled).toBe(true))
+    Reflect.deleteProperty(window.navigator, 'getInstalledRelatedApps')
+  })
+
   it('reflects standalone display mode as installed', async () => {
     // jsdom setup stubs matchMedia with matches: false; emulate standalone here
     const realMatchMedia = window.matchMedia
