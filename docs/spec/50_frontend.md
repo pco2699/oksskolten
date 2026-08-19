@@ -232,12 +232,28 @@ Progressive Web App support via `vite-plugin-pwa`.
 | Registration method | `autoUpdate` |
 | Display mode | `standalone` |
 | Start URL | `/all` |
+| App ID | `/all` (explicit, so a later `start_url` change does not read as a different app) |
+| Related applications | The manifest lists itself (`platform: webapp`) so `navigator.getInstalledRelatedApps()` can report the PWA as installed |
 | Cache strategy (Favicon) | CacheFirst (30 days) |
 | Cache strategy (Article detail API) | StaleWhileRevalidate (7 days) |
 | Cache strategy (General API) | NetworkFirst (24 hours, 5s timeout) |
 | Cache strategy (Images) | CacheFirst (30 days) |
 | Offline queue | Accumulates unsynced read IDs in IndexedDB (`reader-offline` DB) and batch-syncs via `POST /api/articles/batch-seen` when back online |
 | Update notification | When a new service worker is available, a persistent toast ("New version available") with a reload button is displayed via `sonner`. Clicking reload activates the new worker and refreshes the page |
+
+#### Install Section (Settings > About)
+
+`InstallSettings` (`src/components/settings/install-settings.tsx`) renders one of three states, driven by `useInstallPrompt` (`src/hooks/use-install-prompt.ts`):
+
+| State | Condition | UI |
+|---|---|---|
+| Installable | `beforeinstallprompt` was captured | "Install" button that re-opens the native install dialog |
+| Installed | `display-mode: standalone`, iOS `navigator.standalone`, an `appinstalled` event, or `getInstalledRelatedApps()` reporting a `webapp` entry | "Installed" badge |
+| Neither | No captured event and not detected as installed | Manual hint (iOS: Share → Add to Home Screen; otherwise: browser menu → Install app) |
+
+The `beforeinstallprompt` listener is registered at startup from `main.tsx`, before the lazily-loaded settings page mounts, and stores the event in a module-level store so the button works no matter when the browser fired it. The handler calls `preventDefault()`, which is what defers the prompt and keeps the event usable for a later `prompt()` call.
+
+The section never renders empty: Android Chrome stops firing `beforeinstallprompt` once the app is installed, and a normal browser tab still reports `display-mode: browser`, so an empty section was indistinguishable from a broken one.
 
 ### Custom Theme Import
 

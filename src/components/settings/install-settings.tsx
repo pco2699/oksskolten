@@ -15,8 +15,13 @@ function isIOS(): boolean {
  * Chrome/Edge fire `beforeinstallprompt` when the PWA meets installability
  * criteria; the useInstallPrompt hook captures it so we can re-trigger the
  * native install dialog from this button (works even after the one-time
- * mini-infobar has been dismissed). iOS Safari has no equivalent event, so
- * there we fall back to a hint pointing at Add to Home Screen.
+ * browser install hint has been dismissed).
+ *
+ * There are several reasons the event may never arrive — iOS Safari has no
+ * equivalent, the app is already installed, or the browser only offers install
+ * from its own menu — so this section always renders a manual hint rather than
+ * nothing at all. Rendering nothing made the section look broken on Android
+ * Chrome whenever the event was absent.
  */
 export function InstallSettings() {
   const { t } = useI18n()
@@ -33,10 +38,9 @@ export function InstallSettings() {
   }
 
   if (!canInstall) {
-    if (!isIOS()) return null
     return (
       <p className="mt-6 max-w-xs text-center text-xs text-muted select-none">
-        {t('install.iosHint')}
+        {isIOS() ? t('install.iosHint') : t('install.manualHint')}
       </p>
     )
   }

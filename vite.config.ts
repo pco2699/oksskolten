@@ -59,6 +59,10 @@ export default defineConfig(({ mode }) => {
         registerType: 'autoUpdate',
         includeAssets: ['icons/favicon-black.png', 'icons/favicon-white.png', 'apple-touch-icon-180x180.png'],
         manifest: {
+          // Explicit app id pins the install identity. Without it browsers
+          // derive it from start_url, so changing start_url later would look
+          // like a different app to an already-installed client.
+          id: '/all',
           name: 'Oksskolten',
           short_name: 'Oksskolten',
           description: 'Personal RSS Reader',
@@ -67,6 +71,14 @@ export default defineConfig(({ mode }) => {
           background_color: '#4D6782',
           display: 'standalone',
           prefer_related_applications: false,
+          // Listing our own manifest lets navigator.getInstalledRelatedApps()
+          // report this PWA as installed. Android Chrome stops firing
+          // beforeinstallprompt after install, and a browser tab still reports
+          // display-mode: browser, so this is the only way the Settings > About
+          // section can tell "already installed" from "not installable".
+          related_applications: [
+            { platform: 'webapp', url: '/manifest.webmanifest' },
+          ],
           scope: '/',
           start_url: '/all',
           icons: [
