@@ -1,5 +1,9 @@
 # Changelog
 
+## [v0.5.18](https://github.com/pco2699/oksskolten/compare/v0.5.17...v0.5.18) - 2026-08-19
+### Others
+- fix(pwa): make the install section visible on Android Chrome by @pco2699 in https://github.com/pco2699/oksskolten/pull/47
+
 ## [v0.5.17](https://github.com/pco2699/oksskolten/compare/v0.5.16...v0.5.17) - 2026-08-18
 ### Others
 - feat(pwa): improve install experience on Android (manifest, install button, maskable icon) by @pco2699 in https://github.com/pco2699/oksskolten/pull/45
