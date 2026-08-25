@@ -233,7 +233,7 @@ Progressive Web App support via `vite-plugin-pwa`.
 | Display mode | `standalone` |
 | Start URL | `/all` |
 | App ID | `/all` (explicit, so a later `start_url` change does not read as a different app) |
-| Related applications | None. A self-referencing `webapp` entry makes Chrome for Android drop "Install app" from its menu, because Chrome suppresses its own install promotion for a manifest that declares a related application it considers installed |
+| Related applications | The manifest lists itself (`platform: webapp`) so `navigator.getInstalledRelatedApps()` can report the PWA as installed |
 | Cache strategy (Favicon) | CacheFirst (30 days) |
 | Cache strategy (Article detail API) | StaleWhileRevalidate (7 days) |
 | Cache strategy (General API) | NetworkFirst (24 hours, 5s timeout) |
@@ -248,14 +248,14 @@ Progressive Web App support via `vite-plugin-pwa`.
 | State | Condition | UI |
 |---|---|---|
 | Installable | `beforeinstallprompt` was captured | "Install" button that re-opens the native install dialog |
-| Installed | `display-mode: standalone`, iOS `navigator.standalone`, an `appinstalled` event, or a `pwa_installed` marker in `localStorage` | "Installed" badge |
+| Installed | `display-mode: standalone`, iOS `navigator.standalone`, an `appinstalled` event, or `getInstalledRelatedApps()` reporting a `webapp` entry | "Installed" badge |
 | Neither | No captured event and not detected as installed | Manual hint (iOS: Share → Add to Home Screen; otherwise: browser menu → Install app) |
 
 The `beforeinstallprompt` listener is registered at startup from `main.tsx`, before the lazily-loaded settings page mounts, and stores the event in a module-level store so the button works no matter when the browser fired it. The handler calls `preventDefault()`, which is what defers the prompt and keeps the event usable for a later `prompt()` call.
 
-The section never renders empty: a browser stops firing `beforeinstallprompt` once the app is installed, and a normal browser tab still reports `display-mode: browser`, so an empty section was indistinguishable from a broken one.
+The section never renders empty: Android Chrome stops firing `beforeinstallprompt` once the app is installed, and a normal browser tab still reports `display-mode: browser`, so an empty section was indistinguishable from a broken one.
 
-Detecting an existing install therefore relies on a `pwa_installed` marker written to `localStorage` whenever the app runs in standalone display mode or fires `appinstalled`. Android shares storage between Chrome and the installed WebAPK, so launching the app once is enough for later browser tabs to show the badge. `beforeinstallprompt` clears the marker again — a browser only offers to install what is not installed, so the event is proof that a marker left behind by an uninstall is stale.
+Note that a missing install option is not always the app's fault. Android hands home-screen pinning to the active launcher, and a third-party launcher that does not implement it makes Chrome drop "Install app" from its own menu and never fire `beforeinstallprompt` — the same symptoms as a manifest that fails the installability criteria, but with nothing to fix on the web side. Before changing the manifest, confirm the browser's verdict directly: `chrome://inspect` from a desktop (Application > Manifest) names the actual installability error, and `chrome://webapks` on the device lists what Chrome already considers installed.
 
 ### Custom Theme Import
 
