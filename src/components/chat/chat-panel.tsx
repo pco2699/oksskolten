@@ -297,7 +297,7 @@ export function ChatPanel({ variant, chatState: externalChatState, articleId, co
     )
   }
 
-  // Full variant (HomePage / ChatPage)
+  // Full variant (ChatPage)
   return (
     <div className="flex flex-col h-full">
       {/* Messages */}

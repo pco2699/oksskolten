@@ -339,7 +339,7 @@ Return the cached OpenRouter model catalog (id, label, vendor, pricing).
 
 #### ChatPanel Component
 
-Shared between Home chat and in-article chat.
+Shared between the chat page and in-article chat.
 
 ```typescript
 interface ChatPanelProps {

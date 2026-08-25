@@ -14,7 +14,7 @@ export function FeedListHeader({ onClose, onCollapse }: FeedListHeaderProps) {
   return (
     <div className="flex items-center justify-between px-4 pb-2 shrink-0" style={{ paddingTop: 'calc(var(--safe-area-inset-top) + 12px)' }}>
       <button
-        onClick={() => { void navigate('/', { state: { reset: Date.now() } }); onClose() }}
+        onClick={() => { void navigate('/all'); onClose() }}
         className="flex items-center gap-2 outline-none transition-opacity hover:opacity-70"
       >
         <span className="text-[26px] font-semibold tracking-tight text-text font-logo" aria-label={t('header.title')}>{t('header.title')}</span>

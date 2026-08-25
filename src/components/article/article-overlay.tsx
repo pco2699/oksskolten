@@ -26,7 +26,7 @@ export function ArticleOverlay({ articleUrl, onClose, onNavigate }: ArticleOverl
       <DialogPortal>
         <DialogOverlay className="duration-300" />
         <DialogPrimitive.Content
-          className="fixed inset-y-0 right-0 z-[70] w-full md:left-12 md:w-auto bg-bg shadow-2xl data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=open]:slide-in-from-right data-[state=closed]:slide-out-to-right duration-300"
+          className="fixed inset-y-0 right-0 z-[70] w-full md:left-[var(--article-overlay-left)] md:w-auto bg-bg shadow-2xl data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=open]:slide-in-from-right data-[state=closed]:slide-out-to-right duration-300"
           aria-describedby={undefined}
           data-keyboard-nav-passthrough=""
           onOpenAutoFocus={(e) => e.preventDefault()}

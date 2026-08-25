@@ -194,6 +194,23 @@ Four layout options are available for the article list. Independent from the the
 - Hook: `src/hooks/useLayout.ts` (based on `createLocalStorageHook`)
 - Skeleton UI: Dedicated skeletons corresponding to each layout
 
+### Reading Overlay Width
+
+When `articleOpenMode` is `overlay`, `ArticleOverlay` slides a reading panel in from the right. Below the `md` breakpoint the panel is full width. Above it, the panel's left edge is `var(--article-overlay-left)` (`src/index.css`):
+
+```css
+--article-overlay-left: max(3rem, calc(100% - 1200px));
+```
+
+The panel is therefore capped at 1200px and the peek strip absorbs any extra viewport width. A fixed 3rem strip is fine on laptop widths, but on a 4K display it buried the sidebar and article list behind a panel whose own content column is only ~850px wide.
+
+| Viewport | Peek strip | Panel |
+|---|---|---|
+| 800px | 48px | 752px |
+| 1440px | 240px | 1200px |
+| 1920px | 720px | 1200px |
+| 3840px | 2640px | 1200px |
+
 ### Mobile Gestures
 
 Touch gestures below the `md` breakpoint. All of them are no-ops for mouse/keyboard users.

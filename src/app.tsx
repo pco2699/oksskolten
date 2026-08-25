@@ -18,7 +18,6 @@ import { PageLayout } from './components/layout/page-layout'
 import { KeyboardNavigationProvider, useKeyboardNavigationContext } from './contexts/keyboard-navigation-context'
 const SettingsPage = lazy(() => import('./pages/settings-page').then(m => ({ default: m.SettingsPage })))
 const ChatPage = lazy(() => import('./pages/chat-page').then(m => ({ default: m.ChatPage })))
-const HomePage = lazy(() => import('./pages/home-page').then(m => ({ default: m.HomePage })))
 import { AuthShell } from './lib/auth-shell'
 import { ErrorBoundary } from './components/auth/error-boundary'
 import { HintBanner } from './components/ui/hint-banner'
@@ -218,16 +217,6 @@ function ChatPageWrapper() {
   )
 }
 
-function HomePageWrapper() {
-  return (
-    <PageLayout>
-      <Suspense>
-        <HomePage />
-      </Suspense>
-    </PageLayout>
-  )
-}
-
 function ArticleDetailPage() {
   const { '*': splat } = useParams()
   const { lastListUrl } = useKeyboardNavigationContext()
@@ -264,7 +253,7 @@ function ArticleDetailPage() {
  * new page animate as an article detail and fall through to the `/*` catch-all.
  */
 const APP_ROUTES = [
-  { path: '/', element: <HomePageWrapper />, pageType: 'list' },
+  { path: '/', element: <Navigate to="/all" replace />, pageType: 'list' },
   { path: '/all', element: <ArticleListPage />, pageType: 'list' },
   { path: '/inbox', element: <Navigate to="/all" replace />, pageType: 'list' },
   { path: '/bookmarks', element: <ArticleListPage />, pageType: 'list' },

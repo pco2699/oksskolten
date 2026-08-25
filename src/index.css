@@ -23,6 +23,11 @@
 :root {
   --header-height: 48px;
   --sidebar-width: 280px;
+  /* Left edge of the reading overlay panel. A fixed 3rem peek strip works on
+     laptop widths, but on a 4K display it leaves the sidebar and article list
+     buried under a panel whose own content is only ~850px wide. Cap the panel
+     instead and let the strip absorb the extra width. */
+  --article-overlay-left: max(3rem, calc(100% - 1200px));
   --safe-area-inset-top: env(safe-area-inset-top, 0px);
   --safe-area-inset-bottom: env(safe-area-inset-bottom, 0px);
   --color-bg: #ffffff;
