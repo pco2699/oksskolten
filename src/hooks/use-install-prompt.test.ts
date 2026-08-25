@@ -117,6 +117,31 @@ describe('useInstallPrompt', () => {
     expect(localStorage.getItem('pwa_installed')).toBeNull()
   })
 
+  it('survives blocked site data, which throws instead of no-opping', () => {
+    const blocked = () => {
+      throw new DOMException('site data blocked', 'SecurityError')
+    }
+    const realStorage = window.localStorage
+    vi.stubGlobal('localStorage', {
+      getItem: blocked,
+      setItem: blocked,
+      removeItem: blocked,
+      clear: blocked,
+    })
+    try {
+      // This module is imported during startup, so a throw here breaks boot
+      act(() => __resetInstallPromptForTests())
+      const { result } = renderHook(() => useInstallPrompt())
+      expect(result.current.isInstalled).toBe(false)
+
+      // The badge still works within the session, it just is not remembered
+      act(() => dispatchAppInstalled())
+      expect(result.current.isInstalled).toBe(true)
+    } finally {
+      vi.stubGlobal('localStorage', realStorage)
+    }
+  })
+
   it('reflects standalone display mode as installed', async () => {
     // jsdom setup stubs matchMedia with matches: false; emulate standalone here
     const realMatchMedia = window.matchMedia
