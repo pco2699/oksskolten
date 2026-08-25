@@ -1,5 +1,10 @@
 # Changelog
 
+## [v0.5.20](https://github.com/pco2699/oksskolten/compare/v0.5.19...v0.5.20) - 2026-08-25
+### Others
+- Revert #49: the missing Android install option was a launcher, not the manifest by @pco2699 in https://github.com/pco2699/oksskolten/pull/51
+- feat(ui): cap the reading overlay width and make / the all-articles list by @pco2699 in https://github.com/pco2699/oksskolten/pull/53
+
 ## [v0.5.19](https://github.com/pco2699/oksskolten/compare/v0.5.18...v0.5.19) - 2026-08-25
 ### Others
 - fix(pwa): restore the Android install option by dropping related_applications by @pco2699 in https://github.com/pco2699/oksskolten/pull/49
