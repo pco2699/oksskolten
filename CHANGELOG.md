@@ -1,5 +1,9 @@
 # Changelog
 
+## [v0.5.19](https://github.com/pco2699/oksskolten/compare/v0.5.18...v0.5.19) - 2026-08-25
+### Others
+- fix(pwa): restore the Android install option by dropping related_applications by @pco2699 in https://github.com/pco2699/oksskolten/pull/49
+
 ## [v0.5.18](https://github.com/pco2699/oksskolten/compare/v0.5.17...v0.5.18) - 2026-08-19
 ### Others
 - fix(pwa): make the install section visible on Android Chrome by @pco2699 in https://github.com/pco2699/oksskolten/pull/47
