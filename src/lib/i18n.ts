@@ -662,18 +662,7 @@ const dict = {
   // Logout
   'sidebar.logout': { ja: 'ログアウト', en: 'Log out', zh: '退出登录'},
 
-  // Home page — time-based greetings
-  'home.greeting.morning': { ja: 'おはよう、{name}', en: 'Good morning, {name}', zh: '早上好，{name}'},
-  'home.greeting.afternoon': { ja: 'こんにちは、{name}', en: 'Good afternoon, {name}', zh: '下午好，{name}'},
-  'home.greeting.evening': { ja: 'こんばんは、{name}', en: 'Good evening, {name}', zh: '晚上好，{name}'},
-  // Home page — random fallback (outside greeting windows)
-  'home.greeting.random.0': { ja: '何について調べましょうか？', en: 'What would you like to explore?', zh: '想探索些什么？'},
-  'home.greeting.random.1': { ja: '今日はどんな記事を読みますか？', en: 'What would you like to read today?', zh: '今天想读什么？'},
-  'home.greeting.random.2': { ja: '何かお手伝いできることはありますか？', en: 'How can I help you?', zh: '有什么我能帮忙的？'},
-  'home.greeting.random.3': { ja: '気になるトピックはありますか？', en: 'Any topics on your mind?', zh: '有什么感兴趣的话题吗？'},
-  'home.greeting.random.4': { ja: '何から始めましょうか？', en: 'Where shall we start?', zh: '从哪里开始？'},
   'home.placeholder': { ja: '記事について何でも聞いてください...', en: 'Ask anything about your articles...', zh: '随便问关于文章的问题...'},
-  'home.chatHistory': { ja: 'チャット履歴', en: 'Chat history', zh: '聊天历史'},
   'chat.noResponse': { ja: '(応答なし)', en: '(No response)', zh: '（无响应）'},
 
   // Chat
