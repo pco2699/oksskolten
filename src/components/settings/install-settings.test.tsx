@@ -33,6 +33,7 @@ function renderComponent() {
 }
 
 beforeEach(() => {
+  localStorage.clear()
   __resetInstallPromptForTests()
   stubNavigator({ platform: 'Win32', userAgent: 'Mozilla/5.0 (Windows NT 10.0)' })
 })
@@ -55,16 +56,17 @@ describe('InstallSettings', () => {
     ).toBeTruthy()
   })
 
-  it('shows the installed badge when the browser reports the PWA as installed', async () => {
+  it('shows the installed badge in a browser tab once the app has been launched', () => {
     stubNavigator({
       platform: 'Linux armv8l',
-      userAgent: 'Mozilla/5.0 (Linux; Android 14)',
-      getInstalledRelatedApps: vi
-        .fn()
-        .mockResolvedValue([{ platform: 'webapp', url: '/manifest.webmanifest' }]),
-    } as Partial<Navigator>)
+      userAgent: 'Mozilla/5.0 (Linux; Android 16)',
+    })
+    // Android shares storage between Chrome and the installed WebAPK, so the
+    // marker left by a standalone launch is visible from a regular tab
+    localStorage.setItem('pwa_installed', '1')
+    __resetInstallPromptForTests()
     renderComponent()
-    await waitFor(() => expect(screen.getByText('Installed')).toBeTruthy())
+    expect(screen.getByText('Installed')).toBeTruthy()
   })
 
   it('renders the install button when installable', () => {

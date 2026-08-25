@@ -70,15 +70,16 @@ export default defineConfig(({ mode }) => {
           theme_color: '#ffffff',
           background_color: '#4D6782',
           display: 'standalone',
+          // Keep this false and list no related applications at all. Chrome
+          // suppresses its own install promotion when the manifest declares a
+          // related application it considers installed, and only Android
+          // implements the `webapp` platform — so a self-referencing entry
+          // (added to feed navigator.getInstalledRelatedApps()) took the
+          // "Install app" entry out of Chrome's Android menu while desktop,
+          // which ignores that platform, kept offering the install.
+          // Settings > About detects an existing install without it; see
+          // src/hooks/use-install-prompt.ts.
           prefer_related_applications: false,
-          // Listing our own manifest lets navigator.getInstalledRelatedApps()
-          // report this PWA as installed. Android Chrome stops firing
-          // beforeinstallprompt after install, and a browser tab still reports
-          // display-mode: browser, so this is the only way the Settings > About
-          // section can tell "already installed" from "not installable".
-          related_applications: [
-            { platform: 'webapp', url: '/manifest.webmanifest' },
-          ],
           scope: '/',
           start_url: '/all',
           icons: [

@@ -16,6 +16,7 @@ function dispatchAppInstalled() {
 }
 
 beforeEach(() => {
+  localStorage.clear()
   __resetInstallPromptForTests()
 })
 
@@ -90,17 +91,30 @@ describe('useInstallPrompt', () => {
     expect(event.defaultPrevented).toBe(true)
   })
 
-  it('reports installed when the browser lists this PWA as a related app', async () => {
-    const getInstalledRelatedApps = vi
-      .fn()
-      .mockResolvedValue([{ platform: 'webapp', url: '/manifest.webmanifest' }])
-    Object.defineProperty(window.navigator, 'getInstalledRelatedApps', {
-      value: getInstalledRelatedApps,
-      configurable: true,
-    })
+  it('remembers an install so a later browser tab still reports it', () => {
+    renderHook(() => useInstallPrompt())
+    act(() => dispatchAppInstalled())
+    expect(localStorage.getItem('pwa_installed')).toBe('1')
+
+    // A plain browser tab opened later: no event, no standalone display mode
+    act(() => __resetInstallPromptForTests())
+    const reopened = renderHook(() => useInstallPrompt())
+    expect(reopened.result.current.isInstalled).toBe(true)
+    expect(reopened.result.current.canInstall).toBe(false)
+  })
+
+  it('clears a stale marker when the browser offers to install again', () => {
+    localStorage.setItem('pwa_installed', '1')
+    act(() => __resetInstallPromptForTests())
     const { result } = renderHook(() => useInstallPrompt())
-    await waitFor(() => expect(result.current.isInstalled).toBe(true))
-    Reflect.deleteProperty(window.navigator, 'getInstalledRelatedApps')
+    expect(result.current.isInstalled).toBe(true)
+
+    // beforeinstallprompt only fires for an app that is not installed, so it is
+    // proof that a marker left behind by an uninstall is out of date
+    act(() => dispatchBeforeInstallPrompt('accepted'))
+    expect(result.current.isInstalled).toBe(false)
+    expect(result.current.canInstall).toBe(true)
+    expect(localStorage.getItem('pwa_installed')).toBeNull()
   })
 
   it('reflects standalone display mode as installed', async () => {
