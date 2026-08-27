@@ -486,6 +486,31 @@ describe('FeedList', () => {
       try { fn() } finally { mockSettings.hideZeroUnreadFeeds = original }
     }
 
+    it('exposes a header toggle that flips hideZeroUnreadFeeds', () => {
+      const feeds = [makeFeed({ id: 1, name: 'Has Unread', unread_count: 2, category_id: null })]
+      renderFeedList(
+        {},
+        { feeds, bookmark_count: 0, like_count: 0, clip_feed_id: null },
+        { categories: [] },
+      )
+      // Filter currently off: the button offers to hide.
+      fireEvent.click(screen.getByRole('button', { name: 'Hide feeds with no unread' }))
+      expect(mockSettings.setHideZeroUnreadFeeds).toHaveBeenCalledWith('on')
+    })
+
+    it('header toggle offers to show again while the filter is on', () => {
+      withHideOn(() => {
+        const feeds = [makeFeed({ id: 1, name: 'Has Unread', unread_count: 2, category_id: null })]
+        renderFeedList(
+          {},
+          { feeds, bookmark_count: 0, like_count: 0, clip_feed_id: null },
+          { categories: [] },
+        )
+        fireEvent.click(screen.getByRole('button', { name: 'Show feeds with no unread' }))
+        expect(mockSettings.setHideZeroUnreadFeeds).toHaveBeenCalledWith('off')
+      })
+    })
+
     it('hides feeds with zero unread articles when on', () => {
       withHideOn(() => {
         const feeds = [
