@@ -163,6 +163,11 @@ export default defineConfig(({ mode }) => {
     server: {
       host: '0.0.0.0',
       port,
+      // Vite blocks non-localhost Host headers by default; staging on a
+      // tailnet hostname needs it explicitly allow-listed (comma-separated).
+      allowedHosts: env.VITE_ALLOWED_HOSTS
+        ? env.VITE_ALLOWED_HOSTS.split(',').map(h => h.trim()).filter(Boolean)
+        : undefined,
       watch: env.CHOKIDAR_USEPOLLING === 'true'
         ? { usePolling: true, interval: 300 }
         : undefined,
