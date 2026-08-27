@@ -56,7 +56,13 @@ export default defineConfig(({ mode }) => {
       })] : []),
       react(),
       VitePWA({
-        registerType: 'autoUpdate',
+        // 'prompt' (not 'autoUpdate'): under autoUpdate the generated
+        // register code silently calls window.location.reload() as soon as
+        // a new worker activates, so a deploy yanked the page out from under
+        // whoever was reading. It also never calls onNeedRefresh, which made
+        // the update toast in src/main.tsx dead code. 'prompt' leaves the new
+        // worker waiting until the user taps that toast.
+        registerType: 'prompt',
         includeAssets: ['icons/favicon-black.png', 'icons/favicon-white.png', 'apple-touch-icon-180x180.png'],
         manifest: {
           // Explicit app id pins the install identity. Without it browsers
