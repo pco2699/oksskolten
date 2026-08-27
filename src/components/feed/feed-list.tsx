@@ -4,8 +4,9 @@ import useSWR from 'swr'
 import { fetcher } from '../../lib/fetcher'
 import { useI18n } from '../../lib/i18n'
 import { MD_BREAKPOINT } from '../../lib/breakpoints'
-import { LayoutList, Plus, ChevronRight, Bookmark, ThumbsUp, Clock, Paperclip, Search, Command, ArrowBigUp, AlertTriangle, MessagesSquare } from 'lucide-react'
+import { LayoutList, Plus, ChevronRight, Bookmark, ThumbsUp, Clock, Paperclip, Search, Command, ArrowBigUp, AlertTriangle, MessagesSquare, Eye, EyeOff } from 'lucide-react'
 import { Skeleton } from '@/components/ui/skeleton'
+import { IconButton } from '@/components/ui/icon-button'
 import { Input } from '@/components/ui/input'
 import { useFetchProgressContext } from '../../contexts/fetch-progress-context'
 import { toast } from 'sonner'
@@ -505,12 +506,7 @@ export function FeedList({ isOpen, onClose, onBackdropClose, onCollapse, onMarkA
         }`}
         style={{ backgroundColor: 'var(--color-bg-sidebar)' }}
       >
-        <FeedListHeader
-          onClose={onClose}
-          onCollapse={onCollapse}
-          hideZeroUnread={hideZeroUnread}
-          onToggleHideZeroUnread={() => setHideZeroUnreadFeeds(hideZeroUnread ? 'off' : 'on')}
-        />
+        <FeedListHeader onClose={onClose} onCollapse={onCollapse} />
 
         <nav className="flex-1 overflow-y-auto overscroll-contain py-2 px-2">
           <SidebarNavItem icon={LayoutList} label={t('feeds.all')} selected={isAll && selectedFeedId === null} onClick={() => { void navigate('/all'); onClose() }} badge={totalUnread > 0 ? <UnreadBadge count={totalUnread} /> : undefined} />
@@ -533,8 +529,21 @@ export function FeedList({ isOpen, onClose, onBackdropClose, onCollapse, onMarkA
 
           <SidebarNavItem icon={Plus} label={t('modal.addNew')} onClick={() => setFeedModalOpen(true)} className="text-muted hover:text-text" />
 
-          <div className="px-2 pt-4 pb-1">
+          <div className="flex items-center justify-between pl-2 pr-1 pt-4 pb-1">
             <h2 className="text-[11px] font-medium uppercase tracking-wider text-muted">{t('feeds.title')}</h2>
+            {/* Icon mirrors the current state (EyeOff while zero-unread feeds
+                are hidden); the label names the action the click performs. */}
+            <IconButton
+              onClick={() => setHideZeroUnreadFeeds(hideZeroUnread ? 'off' : 'on')}
+              aria-label={hideZeroUnread ? t('sidebar.showZeroUnreadFeeds') : t('sidebar.hideZeroUnreadFeeds')}
+              title={hideZeroUnread ? t('sidebar.showZeroUnreadFeeds') : t('sidebar.hideZeroUnreadFeeds')}
+              size="xs"
+              className="hover:bg-hover rounded"
+            >
+              {hideZeroUnread
+                ? <EyeOff size={14} strokeWidth={1.5} />
+                : <Eye size={14} strokeWidth={1.5} />}
+            </IconButton>
           </div>
 
           {/* Categories with their feeds */}
