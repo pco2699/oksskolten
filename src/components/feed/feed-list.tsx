@@ -126,6 +126,7 @@ export function FeedList({ isOpen, onClose, onBackdropClose, onCollapse, onMarkA
   const clipFeedId = useClipFeedId()
 
   const { settings } = useAppLayout()
+  const { setHideZeroUnreadFeeds } = settings
   const showFeedActivity = settings.showFeedActivity
   const hideZeroUnread = settings.hideZeroUnreadFeeds === 'on'
 
@@ -504,7 +505,12 @@ export function FeedList({ isOpen, onClose, onBackdropClose, onCollapse, onMarkA
         }`}
         style={{ backgroundColor: 'var(--color-bg-sidebar)' }}
       >
-        <FeedListHeader onClose={onClose} onCollapse={onCollapse} />
+        <FeedListHeader
+          onClose={onClose}
+          onCollapse={onCollapse}
+          hideZeroUnread={hideZeroUnread}
+          onToggleHideZeroUnread={() => setHideZeroUnreadFeeds(hideZeroUnread ? 'off' : 'on')}
+        />
 
         <nav className="flex-1 overflow-y-auto overscroll-contain py-2 px-2">
           <SidebarNavItem icon={LayoutList} label={t('feeds.all')} selected={isAll && selectedFeedId === null} onClick={() => { void navigate('/all'); onClose() }} badge={totalUnread > 0 ? <UnreadBadge count={totalUnread} /> : undefined} />

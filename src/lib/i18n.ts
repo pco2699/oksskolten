@@ -250,6 +250,8 @@ const dict = {
 
   // Sidebar menu
   'sidebar.settings': { ja: '設定', en: 'Settings', zh: '设置'},
+  'sidebar.hideZeroUnreadFeeds': { ja: '未読ゼロのフィードを隠す', en: 'Hide feeds with no unread', zh: '隐藏无未读的订阅源'},
+  'sidebar.showZeroUnreadFeeds': { ja: '未読ゼロのフィードも表示', en: 'Show feeds with no unread', zh: '显示无未读的订阅源'},
 
   // Settings page
   'settings.title': { ja: '設定', en: 'Settings', zh: '设置'},
