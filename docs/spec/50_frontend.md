@@ -246,7 +246,7 @@ Progressive Web App support via `vite-plugin-pwa`.
 
 | Item | Configuration |
 |---|---|
-| Registration method | `autoUpdate` |
+| Registration method | `prompt` (`autoUpdate` reloads the page silently on every deploy and never fires `onNeedRefresh`) |
 | Display mode | `standalone` |
 | Start URL | `/all` |
 | App ID | `/all` (explicit, so a later `start_url` change does not read as a different app) |
