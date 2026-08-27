@@ -1,5 +1,9 @@
 # Changelog
 
+## [v0.5.21](https://github.com/pco2699/oksskolten/compare/v0.5.20...v0.5.21) - 2026-08-27
+### Others
+- feat(sidebar): toggle hide-zero-unread-feeds from the FEEDS section header by @pco2699 in https://github.com/pco2699/oksskolten/pull/54
+
 ## [v0.5.20](https://github.com/pco2699/oksskolten/compare/v0.5.19...v0.5.20) - 2026-08-25
 ### Others
 - Revert #49: the missing Android install option was a launcher, not the manifest by @pco2699 in https://github.com/pco2699/oksskolten/pull/51
