@@ -50,7 +50,7 @@ export function ChatFab({ articleId }: ChatFabProps) {
     <>
       {/* Floating chat panel — only mount after first open, then use hidden to preserve state */}
       {mounted && (
-        <div className={`fixed bottom-[calc(5rem+var(--safe-area-inset-bottom))] left-4 right-4 md:left-auto md:right-6 md:w-[380px] z-50 max-h-[500px] flex flex-col bg-bg-card rounded-xl border border-border shadow-lg ${panelOpen ? '' : 'hidden'}`}>
+        <div className={`fixed bottom-[calc(5rem+var(--article-bottom-bar,0px)+var(--safe-area-inset-bottom))] left-4 right-4 md:left-auto md:right-6 md:w-[380px] z-50 max-h-[500px] flex flex-col bg-bg-card rounded-xl border border-border shadow-lg ${panelOpen ? '' : 'hidden'}`}>
           <ChatPanel variant="inline" articleId={articleId} onClose={() => setPanelOpen(false)} />
         </div>
       )}
@@ -58,7 +58,7 @@ export function ChatFab({ articleId }: ChatFabProps) {
       {/* FAB button */}
       <button
         onClick={handleToggle}
-        className="fixed bottom-[calc(1.5rem+var(--safe-area-inset-bottom))] right-6 z-50 w-12 h-12 rounded-full bg-accent text-accent-text flex items-center justify-center shadow-lg hover:opacity-90 transition-opacity select-none"
+        className="fixed bottom-[calc(1.5rem+var(--article-bottom-bar,0px)+var(--safe-area-inset-bottom))] right-6 z-50 w-12 h-12 rounded-full bg-accent text-accent-text flex items-center justify-center shadow-lg hover:opacity-90 transition-opacity select-none"
         aria-label="Chat"
       >
         <MessagesSquare className="w-5 h-5" />
