@@ -1,5 +1,9 @@
 # Changelog
 
+## [v0.5.22](https://github.com/pco2699/oksskolten/compare/v0.5.21...v0.5.22) - 2026-08-28
+### Others
+- Move article overlay action bar to the bottom on mobile by @pco2699 in https://github.com/pco2699/oksskolten/pull/59
+
 ## [v0.5.21](https://github.com/pco2699/oksskolten/compare/v0.5.20...v0.5.21) - 2026-08-27
 ### Others
 - feat(sidebar): toggle hide-zero-unread-feeds from the FEEDS section header by @pco2699 in https://github.com/pco2699/oksskolten/pull/54
