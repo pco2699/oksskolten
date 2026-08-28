@@ -26,7 +26,7 @@ export function ArticleOverlay({ articleUrl, onClose, onNavigate }: ArticleOverl
       <DialogPortal>
         <DialogOverlay className="duration-300" />
         <DialogPrimitive.Content
-          className="fixed inset-y-0 right-0 z-[70] w-full md:left-[var(--article-overlay-left)] md:w-auto bg-bg shadow-2xl data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=open]:slide-in-from-right data-[state=closed]:slide-out-to-right duration-300"
+          className="fixed inset-y-0 right-0 z-[70] w-full [--article-bottom-bar:3rem] md:[--article-bottom-bar:0px] md:left-[var(--article-overlay-left)] md:w-auto bg-bg shadow-2xl data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=open]:slide-in-from-right data-[state=closed]:slide-out-to-right duration-300"
           aria-describedby={undefined}
           data-keyboard-nav-passthrough=""
           onOpenAutoFocus={(e) => e.preventDefault()}
@@ -34,23 +34,28 @@ export function ArticleOverlay({ articleUrl, onClose, onNavigate }: ArticleOverl
           {...swipeHandlers}
         >
           {/* Scrollable inner wrapper — kept separate from the fixed Content box so the
-              nav arrows below can stay pinned to the panel's edges without scrolling away. */}
-          <div className="h-full overflow-y-auto overscroll-contain">
+              action bar and nav arrows below can stay pinned to the panel's edges
+              without scrolling away. The padding keeps the article clear of the bar,
+              which sits at the bottom on mobile and at the top from md up. */}
+          <div className="h-full overflow-y-auto overscroll-contain pt-[var(--safe-area-inset-top)] pb-[calc(3rem+var(--safe-area-inset-bottom))] md:pb-0 md:pt-[calc(3rem+var(--safe-area-inset-top))]">
             <DialogTitle className="sr-only">Article</DialogTitle>
-            {/* Close button */}
-            <div className="sticky top-0 z-10 flex items-center h-12 px-4 bg-bg/80 backdrop-blur-sm border-b border-border" style={{ paddingTop: 'var(--safe-area-inset-top)' }}>
-              <button
-                onClick={onClose}
-                className="flex items-center justify-center w-8 h-8 rounded-full hover:bg-hover transition-colors"
-                aria-label="Close"
-              >
-                <X className="w-5 h-5 text-muted" />
-              </button>
-              {/* Mobile has no room for the edge chevrons — the same prev/next
-                  navigation lives in this bar instead. */}
-              {articleUrl && <ArticleNavArrows currentArticleUrl={articleUrl} onNavigate={onNavigate} variant="header" />}
-            </div>
             {articleUrl && <ArticleDetail articleUrl={articleUrl} />}
+          </div>
+          {/* Close + prev/next bar. On phones it sits at the bottom, within thumb
+              reach; from md up it stays at the top of the panel as a header. */}
+          <div
+            className="absolute inset-x-0 bottom-0 z-10 flex items-center h-[calc(3rem+var(--safe-area-inset-bottom))] pb-[var(--safe-area-inset-bottom)] px-4 bg-bg/80 backdrop-blur-sm border-t border-border md:bottom-auto md:top-0 md:h-[calc(3rem+var(--safe-area-inset-top))] md:pb-0 md:pt-[var(--safe-area-inset-top)] md:border-t-0 md:border-b"
+          >
+            <button
+              onClick={onClose}
+              className="flex items-center justify-center w-8 h-8 rounded-full hover:bg-hover transition-colors"
+              aria-label="Close"
+            >
+              <X className="w-5 h-5 text-muted" />
+            </button>
+            {/* Mobile has no room for the edge chevrons — the same prev/next
+                navigation lives in this bar instead. */}
+            {articleUrl && <ArticleNavArrows currentArticleUrl={articleUrl} onNavigate={onNavigate} variant="header" />}
           </div>
           {articleUrl && <ArticleNavArrows currentArticleUrl={articleUrl} onNavigate={onNavigate} variant="overlay" />}
         </DialogPrimitive.Content>
