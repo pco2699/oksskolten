@@ -204,7 +204,7 @@ export function getArticles(opts: {
     const top20Row = getNamed<{ floor: string | null }>(`
       SELECT a.published_at AS floor FROM active_articles a
       ${scopeWhere}
-      ORDER BY a.published_at DESC
+      ORDER BY a.published_at DESC, a.id DESC
       LIMIT 1 OFFSET ${SMART_FLOOR_MIN_ARTICLES - 1}
     `, params)
 
@@ -238,9 +238,15 @@ export function getArticles(opts: {
     : undefined
 
   const where = conditions.length > 0 ? 'WHERE ' + conditions.join(' AND ') : ''
+  // Every ordering ends in `a.id DESC` so that rows sharing the same sort value
+  // get a stable position. Ties are common — a feed's items frequently carry the
+  // identical published_at, and published_at can be NULL altogether — and SQLite
+  // is free to return tied rows in a different order for each query. With OFFSET
+  // pagination that means page 2 can repeat an article page 1 already showed
+  // (and drop another one entirely).
   const orderBy = opts.sort === 'score'
-    ? 'a.score DESC, a.published_at DESC'
-    : opts.liked ? 'a.liked_at DESC' : opts.read ? 'a.read_at DESC' : 'a.published_at DESC'
+    ? 'a.score DESC, a.published_at DESC, a.id DESC'
+    : opts.liked ? 'a.liked_at DESC, a.id DESC' : opts.read ? 'a.read_at DESC, a.id DESC' : 'a.published_at DESC, a.id DESC'
 
   const totalRow = getNamed<{ cnt: number }>(`
     SELECT COUNT(*) AS cnt FROM active_articles a ${where}

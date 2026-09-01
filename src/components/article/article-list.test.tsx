@@ -374,6 +374,27 @@ describe('ArticleList', () => {
     expect(screen.getByText('Page 2')).toBeTruthy()
   })
 
+  it('renders an article repeated across pages only once', () => {
+    // A feed fetch between two page requests shifts the OFFSET window, so the
+    // next page can start with articles the previous page already returned.
+    swrInfiniteReturn = {
+      data: [
+        { articles: [makeArticle({ id: 1, title: 'First' }), makeArticle({ id: 2, title: 'Shared' })], total: 3, has_more: true },
+        { articles: [makeArticle({ id: 2, title: 'Shared' }), makeArticle({ id: 3, title: 'Third' })], total: 3, has_more: false },
+      ],
+      error: undefined,
+      size: 2,
+      setSize: vi.fn(),
+      isLoading: false,
+      isValidating: false,
+      mutate: vi.fn(),
+    }
+    renderArticleList()
+    expect(screen.getAllByText('Shared')).toHaveLength(1)
+    expect(screen.getByText('First')).toBeTruthy()
+    expect(screen.getByText('Third')).toBeTruthy()
+  })
+
   it('renders FeedMetricsBar for current feed', () => {
     swrFeedsData = {
       feeds: [

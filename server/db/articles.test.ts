@@ -168,6 +168,53 @@ describe('getArticles unreadSince', () => {
   })
 })
 
+// --- getArticles: pagination stability ---
+
+describe('getArticles pagination with tied sort values', () => {
+  it('never repeats or drops an article across pages when published_at ties', () => {
+    const feed = seedFeed()
+    const total = 25
+    for (let i = 0; i < total; i++) {
+      seedArticle(feed.id, { url: `https://example.com/tied-${i}`, published_at: '2025-01-01T00:00:00Z' })
+    }
+
+    const seen: number[] = []
+    for (let offset = 0; offset < total; offset += 5) {
+      const { articles } = getArticles({ feedId: feed.id, limit: 5, offset })
+      seen.push(...articles.map(a => a.id))
+    }
+
+    expect(seen).toHaveLength(total)
+    expect(new Set(seen).size).toBe(total)
+  })
+
+  it('orders tied articles by id descending', () => {
+    const feed = seedFeed()
+    const ids = [0, 1, 2].map(i =>
+      seedArticle(feed.id, { url: `https://example.com/tie-order-${i}`, published_at: '2025-01-01T00:00:00Z' }),
+    )
+
+    const { articles } = getArticles({ feedId: feed.id, limit: 100, offset: 0 })
+    expect(articles.map(a => a.id)).toEqual([...ids].reverse())
+  })
+
+  it('keeps articles without a published_at in a stable order', () => {
+    const feed = seedFeed()
+    const total = 12
+    for (let i = 0; i < total; i++) {
+      seedArticle(feed.id, { url: `https://example.com/no-date-${i}`, published_at: null })
+    }
+
+    const seen: number[] = []
+    for (let offset = 0; offset < total; offset += 4) {
+      const { articles } = getArticles({ feedId: feed.id, limit: 4, offset })
+      seen.push(...articles.map(a => a.id))
+    }
+
+    expect(new Set(seen).size).toBe(total)
+  })
+})
+
 // --- searchArticles ---
 
 describe('searchArticles', () => {
