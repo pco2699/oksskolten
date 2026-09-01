@@ -178,7 +178,24 @@ export const ArticleList = forwardRef<ArticleListHandle, object>(function Articl
     },
   }), [mutate, unreadOnly])
 
-  const articles = useMemo(() => data ? data.flatMap(page => page.articles) : [], [data])
+  // Pages are de-duplicated by id, not just concatenated. OFFSET pagination is
+  // relative to the result set at the moment each page is fetched, so articles
+  // arriving between two page requests (a feed fetch finishing, an auto-refresh)
+  // push everything down and the next page repeats what the previous one ended
+  // with. Dropping the repeats keeps the list — and its React keys — unique.
+  const articles = useMemo(() => {
+    if (!data) return []
+    const seen = new Set<number>()
+    const merged: ArticleListItem[] = []
+    for (const page of data) {
+      for (const article of page.articles) {
+        if (seen.has(article.id)) continue
+        seen.add(article.id)
+        merged.push(article)
+      }
+    }
+    return merged
+  }, [data])
   const hasMore = data ? data[data.length - 1]?.has_more ?? false : false
   const isEmpty = data?.[0]?.articles.length === 0
   const totalAll = data?.[0]?.total_all
