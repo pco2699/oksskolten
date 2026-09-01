@@ -1,5 +1,9 @@
 # Changelog
 
+## [v0.5.23](https://github.com/pco2699/oksskolten/compare/v0.5.22...v0.5.23) - 2026-09-01
+### Others
+- Fix duplicate articles in paginated lists by @pco2699 in https://github.com/pco2699/oksskolten/pull/60
+
 ## [v0.5.22](https://github.com/pco2699/oksskolten/compare/v0.5.21...v0.5.22) - 2026-08-28
 ### Others
 - Move article overlay action bar to the bottom on mobile by @pco2699 in https://github.com/pco2699/oksskolten/pull/59
