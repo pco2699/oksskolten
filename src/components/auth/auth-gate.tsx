@@ -1,18 +1,26 @@
 import { useCallback, useEffect, useState } from 'react'
 import useSWR from 'swr'
 import { AUTH_LOGOUT_EVENT, getAuthToken, setAuthToken } from '../../lib/auth'
+import { ApiError } from '../../lib/api-base'
 import { LoginPage } from '../../pages/login-page'
 
 // AuthGate uses its own fetcher that does NOT redirect on 401.
 // The global fetcher calls window.location.href = '/' on 401, which causes
 // an infinite reload loop when unauthenticated. AuthGate handles 401 by
 // showing LoginPage instead.
+//
+// The fetcher also distinguishes "server rejected the session" from
+// "network unreachable": a non-ok response throws ApiError (carries an HTTP
+// status), while a dropped connection makes fetch() itself reject with a
+// plain TypeError (no status). The render gate below uses that distinction
+// to render cached content optimistically while offline, instead of
+// bouncing a previously-signed-in user to the login form.
 const meFetcher = (url: string) => {
   const token = getAuthToken()
   return fetch(url, {
     headers: token ? { Authorization: `Bearer ${token}` } : {},
   }).then(r => {
-    if (!r.ok) throw new Error('Unauthorized')
+    if (!r.ok) throw new ApiError('Unauthorized', r.status, {})
     return r.json()
   })
 }
@@ -21,7 +29,7 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
   const [exchanging, setExchanging] = useState(false)
   const { data, error, isLoading, mutate } = useSWR<{ email: string }>('/api/me', meFetcher, {
     revalidateOnFocus: false,
-    revalidateOnReconnect: false,
+    revalidateOnReconnect: true,
     errorRetryCount: 0,
   })
 
@@ -72,7 +80,20 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
       </div>
     )
   }
-  if (error || !data) return <LoginPage onLogin={handleLogin} />
+  if (error) {
+    // Server explicitly rejected the session (e.g. 401): show the login form.
+    if (error instanceof ApiError) return <LoginPage onLogin={handleLogin} />
+
+    // Otherwise this is a network failure (fetch rejected, no HTTP status).
+    // If we previously established a session, render optimistically so the
+    // app keeps working offline against the service worker's cached API
+    // responses. `revalidateOnReconnect` reconciles the real auth state
+    // once connectivity returns. Never do this for someone with no token.
+    if (getAuthToken()) return <>{children}</>
+
+    return <LoginPage onLogin={handleLogin} />
+  }
+  if (!data) return <LoginPage onLogin={handleLogin} />
 
   return <>{children}</>
 }
