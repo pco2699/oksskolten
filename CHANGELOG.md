@@ -1,5 +1,9 @@
 # Changelog
 
+## [v0.5.24](https://github.com/pco2699/oksskolten/compare/v0.5.23...v0.5.24) - 2026-09-06
+### Others
+- fix(fetcher): remove two backtracking regexes that can wedge a thread by @pco2699 in https://github.com/pco2699/oksskolten/pull/62
+
 ## [v0.5.23](https://github.com/pco2699/oksskolten/compare/v0.5.22...v0.5.23) - 2026-09-01
 ### Others
 - Fix duplicate articles in paginated lists by @pco2699 in https://github.com/pco2699/oksskolten/pull/60
