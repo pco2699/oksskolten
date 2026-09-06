@@ -157,3 +157,80 @@ describe('parseHtml', () => {
     expect(result.excerpt).toContain('Click here')
   })
 })
+
+// --- quality verdicts, computed here so the caller never rescans fullText ---
+
+describe('parseHtml quality verdicts', () => {
+  const PROSE = `
+        <p>This is the article body with enough text to be extracted by readability.
+        The content needs to be sufficiently long for Readability to pick it up.
+        Adding more paragraphs helps with this detection algorithm.</p>
+        <p>Second paragraph with additional content to ensure proper extraction.
+        Readability needs a reasonable amount of text to identify the content area.</p>
+        <p>Third paragraph. More content is better for article extraction accuracy.</p>`
+
+  it('reports textLength as the whitespace-collapsed length of fullText', () => {
+    const result = parseHtml({ html: makeHtml(`<article>${PROSE}</article>`), articleUrl: BASE_URL })
+    expect(result.textLength).toBe(result.fullText.replace(/\s+/g, ' ').trim().length)
+    expect(result.textLength).toBeGreaterThan(0)
+  })
+
+  it('does not flag a normal prose article as garbage', () => {
+    const result = parseHtml({ html: makeHtml(`<article>${PROSE}</article>`), articleUrl: BASE_URL })
+    expect(result.looksGarbage).toBe(false)
+  })
+
+  it('flags a bot-check interstitial as garbage', () => {
+    const html = makeHtml(`
+      <article>
+        <h1>Just a moment...</h1>
+        <p>Our systems have detected unusual traffic from your computer network.
+        This page checks to see if it is really you sending the requests.
+        Please try again later, or contact your network administrator.</p>
+        <p>Why did this happen? About this page. Verify you are a human to continue.</p>
+      </article>
+    `)
+    expect(parseHtml({ html, articleUrl: BASE_URL }).looksGarbage).toBe(true)
+  })
+
+  it('flags an extraction with no sentence punctuation as garbage', () => {
+    // A terminator-free blob is exactly what used to make the sentence counter
+    // quadratic on the main thread; it must be cheap and must come back true.
+    const blob = 'aaaa bbbb cccc dddd eeee ffff gggg hhhh '.repeat(400)
+    const html = makeHtml(`<article><p>${blob}</p></article>`)
+
+    const started = Date.now()
+    const result = parseHtml({ html, articleUrl: BASE_URL })
+    expect(result.looksGarbage).toBe(true)
+    expect(Date.now() - started).toBeLessThan(5_000)
+  })
+})
+
+// --- HTML preparation now happens inside the worker ---
+
+describe('parseHtml input preparation', () => {
+  // `stripHeavyTags` is covered directly in content.test.ts; its effect is not
+  // observable through parseHtml, because Readability drops those shells too.
+  // Anchor extraction is observable, so that is what pins the prep in place.
+  const SECTION = (n: string) => `
+    <h2 id="v${n}">Version ${n}</h2>
+    <p>Release notes for version ${n} with a decent amount of prose so that
+    Readability treats the whole page as content and keeps every section.</p>
+    <p>Further detail about version ${n}, long enough to carry weight in scoring.</p>`
+
+  const CHANGELOG = makeHtml(`<article>${SECTION('3')}${SECTION('2')}${SECTION('1')}</article>`)
+
+  it('narrows an anchored document to the targeted section', () => {
+    const result = parseHtml({ html: CHANGELOG, articleUrl: 'https://example.com/changelog#v2' })
+    expect(result.fullText).toContain('## Version 2')
+    expect(result.fullText).not.toContain('## Version 3')
+    expect(result.fullText).not.toContain('## Version 1')
+  })
+
+  it('keeps the whole document when the url carries no fragment', () => {
+    const result = parseHtml({ html: CHANGELOG, articleUrl: 'https://example.com/changelog' })
+    expect(result.fullText).toContain('## Version 3')
+    expect(result.fullText).toContain('## Version 2')
+    expect(result.fullText).toContain('## Version 1')
+  })
+})

@@ -6,6 +6,8 @@ import { preClean, postClean } from '../lib/cleaner/index.js'
 import { findBestContentBlock } from '../lib/cleaner/content-scorer.js'
 import type { CleanerConfig } from '../lib/cleaner/selectors.js'
 import { markdownToExcerpt } from './markdown-utils.js'
+import { stripHeavyTags, extractAnchoredContentHtml } from './html-prep.js'
+import { isBotBlockPage } from '../lib/blocked-body.js'
 
 const isDev = process.env.NODE_ENV === 'development'
 const logger = pino({
@@ -45,6 +47,7 @@ turndown.addRule('barePreBlock', {
 })
 
 export interface ParseHtmlInput {
+  /** Raw page body. Anchor extraction and tag stripping happen in here. */
   html: string
   articleUrl: string
   cleanerConfig?: CleanerConfig
@@ -55,10 +58,19 @@ export interface ParseHtmlResult {
   ogImage: string | null
   excerpt: string | null
   title: string | null
+  /** Whitespace-collapsed length of `fullText`, so callers need not rescan it. */
+  textLength: number
+  /** True when the extraction looks like an interstitial or a script dump. */
+  looksGarbage: boolean
 }
 
 export function parseHtml(input: ParseHtmlInput): ParseHtmlResult {
-  const { html, articleUrl, cleanerConfig } = input
+  const { html: rawHtml, articleUrl, cleanerConfig } = input
+
+  // Prepare the body here rather than at the call site: both entry points
+  // (direct fetch and the FlareSolverr retry) used to run these two passes on
+  // the main thread, identically, before handing the result over.
+  const html = stripHeavyTags(extractAnchoredContentHtml(rawHtml, articleUrl))
 
   // Extract og:image and og:title before any DOM mutation
   const vc = createVirtualConsole(articleUrl)
@@ -153,7 +165,62 @@ export function parseHtml(input: ParseHtmlInput): ParseHtmlResult {
   const excerpt = markdownToExcerpt(fullText)
 
   const title = article?.title || ogTitle || htmlTitle
-  return { fullText, ogImage, excerpt, title }
+  const textLength = fullText.replace(/\s+/g, ' ').trim().length
+  return { fullText, ogImage, excerpt, title, textLength, looksGarbage: isGarbageExtraction(fullText) }
+}
+
+/**
+ * Detect garbage extraction: text that is mostly code/scripts with little
+ * natural prose. Readability "succeeds" on bot checks, consent walls and leaked
+ * script blobs, and the result is indistinguishable from an article downstream
+ * — the summarizer will confidently summarize a CAPTCHA page. Strips markdown
+ * code fences and asks whether what remains reads like prose.
+ *
+ * Lives here, beside the parse that produces its input, so it runs under the
+ * worker pool's timeout. It sat in `content.ts` on the main thread until
+ * 2026-09-06, when its sentence-counting regex went quadratic on a ~1 MB
+ * terminator-free extraction and pinned the event loop for ~1 hour.
+ */
+function isGarbageExtraction(text: string): boolean {
+  // Bot detection / form submission pages. Classified by `isBotBlockPage` in
+  // server/lib/blocked-body.ts, shared with the summarize path so the fetcher
+  // and the tools agree on what a failed fetch is.
+  if (isBotBlockPage(text)) return true
+
+  // Strip markdown code blocks (```...```)
+  const withoutCodeBlocks = text.replace(/```[\s\S]*?```/g, '')
+  // Strip inline code (`...`)
+  const withoutInlineCode = withoutCodeBlocks.replace(/`[^`]+`/g, '')
+
+  const prose = withoutInlineCode.replace(/\s+/g, ' ').trim()
+  if (prose.length === 0) return true
+
+  // Count prose sentences: sequences ending with sentence-final punctuation
+  // that contain at least a few word-like tokens.
+  //
+  // Walk the string instead of matching /[^.!?。！？]+[.!?。！？]/g. That pattern
+  // is quadratic on text whose tail holds no terminator: the run is scanned to
+  // the end, backtracks, and is rescanned from the next start position, so cost
+  // grows with the square of the trailing run. The walk is linear and stops as
+  // soon as the threshold is met.
+  const SENTENCE_END = new Set(['.', '!', '?', '。', '！', '？'])
+  const MIN_PROSE_SENTENCES = 3
+  let proseSentences = 0
+  let sentenceStart = 0
+  for (let i = 0; i < prose.length && proseSentences < MIN_PROSE_SENTENCES; i++) {
+    if (!SENTENCE_END.has(prose[i])) continue
+    const sentence = prose.slice(sentenceStart, i + 1).trim()
+    sentenceStart = i + 1
+    if (sentence && sentence.split(/\s+/).length >= 3) proseSentences++
+  }
+
+  // A real article should have at least a handful of prose sentences
+  if (proseSentences < MIN_PROSE_SENTENCES) return true
+
+  // Check ratio: if prose (outside code fences) is tiny relative to total text, likely garbage
+  if (prose.length < text.length * 0.1) return true
+
+  return false
 }
 
 // piscina default export: receives serializable input, returns serializable output
