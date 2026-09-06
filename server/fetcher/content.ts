@@ -1,10 +1,9 @@
 import fs from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { Piscina as PiscinaPool } from 'piscina'
-import { JSDOM } from 'jsdom'
 import { fetchHtml } from './http.js'
 import { fetchViaFlareSolverr } from './flaresolverr.js'
-import { isBotBlockPage, MIN_ARTICLE_BODY_LENGTH } from '../lib/blocked-body.js'
+import { MIN_ARTICLE_BODY_LENGTH } from '../lib/blocked-body.js'
 import type { CleanerConfig } from '../lib/cleaner/selectors.js'
 import type { ParseHtmlInput, ParseHtmlResult } from './contentWorker.js'
 
@@ -81,101 +80,6 @@ async function runWithTimeout(input: ParseHtmlInput, timeoutMs: number): Promise
  */
 export const MIN_EXTRACTED_LENGTH = MIN_ARTICLE_BODY_LENGTH
 
-/**
- * Strip heavy non-content tags before passing HTML to the worker thread.
- * This runs on the main thread with simple regex (no DOM parsing), so it's fast.
- * Removes clearly non-content shells before Readability to reduce parse time.
- */
-export function stripHeavyTags(html: string): string {
-  return html
-    .replace(/<script[\s\S]*?<\/script>/gi, '')
-    .replace(/<style[\s\S]*?<\/style>/gi, '')
-    .replace(/<svg[\s\S]*?<\/svg>/gi, '')
-    .replace(/<noscript[\s\S]*?<\/noscript>/gi, '')
-    .replace(/<nav[\s\S]*?<\/nav>/gi, '')
-    .replace(/<header[\s\S]*?<\/header>/gi, '')
-    .replace(/<footer[\s\S]*?<\/footer>/gi, '')
-    .replace(/<aside[\s\S]*?<\/aside>/gi, '')
-    .replace(/<dialog[\s\S]*?<\/dialog>/gi, '')
-    .replace(/<form[\s\S]*?<\/form>/gi, '')
-    .replace(/<template[\s\S]*?<\/template>/gi, '')
-    .replace(/<canvas[\s\S]*?<\/canvas>/gi, '')
-}
-
-function isHeading(el: Element): el is HTMLElement {
-  return /^H[1-6]$/i.test(el.tagName)
-}
-
-function headingLevel(el: Element | null): number {
-  if (!el) return 6
-  if (isHeading(el)) return Number(el.tagName[1])
-  if (el.getAttribute('role') === 'heading') {
-    const ariaLevel = Number(el.getAttribute('aria-level') || '6')
-    return Number.isFinite(ariaLevel) && ariaLevel > 0 ? ariaLevel : 6
-  }
-  return 6
-}
-
-function isBoundaryHeading(el: Element, targetLevel: number): boolean {
-  return headingLevel(el) <= targetLevel
-}
-
-/**
- * For anchor-link documents like changelogs, extract only the targeted section.
- * This avoids sending the entire page history to jsdom + Readability.
- */
-export function extractAnchoredContentHtml(html: string, articleUrl: string): string {
-  const url = new URL(articleUrl)
-  const hash = url.hash.replace(/^#/, '')
-  if (!hash) return html
-
-  const dom = new JSDOM(html, { url: articleUrl })
-  const doc = dom.window.document
-  const target = doc.getElementById(hash)
-  if (!target) return html
-
-  const start = isHeading(target) ? target : (target as Element).closest('h1, h2, h3, h4, h5, h6, [role="heading"]') || target
-  const targetLevel = headingLevel(start)
-
-  let endBoundary: Element | null = null
-  let current: Element | null = start
-  while ((current = current!.nextElementSibling)) {
-    if (isBoundaryHeading(current, targetLevel)) {
-      endBoundary = current
-      break
-    }
-  }
-
-  const range = doc.createRange()
-  range.setStartBefore(start)
-  if (endBoundary) range.setEndBefore(endBoundary)
-  else range.setEndAfter(doc.body.lastElementChild || doc.body)
-
-  const fragment = doc.createElement('article')
-  fragment.append(range.cloneContents())
-  const fragmentHtml = fragment.innerHTML.trim()
-  if (!fragmentHtml) return html
-
-  const ogTags = [
-    doc.querySelector('meta[property="og:image"]')?.outerHTML,
-    doc.querySelector('meta[property="og:title"]')?.outerHTML,
-  ].filter(Boolean).join('\n')
-  const title = doc.querySelector('title')?.textContent || ''
-
-  return `<!DOCTYPE html>
-<html>
-<head>
-<title>${title}</title>
-${ogTags}
-</head>
-<body>
-<article>
-${fragmentHtml}
-</article>
-</body>
-</html>`
-}
-
 export interface FetchFullTextOptions {
   cleanerConfig?: CleanerConfig
   requiresJsChallenge?: boolean
@@ -185,28 +89,29 @@ export async function fetchFullText(articleUrl: string, options?: FetchFullTextO
   const cleanerConfig = options?.cleanerConfig
   const requiresJsChallenge = options?.requiresJsChallenge ?? false
 
-  // Step 1: Fetch HTML (async I/O, non-blocking — stays on main thread)
+  // Step 1: Fetch HTML. Async I/O, so it does not hold the event loop.
   const { html } = await fetchHtml(articleUrl, { useFlareSolverr: requiresJsChallenge })
-  const extractedHtml = extractAnchoredContentHtml(html, articleUrl)
-  const cleanedHtml = stripHeavyTags(extractedHtml)
 
-  // Step 2: Parse HTML in worker thread (CPU-intensive, off main thread)
-  const input: ParseHtmlInput = { html: cleanedHtml, articleUrl, cleanerConfig }
-  const result = await runWithTimeout(input, WORKER_TIMEOUT_MS)
+  // Step 2: Everything CPU-bound happens in the worker — anchor extraction,
+  // tag stripping, Readability, Turndown, and the quality checks below. The
+  // raw body goes across as-is; `parseHtml` prepares it on the other side.
+  const result = await runWithTimeout({ html, articleUrl, cleanerConfig }, WORKER_TIMEOUT_MS)
 
-  // Step 3: FlareSolverr fallback if extracted text is too short or looks like garbage
-  const extractedLen = result.fullText.replace(/\s+/g, ' ').trim().length
-  const needsRetry = extractedLen < MIN_EXTRACTED_LENGTH || isGarbageExtraction(result.fullText)
+  // Step 3: FlareSolverr fallback if the extraction is too short or looks like
+  // garbage. Both verdicts are computed in the worker and travel back as
+  // `textLength` and `looksGarbage`, so deciding costs no scan of `fullText`
+  // here. This function used to re-scan the extracted text on the event loop.
+  const needsRetry = result.textLength < MIN_EXTRACTED_LENGTH || result.looksGarbage
   if (needsRetry && !requiresJsChallenge) {
     const flare = await fetchViaFlareSolverr(articleUrl, {
       waitForSelector: 'article, main, [role="main"], .post-content, .entry-content',
     })
     if (flare) {
-      const flareHtml = stripHeavyTags(extractAnchoredContentHtml(flare.body, articleUrl))
-      const flareInput: ParseHtmlInput = { html: flareHtml, articleUrl, cleanerConfig }
-      const flareResult = await runWithTimeout(flareInput, WORKER_TIMEOUT_MS)
-      const flareLen = flareResult.fullText.replace(/\s+/g, ' ').trim().length
-      if (flareLen > extractedLen) {
+      const flareResult = await runWithTimeout(
+        { html: flare.body, articleUrl, cleanerConfig },
+        WORKER_TIMEOUT_MS,
+      )
+      if (flareResult.textLength > result.textLength) {
         return flareResult
       }
     }
@@ -215,60 +120,8 @@ export async function fetchFullText(articleUrl: string, options?: FetchFullTextO
   return result
 }
 
-/**
- * Detect garbage extraction: text that is mostly code/scripts with little natural prose.
- * Strips markdown code fences and checks if remaining text has enough prose sentences.
- * A legitimate blog post about JS has explanatory sentences outside code blocks;
- * garbage extraction from leaked scripts has almost none.
- */
-function isGarbageExtraction(text: string): boolean {
-  // Bot detection / form submission pages
-  if (isBotBlockPage(text)) return true
-
-  // Strip markdown code blocks (```...```)
-  const withoutCodeBlocks = text.replace(/```[\s\S]*?```/g, '')
-  // Strip inline code (`...`)
-  const withoutInlineCode = withoutCodeBlocks.replace(/`[^`]+`/g, '')
-
-  const prose = withoutInlineCode.replace(/\s+/g, ' ').trim()
-  if (prose.length === 0) return true
-
-  // Count prose sentences: sequences ending with sentence-final punctuation
-  // that contain at least a few word-like tokens.
-  //
-  // Walk the string instead of matching /[^.!?。！？]+[.!?。！？]/g. That pattern
-  // is quadratic on text whose tail holds no terminator: the run is scanned to
-  // the end, backtracks, and is rescanned from the next start position, so cost
-  // grows with the square of the trailing run. Measured on Node 25: 320 kB took
-  // 156 s, and on 2026-09-06 a ~1 MB terminator-free extraction pinned the main
-  // thread for ~1 hour. This runs on the event loop, outside the worker pool's
-  // timeout, so nothing could interrupt it. The walk is linear and stops as soon
-  // as the threshold is met.
-  const SENTENCE_END = new Set(['.', '!', '?', '。', '！', '？'])
-  const MIN_PROSE_SENTENCES = 3
-  let proseSentences = 0
-  let sentenceStart = 0
-  for (let i = 0; i < prose.length && proseSentences < MIN_PROSE_SENTENCES; i++) {
-    if (!SENTENCE_END.has(prose[i])) continue
-    const sentence = prose.slice(sentenceStart, i + 1).trim()
-    sentenceStart = i + 1
-    if (sentence && sentence.split(/\s+/).length >= 3) proseSentences++
-  }
-
-  // A real article should have at least a handful of prose sentences
-  if (proseSentences < MIN_PROSE_SENTENCES) return true
-
-  // Check ratio: if prose (outside code fences) is tiny relative to total text, likely garbage
-  if (prose.length < text.length * 0.1) return true
-
-  return false
-}
-
-// Bot-block / consent / login pages that Readability mistakenly extracts are
-// classified by `isBotBlockPage` in server/lib/blocked-body.ts, shared with the
-// summarize path so the fetcher and the tools agree on what a failed fetch is.
-
-// Re-export markdown utilities so existing import sites don't break.
-// These live in a separate file to avoid circular dependency: contentWorker.ts
-// imports from here, but content.ts creates the Piscina pool that loads contentWorker.ts.
+// Re-export markdown and HTML-prep utilities so existing import sites don't break.
+// These live in separate files to avoid circular dependency: contentWorker.ts
+// imports from them, but content.ts creates the Piscina pool that loads contentWorker.ts.
 export { convertHtmlToMarkdown, markdownToExcerpt } from './markdown-utils.js'
+export { stripHeavyTags, extractAnchoredContentHtml } from './html-prep.js'
