@@ -234,15 +234,29 @@ function isGarbageExtraction(text: string): boolean {
   if (prose.length === 0) return true
 
   // Count prose sentences: sequences ending with sentence-final punctuation
-  // that contain at least a few word-like tokens
-  const sentences = prose.match(/[^.!?。！？]+[.!?。！？]/g) || []
-  const proseSentences = sentences.filter(s => {
-    const words = s.trim().split(/\s+/)
-    return words.length >= 3
-  })
+  // that contain at least a few word-like tokens.
+  //
+  // Walk the string instead of matching /[^.!?。！？]+[.!?。！？]/g. That pattern
+  // is quadratic on text whose tail holds no terminator: the run is scanned to
+  // the end, backtracks, and is rescanned from the next start position, so cost
+  // grows with the square of the trailing run. Measured on Node 25: 320 kB took
+  // 156 s, and on 2026-09-06 a ~1 MB terminator-free extraction pinned the main
+  // thread for ~1 hour. This runs on the event loop, outside the worker pool's
+  // timeout, so nothing could interrupt it. The walk is linear and stops as soon
+  // as the threshold is met.
+  const SENTENCE_END = new Set(['.', '!', '?', '。', '！', '？'])
+  const MIN_PROSE_SENTENCES = 3
+  let proseSentences = 0
+  let sentenceStart = 0
+  for (let i = 0; i < prose.length && proseSentences < MIN_PROSE_SENTENCES; i++) {
+    if (!SENTENCE_END.has(prose[i])) continue
+    const sentence = prose.slice(sentenceStart, i + 1).trim()
+    sentenceStart = i + 1
+    if (sentence && sentence.split(/\s+/).length >= 3) proseSentences++
+  }
 
   // A real article should have at least a handful of prose sentences
-  if (proseSentences.length < 3) return true
+  if (proseSentences < MIN_PROSE_SENTENCES) return true
 
   // Check ratio: if prose (outside code fences) is tiny relative to total text, likely garbage
   if (prose.length < text.length * 0.1) return true
