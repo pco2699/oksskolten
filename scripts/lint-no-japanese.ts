@@ -44,8 +44,10 @@ const ALLOWLIST: RegExp[] = [
   // OPA policy tests (contain Japanese string assertions)
   /^policy\//,
 
-  // Fetcher uses Japanese punctuation in sentence-splitting regex
-  /^server\/fetcher\/content\.ts$/,
+  // Fetcher uses Japanese punctuation in sentence-splitting logic. This moved
+  // from content.ts to contentWorker.ts when the CPU-bound text passes were
+  // pushed onto the worker thread; content.ts no longer holds any.
+  /^server\/fetcher\/contentWorker\.ts$/,
 ]
 
 function isAllowed(filePath: string): boolean {
