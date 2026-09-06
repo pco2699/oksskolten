@@ -139,8 +139,15 @@ export function parseHtml(input: ParseHtmlInput): ParseHtmlResult {
     /\[\s*\n+\s*(!\[[^\]]*\]\([^)]*\))\s*\n+\s*\]\s*\(([^)]*)\)/g,
     (_m, img, url) => `[${img}](${url})`,
   )
+  // Collapse a markdown link whose text was wrapped across lines.
+  //
+  // `[^\]]` must exclude `\n` here: it otherwise overlaps with the `\n` that
+  // opens the repeated group, so the same run of text can be split between the
+  // two in exponentially many ways. On a `[` that never gets its closing `](`,
+  // that ambiguity is catastrophic backtracking. Excluding the newline from
+  // both classes makes the parse unique while matching the same language.
   fullText = fullText.replace(
-    /\[([^\]]*(?:\n[^\]]*)+)\]\(([^)]+)\)/g,
+    /\[([^\]\n]*(?:\n[^\]\n]*)+)\]\(([^)]+)\)/g,
     (_m, text, url) => `[${text.replace(/\s*\n\s*/g, ' ').trim()}](${url})`,
   )
   const excerpt = markdownToExcerpt(fullText)
