@@ -570,6 +570,28 @@ describe('get_recent_activity', () => {
     expect(result).toHaveLength(2)
   })
 
+  it('allows a limit above the old cap of 50', async () => {
+    const feed = seedFeed()
+    for (let i = 0; i < 60; i++) {
+      const id = seedArticle(feed.id, { url: `https://example.com/cap${i}` })
+      markArticleSeen(id, true)
+    }
+
+    const result = JSON.parse(await executeTool('get_recent_activity', { limit: 60 }))
+    expect(result).toHaveLength(60)
+  })
+
+  it('clamps the limit to 100', async () => {
+    const feed = seedFeed()
+    for (let i = 0; i < 105; i++) {
+      const id = seedArticle(feed.id, { url: `https://example.com/clamp${i}` })
+      markArticleSeen(id, true)
+    }
+
+    const result = JSON.parse(await executeTool('get_recent_activity', { limit: 500 }))
+    expect(result).toHaveLength(100)
+  })
+
   it('returns app-internal URLs', async () => {
     const feed = seedFeed()
     const id = seedArticle(feed.id, { url: 'https://example.com/internal-test' })

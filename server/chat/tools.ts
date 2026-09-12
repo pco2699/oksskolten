@@ -528,12 +528,12 @@ const getRecentActivityTool: ToolDef = {
         enum: ['read', 'liked', 'bookmarked', 'all'],
         description: 'Activity type filter (default: all)',
       },
-      limit: { type: 'number', description: 'Maximum number of results (default: 15, max: 50)' },
+      limit: { type: 'number', description: 'Maximum number of results (default: 15, max: 100)' },
     },
   },
   execute: async (input, context) => {
     const type = (input.type as string) ?? 'all'
-    const limit = clampLimit(input.limit as number | undefined, 15, 50)
+    const limit = clampLimit(input.limit as number | undefined, 15, 100)
     const db = getDb()
 
     // Build UNION query based on type filter
