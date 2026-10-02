@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { Semaphore, errorMessage, normalizeDate, CONCURRENCY } from './util.js'
+import { Semaphore, errorMessage, normalizeDate, withTimeout, TimeoutError, CONCURRENCY } from './util.js'
 
 // --- CONCURRENCY ---
 
@@ -72,6 +72,32 @@ describe('Semaphore', () => {
     const returned = await Promise.all(tasks)
     expect(returned).toEqual([0, 1, 2, 3, 4, 5, 6, 7, 8, 9])
     expect(results).toHaveLength(10)
+  })
+})
+
+// --- withTimeout ---
+
+describe('withTimeout', () => {
+  it('passes through a value that settles in time', async () => {
+    await expect(withTimeout(Promise.resolve(7), 50, 'x')).resolves.toBe(7)
+  })
+
+  it('passes through a rejection that settles in time', async () => {
+    await expect(withTimeout(Promise.reject(new Error('boom')), 50, 'x')).rejects.toThrow('boom')
+  })
+
+  it('rejects with TimeoutError when the promise never settles', async () => {
+    const p = withTimeout(new Promise(() => {}), 20, 'stuck task')
+    await expect(p).rejects.toBeInstanceOf(TimeoutError)
+    await expect(p).rejects.toThrow(/stuck task timed out/)
+  })
+
+  it('frees a Semaphore slot held by a hung task', async () => {
+    const sem = new Semaphore(1)
+    const hung = sem.run(() => withTimeout(new Promise<void>(() => {}), 20, 'hung'))
+    const next = sem.run(async () => 'ran')
+    await expect(hung).rejects.toBeInstanceOf(TimeoutError)
+    await expect(next).resolves.toBe('ran')
   })
 })
 

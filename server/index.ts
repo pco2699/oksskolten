@@ -19,7 +19,7 @@ import { authRoutes } from './authRoutes.js'
 import { passkeyRoutes } from './passkeyRoutes.js'
 import { oauthRoutes } from './oauthRoutes.js'
 import { mcpRoutes } from './routes/mcp.js'
-import { fetchAllFeeds } from './fetcher.js'
+import { fetchAllFeeds, isFetchStalled } from './fetcher.js'
 import { ensureSearchIndex, rebuildSearchIndex, isSearchReady, syncAllScoredArticlesToSearch } from './search/sync.js'
 
 // --- Startup guards ---
@@ -121,10 +121,16 @@ app.addHook('onRequest', (_req, reply, done) => {
 })
 
 // Health check (no auth)
+// A wedged feed sweep leaves the HTTP server perfectly responsive, so "the
+// server answers" alone said nothing about whether articles were arriving: on
+// 2026-10-01 ingestion stopped for 8.5 hours while this returned 200. A 503
+// here lets the container's healthcheck (and autoheal) act on it.
 app.get('/api/health', async (_req, reply) => {
   reply.header('Cache-Control', 'no-store')
-  return reply.send({
-    ok: true,
+  const fetchStalled = isFetchStalled()
+  return reply.status(fetchStalled ? 503 : 200).send({
+    ok: !fetchStalled,
+    fetchStalled,
     searchReady: isSearchReady(),
     gitCommit: process.env.GIT_COMMIT || 'dev',
     gitTag: process.env.GIT_TAG || 'dev',
