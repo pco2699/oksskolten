@@ -1,5 +1,9 @@
 # Changelog
 
+## [v0.5.26](https://github.com/pco2699/oksskolten/compare/v0.5.25...v0.5.26) - 2026-10-02
+### Others
+- fix: bound the feed sweep so one hung task cannot stop ingestion by @pco2699 in https://github.com/pco2699/oksskolten/pull/67
+
 ## [v0.5.25](https://github.com/pco2699/oksskolten/compare/v0.5.24...v0.5.25) - 2026-09-06
 ### Others
 - refactor(fetcher): move all CPU-bound text work onto the worker thread by @pco2699 in https://github.com/pco2699/oksskolten/pull/64
