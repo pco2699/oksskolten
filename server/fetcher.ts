@@ -17,7 +17,16 @@ import {
   type Article,
 } from './db.js'
 
-import { Semaphore, CONCURRENCY, errorMessage } from './fetcher/util.js'
+import {
+  Semaphore,
+  CONCURRENCY,
+  FEED_TIMEOUT_MS,
+  ARTICLE_TIMEOUT_MS,
+  SWEEP_TIMEOUT_MS,
+  TimeoutError,
+  errorMessage,
+  withTimeout,
+} from './fetcher/util.js'
 import { detectAndStoreSimilarArticles } from './similarity.js'
 import { type FetchProgressEvent, emitProgress, markFeedDone } from './fetcher/progress.js'
 import { fetchFullText, convertHtmlToMarkdown, markdownToExcerpt, MIN_EXTRACTED_LENGTH } from './fetcher/content.js'
@@ -285,7 +294,11 @@ async function collectFeedTasks(feed: Feed, opts?: { skipCache?: boolean }): Pro
     // would skip the refresh path and the broken articles would never get a
     // chance to be repaired.
     const skipCache = opts?.skipCache || countStaleArticlesByFeed(feed.id, MIN_EXTRACTED_LENGTH) > 0
-    rssResult = await fetchAndParseRss(feed, { ...opts, skipCache })
+    rssResult = await withTimeout(
+      fetchAndParseRss(feed, { ...opts, skipCache }),
+      FEED_TIMEOUT_MS,
+      'feed fetch',
+    )
     updateFeedError(feed.id, null)
     updateFeedCacheHeaders(feed.id, rssResult.etag, rssResult.lastModified, rssResult.contentHash)
   } catch (err) {
@@ -342,12 +355,35 @@ async function collectFeedTasks(feed: Feed, opts?: { skipCache?: boolean }): Pro
 async function processArticle(task: ArticleTask): Promise<boolean> {
   const articleUrl = task.kind === 'new' ? task.url : task.article.url
 
-  const content = await fetchArticleContent(articleUrl, {
-    requiresJsChallenge: task.kind === 'new' ? task.requires_js_challenge : undefined,
-    skipFullTextFetch: task.kind === 'new' ? task.skip_full_text_fetch : undefined,
-    listingExcerpt: task.excerpt,
-    existingArticle: task.kind === 'retry' ? task.article : undefined,
-  })
+  let content: FetchedContent
+  try {
+    content = await withTimeout(
+      fetchArticleContent(articleUrl, {
+        requiresJsChallenge: task.kind === 'new' ? task.requires_js_challenge : undefined,
+        skipFullTextFetch: task.kind === 'new' ? task.skip_full_text_fetch : undefined,
+        listingExcerpt: task.excerpt,
+        existingArticle: task.kind === 'retry' ? task.article : undefined,
+      }),
+      ARTICLE_TIMEOUT_MS,
+      'article fetch',
+    )
+  } catch (err) {
+    if (!(err instanceof TimeoutError)) throw err
+    // Store the article anyway, flagged, so it enters the retry queue with its
+    // backoff and attempt cap. Left out, it would come back as "new" on every
+    // sweep and could hang each one for the full timeout, forever. A retry
+    // keeps whatever body it already had.
+    log.error({ url: articleUrl }, err.message)
+    const existing = task.kind === 'retry' ? task.article : null
+    content = {
+      fullText: existing?.full_text ?? null,
+      ogImage: existing?.og_image ?? null,
+      excerpt: null,
+      lang: existing?.lang ?? null,
+      lastError: err.message,
+      title: null,
+    }
+  }
 
   const effectiveLang = content.lang || (task.kind === 'retry' ? task.article.lang : null)
 
@@ -455,8 +491,25 @@ export async function fetchSingleFeed(
  */
 let activeSweep: Promise<void> | null = null
 
+/**
+ * How long ingestion may go without a completed sweep before the process
+ * reports itself unhealthy. A sweep that hangs is abandoned after
+ * `SWEEP_TIMEOUT_MS`, but the hung work itself cannot be cancelled; if sweeps
+ * keep failing, restarting the process is the only way to reclaim it.
+ * Must exceed the cron interval — raise it if `CRON_SCHEDULE` is slower than
+ * every few minutes.
+ */
+const FETCH_STALL_MS = Number(process.env.FETCH_STALL_MS) || 60 * 60_000
+const processStartedAt = Date.now()
+let lastSweepCompletedAt: number | null = null
+
 export function isFetchAllRunning(): boolean {
   return activeSweep !== null
+}
+
+/** True when no sweep has completed within `FETCH_STALL_MS` (counted from boot until the first one). */
+export function isFetchStalled(now = Date.now()): boolean {
+  return now - (lastSweepCompletedAt ?? processStartedAt) > FETCH_STALL_MS
 }
 
 export function fetchAllFeeds(
@@ -466,7 +519,12 @@ export function fetchAllFeeds(
     log.info('Feed sweep already in progress, joining the running one')
     return activeSweep
   }
-  const run = fetchAllFeedsInner(onProgress).finally(() => { activeSweep = null })
+  // The timeout releases `activeSweep` so the next firing can start a fresh
+  // sweep instead of joining (or, under `noOverlap`, being skipped behind) one
+  // that will never finish.
+  const run = withTimeout(fetchAllFeedsInner(onProgress), SWEEP_TIMEOUT_MS, 'feed sweep')
+    .then(() => { lastSweepCompletedAt = Date.now() })
+    .finally(() => { activeSweep = null })
   activeSweep = run
   return run
 }
