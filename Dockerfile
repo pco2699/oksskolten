@@ -1,4 +1,8 @@
-FROM node:22-slim AS base
+# Pinned to a patch release: 22.23.4 is the first 22.x with the Brotli decoder fix for
+# CVE-2026-111497 (HTTP2Shell). The fetcher uses global fetch(), which decodes `br`
+# responses from arbitrary feed/article hosts, so a floating `22-slim` that resolves to
+# an older cached base is not acceptable here. Bump deliberately.
+FROM node:22.23.4-slim AS base
 
 ENV TZ=UTC
 RUN apt-get update -qq && apt-get install -y -qq ca-certificates curl tzdata \
