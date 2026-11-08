@@ -72,11 +72,11 @@ Save the JSON before making any scoring change and keep it; a later run diffs ag
 
 **Decision: store vectors in SQLite, using libsql's native vector types. Do not put them in Meilisearch.**
 
-The deciding argument is not performance — it is which store owns the data. `rebuildSearchIndex()` runs on `0 */6 * * *` (`server/index.ts`): it deletes the staging index, repopulates it entirely from SQLite via `buildMeiliDoc()`, swaps, and deletes the old index. Meilisearch is a **derived, disposable** index in this project, rebuilt from scratch four times a day. Embeddings are the opposite: paid source data, one API call per article, unrecoverable except by paying again. Data that costs money to produce belongs in the system of record.
+The deciding argument is not performance — it is which store owns the data. `rebuildSearchIndex()` runs daily (`SEARCH_REBUILD_SCHEDULE`, default `0 2 * * *` America/Los_Angeles, `server/index.ts`): it deletes the staging index, repopulates it entirely from SQLite via `buildMeiliDoc()`, swaps, and deletes the old index. Meilisearch is a **derived, disposable** index in this project, rebuilt from scratch every day. Embeddings are the opposite: paid source data, one API call per article, unrecoverable except by paying again. Data that costs money to produce belongs in the system of record.
 
 That plays out concretely for each embedder source:
 
-| Meilisearch embedder source | What a 6-hourly rebuild costs |
+| Meilisearch embedder source | What a daily rebuild costs |
 |---|---|
 | `openAi` / `rest` (auto-embedding) | Re-embeds the entire archive on every rebuild — recurring API spend. Also needs its own API key at container level, outside the BYOK settings UI |
 | `userProvided` | No re-embedding, but only because SQLite must already hold every vector to re-send it. Meilisearch then holds a redundant second copy |

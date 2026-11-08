@@ -557,7 +557,7 @@ SQLite writes use independent INSERTs per article (minimizing the blast radius o
 The Meilisearch full-text search index is rebuilt at the following times:
 
 - **On startup**: Async rebuild on first startup (with backoff retry: 0s -> 5s -> 15s -> 30s)
-- **Scheduled Cron**: Rebuild every 6 hours (`0 */6 * * *`)
+- **Scheduled Cron**: Rebuild once a day at 02:00 America/Los_Angeles (`SEARCH_REBUILD_SCHEDULE`, default `0 2 * * *`; timezone via `SEARCH_REBUILD_TZ`)
 - During rebuild, the API does not return `503`; instead, `GET /api/health` reports `searchReady: false`. The search endpoint returns `503` when the index is not yet built
 
 ### Score Recalculation
