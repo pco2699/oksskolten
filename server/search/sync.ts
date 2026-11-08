@@ -175,8 +175,8 @@ export async function rebuildSearchIndex(): Promise<void> {
  * in the Meilisearch queue (the symptom is "Index `articles_staging`
  * already exists" failures and waitTask timeouts piling up).
  *
- * The 6-hour cron continues to call `rebuildSearchIndex()` directly so a
- * full refresh still happens periodically.
+ * The daily rebuild cron continues to call `rebuildSearchIndex()` directly so
+ * a full refresh still happens periodically.
  */
 export async function ensureSearchIndex(): Promise<void> {
   // Step 1: existence and population check. Failures here usually mean

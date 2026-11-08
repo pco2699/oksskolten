@@ -248,17 +248,23 @@ void (async () => {
       log.error(`[search] Index ensure attempt failed (next retry in ${retries[retries.indexOf(delay) + 1] ?? 'none'}ms):`, err)
     }
   }
-  log.error('[search] All initial ensure attempts failed, will retry on next 6h cron')
+  log.error('[search] All initial ensure attempts failed, will retry on next scheduled rebuild')
 })()
 
-cronTasks.push(cron.schedule('0 */6 * * *', async () => {
+// Full rebuild is a safety net only — incremental sync keeps the index current
+// between runs. Each rebuild re-indexes every article (~10-15 min of saturated
+// CPU/IO on a small host), so it runs once a day in the small hours, Pacific time.
+const SEARCH_REBUILD_SCHEDULE = process.env.SEARCH_REBUILD_SCHEDULE || '0 2 * * *'
+const SEARCH_REBUILD_TZ = process.env.SEARCH_REBUILD_TZ || 'America/Los_Angeles'
+
+cronTasks.push(cron.schedule(SEARCH_REBUILD_SCHEDULE, async () => {
   log.info('[cron] Search index rebuild triggered')
   try {
     await rebuildSearchIndex()
   } catch (err) {
     log.error('[cron] Search index rebuild error:', err)
   }
-}, CRON_OPTIONS))
+}, { ...CRON_OPTIONS, timezone: SEARCH_REBUILD_TZ }))
 
 // --- Retention policy ---
 // Daily cleanup of old articles based on user-configured retention settings.
