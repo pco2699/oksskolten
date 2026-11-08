@@ -1,5 +1,9 @@
 # Changelog
 
+## [v0.5.28](https://github.com/pco2699/oksskolten/compare/v0.5.27...v0.5.28) - 2026-11-08
+### Others
+- perf: cover /api/feeds aggregates with an index and rebuild search daily by @pco2699 in https://github.com/pco2699/oksskolten/pull/71
+
 ## [v0.5.27](https://github.com/pco2699/oksskolten/compare/v0.5.26...v0.5.27) - 2026-10-25
 
 ## [v0.5.26](https://github.com/pco2699/oksskolten/compare/v0.5.25...v0.5.26) - 2026-10-02
