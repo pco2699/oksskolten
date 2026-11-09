@@ -3,6 +3,11 @@
 ## [v0.5.29](https://github.com/pco2699/oksskolten/compare/v0.5.28...v0.5.29) - 2026-11-09
 ### Others
 - perf: recalculate scores daily instead of every 5 minutes by @pco2699 in https://github.com/pco2699/oksskolten/pull/73
+- perf: cover article list queries with indexes and fetch rows by id by @pco2699 in https://github.com/pco2699/oksskolten/pull/75
+
+## [v0.5.29](https://github.com/pco2699/oksskolten/compare/v0.5.28...v0.5.29) - 2026-11-09
+### Others
+- perf: recalculate scores daily instead of every 5 minutes by @pco2699 in https://github.com/pco2699/oksskolten/pull/73
 
 ## [v0.5.28](https://github.com/pco2699/oksskolten/compare/v0.5.27...v0.5.28) - 2026-11-08
 ### Others
