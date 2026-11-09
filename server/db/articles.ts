@@ -257,16 +257,27 @@ export function getArticles(opts: {
     ? getNamed<{ cnt: number }>(`SELECT COUNT(*) AS cnt FROM active_articles a ${baseWhere}`, params).cnt
     : undefined
 
+  // Deferred join: pick the page's ids first, then load the rows for just
+  // those ids. The filter/sort columns all live after full_text in the row, so
+  // filtering and sorting on the table itself walks every article's overflow
+  // pages (a full ~300 MB scan; 5-10 s against a cold cache). The inner query
+  // only touches columns in idx_articles_active_list / idx_articles_category_list
+  // (migration 0015), so it stays a covering index scan. A subquery with LIMIT
+  // on one side of a join is never flattened, so the split is preserved.
   const articles = allNamed<ArticleListItem>(`
     SELECT a.id, a.feed_id, f.name AS feed_name,
            a.title, a.url, a.published_at, a.lang, a.summary, a.excerpt, a.og_image, a.seen_at, a.read_at, a.bookmarked_at, a.liked_at,
            a.score,
            (SELECT COUNT(*) FROM article_similarities WHERE article_id = a.id) AS similar_count
-    FROM active_articles a
+    FROM (
+      SELECT a.id FROM active_articles a
+      ${where}
+      ORDER BY ${orderBy}
+      LIMIT @_limit OFFSET @_offset
+    ) page
+    JOIN active_articles a ON a.id = page.id
     JOIN feeds f ON a.feed_id = f.id
-    ${where}
     ORDER BY ${orderBy}
-    LIMIT @_limit OFFSET @_offset
   `, { ...params, _limit: Number(opts.limit), _offset: Number(opts.offset) })
 
   return { articles, total, ...(totalWithoutFloor != null && totalWithoutFloor > total ? { totalWithoutFloor } : {}) }
