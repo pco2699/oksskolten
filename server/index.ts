@@ -206,10 +206,13 @@ cronTasks.push(cron.schedule(CRON_SCHEDULE, async () => {
 
 // --- Score recalculation ---
 // Decoupled from feed fetch so the schedule can be tuned independently.
-// Default matches the original 5-minute interval; set SCORE_RECALC_SCHEDULE
-// to e.g. '0 3 * * *' (daily at 3 AM) if the event-driven path covers all
-// engagement actions and only time-decay refresh is needed.
-const SCORE_RECALC_SCHEDULE = process.env.SCORE_RECALC_SCHEDULE || '*/5 * * * *'
+// Engagement actions (read/like/bookmark/translate) already recompute and sync
+// the affected article's score immediately, so this cron only refreshes time
+// decay — which moves a score ~5% per day. Running it every 5 minutes re-sent
+// every scored article to Meilisearch (a full-document re-index each) for a
+// negligible accuracy gain, so it now runs daily by default.
+const SCORE_RECALC_SCHEDULE = process.env.SCORE_RECALC_SCHEDULE || '0 3 * * *'
+const SCORE_RECALC_TZ = process.env.SCORE_RECALC_TZ || 'America/Los_Angeles'
 cronTasks.push(cron.schedule(SCORE_RECALC_SCHEDULE, async () => {
   try {
     const { updated } = recalculateScores()
@@ -221,7 +224,7 @@ cronTasks.push(cron.schedule(SCORE_RECALC_SCHEDULE, async () => {
   } catch (err) {
     log.error('[cron] Score recalculation error:', err)
   }
-}, CRON_OPTIONS))
+}, { ...CRON_OPTIONS, timezone: SCORE_RECALC_TZ }))
 
 // --- SQLite memory shrink ---
 // Periodic shrink_memory + wal_checkpoint to prevent libsql native heap accumulation.
