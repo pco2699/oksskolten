@@ -154,9 +154,13 @@ CREATE INDEX idx_articles_seen_at ON articles(seen_at);
 CREATE INDEX idx_articles_read_at ON articles(read_at);
 CREATE INDEX idx_articles_score ON articles(score DESC);
 CREATE INDEX idx_articles_liked_at ON articles(liked_at);
-CREATE INDEX idx_articles_category_published ON articles(category_id, published_at DESC);
 CREATE INDEX idx_articles_feed_score ON articles(feed_id, score DESC);
 CREATE INDEX idx_articles_category_score ON articles(category_id, score DESC);
+-- Covering indexes: every column the list / sidebar queries filter or sort on,
+-- so those queries never touch the wide rows (full_text etc.). See migrations 0014 / 0015.
+CREATE INDEX idx_articles_active_feed_stats ON articles(purged_at, feed_id, seen_at, published_at, fetched_at, bookmarked_at, liked_at);
+CREATE INDEX idx_articles_active_list ON articles(purged_at, published_at, seen_at, read_at, bookmarked_at, liked_at, score, feed_id, category_id);
+CREATE INDEX idx_articles_category_list ON articles(category_id, published_at DESC, purged_at, seen_at, read_at, bookmarked_at, liked_at, score, feed_id);
 
 CREATE TABLE settings (
   key   TEXT PRIMARY KEY,
