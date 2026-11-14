@@ -1,5 +1,9 @@
 # Changelog
 
+## [v0.5.30](https://github.com/pco2699/oksskolten/compare/v0.5.29...v0.5.30) - 2026-11-14
+### Others
+- perf: stop feed sweeps from scanning the articles table by @pco2699 in https://github.com/pco2699/oksskolten/pull/77
+
 ## [v0.5.29](https://github.com/pco2699/oksskolten/compare/v0.5.28...v0.5.29) - 2026-11-09
 ### Others
 - perf: recalculate scores daily instead of every 5 minutes by @pco2699 in https://github.com/pco2699/oksskolten/pull/73
