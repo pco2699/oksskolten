@@ -13,6 +13,12 @@
 -- handful of rows that really are stale. The queries must keep the exact
 -- expression `length(coalesce(trim(full_text), ''))` and the `purged_at IS NULL`
 -- term, or the planner can no longer use this index.
+--
+-- Building the index reads every article body once, synchronously in
+-- runMigrations() before the server listens. That took ~14 s on a 31k-article /
+-- 350 MB database, but a cold page cache on a larger or busier host can push it
+-- toward a minute, so the first boot after this migration may look slow; allow a
+-- healthcheck start period long enough to cover it.
 CREATE INDEX IF NOT EXISTS idx_articles_stale_body
   ON articles(feed_id, length(coalesce(trim(full_text), '')))
   WHERE purged_at IS NULL;

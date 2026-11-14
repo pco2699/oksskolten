@@ -842,6 +842,16 @@ describe('getRetryArticles', () => {
     expect(results).toHaveLength(1)
   })
 
+  it('excludes purged articles', () => {
+    const feed = seedFeed()
+    const kept = seedArticle(feed.id, { url: 'https://example.com/err-kept', last_error: 'fetch failed' })
+    const purged = seedArticle(feed.id, { url: 'https://example.com/err-purged', last_error: 'fetch failed' })
+    getDb().prepare("UPDATE articles SET purged_at = datetime('now') WHERE id = ?").run(purged)
+    // Reads the table rather than the active_articles view (see
+    // RETRY_CANDIDATES_FROM), so the purged_at filter is the query's own job.
+    expect(getRetryArticles().map(a => a.id)).toEqual([kept])
+  })
+
   it('excludes articles with full_text even if last_error is set', () => {
     const feed = seedFeed()
     seedArticle(feed.id, { url: 'https://example.com/partial', full_text: 'partial content', last_error: 'Turndown failed' })
@@ -928,14 +938,15 @@ describe('getRetryArticles', () => {
 // --- getRetryStats ---
 
 describe('getRetryStats', () => {
-  it('reads candidates from the last_error partial index, not every active row', () => {
+  it('excludes purged articles', () => {
     const feed = seedFeed()
-    const id = seedArticle(feed.id)
-    getDb().prepare("UPDATE articles SET last_error = 'boom', purged_at = datetime('now') WHERE id = ?").run(id)
-    // Purged rows stay excluded now that the query reads the table, not the view.
-    expect(getRetryStats()).toEqual({ eligible: 0, backoff_waiting: 0, exceeded: 0 })
+    seedArticle(feed.id, { last_error: 'boom' })
+    const purged = seedArticle(feed.id, { last_error: 'boom' })
+    getDb().prepare("UPDATE articles SET purged_at = datetime('now') WHERE id = ?").run(purged)
+    // The query reads the table (to pin the index), not the active_articles
+    // view, so it has to repeat the view's purged_at filter itself.
+    expect(getRetryStats()).toEqual({ eligible: 1, backoff_waiting: 0, exceeded: 0 })
   })
-
 
   it('returns zeros when no retry candidates exist', () => {
     const stats = getRetryStats()
@@ -1042,7 +1053,7 @@ describe('backfillNormalizedArticleUrls', () => {
   })
 })
 
-// --- Stale-body detection (byte-length prefilter) ---
+// --- Stale-body detection (idx_articles_stale_body) ---
 
 describe('countStaleArticlesByFeed / getArticlesNeedingRefresh', () => {
   it('measures the threshold in characters, so short multibyte bodies still count', () => {
@@ -1050,7 +1061,7 @@ describe('countStaleArticlesByFeed / getArticlesNeedingRefresh', () => {
     const urlOf = (n: string) => `https://example.com/stale/${n}`
     seedArticle(feed.id, { url: urlOf('null'), full_text: null })
     seedArticle(feed.id, { url: urlOf('padded'), full_text: `   ${'a'.repeat(150)}   ` })
-    // 199 four-byte characters = 796 bytes: just under the prefilter's 800-byte cut.
+    // 199 four-byte characters: under the threshold, which counts characters, not bytes.
     seedArticle(feed.id, { url: urlOf('emoji'), full_text: '😀'.repeat(199) })
     // 150 three-byte characters = 450 bytes.
     seedArticle(feed.id, { url: urlOf('japanese'), full_text: 'あ'.repeat(150) })
