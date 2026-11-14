@@ -17,8 +17,11 @@ import {
   getArticleByUrl,
   getExistingArticleUrls,
   backfillNormalizedArticleUrls,
+  countStaleArticlesByFeed,
+  getArticlesNeedingRefresh,
 } from '../db.js'
 import { createFeed, createCategory, getDb } from '../db.js'
+import { STALE_BODY_WHERE } from './articles.js'
 
 beforeEach(() => {
   setupTestDb()
@@ -925,6 +928,15 @@ describe('getRetryArticles', () => {
 // --- getRetryStats ---
 
 describe('getRetryStats', () => {
+  it('reads candidates from the last_error partial index, not every active row', () => {
+    const feed = seedFeed()
+    const id = seedArticle(feed.id)
+    getDb().prepare("UPDATE articles SET last_error = 'boom', purged_at = datetime('now') WHERE id = ?").run(id)
+    // Purged rows stay excluded now that the query reads the table, not the view.
+    expect(getRetryStats()).toEqual({ eligible: 0, backoff_waiting: 0, exceeded: 0 })
+  })
+
+
   it('returns zeros when no retry candidates exist', () => {
     const stats = getRetryStats()
     expect(stats.eligible).toBe(0)
@@ -1027,5 +1039,44 @@ describe('backfillNormalizedArticleUrls', () => {
     seedArticle(feed.id, { url: 'https://example.com/b' })
 
     expect(backfillNormalizedArticleUrls()).toEqual({ updated: 0, deduped: 0 })
+  })
+})
+
+// --- Stale-body detection (byte-length prefilter) ---
+
+describe('countStaleArticlesByFeed / getArticlesNeedingRefresh', () => {
+  it('measures the threshold in characters, so short multibyte bodies still count', () => {
+    const feed = seedFeed()
+    const urlOf = (n: string) => `https://example.com/stale/${n}`
+    seedArticle(feed.id, { url: urlOf('null'), full_text: null })
+    seedArticle(feed.id, { url: urlOf('padded'), full_text: `   ${'a'.repeat(150)}   ` })
+    // 199 four-byte characters = 796 bytes: just under the prefilter's 800-byte cut.
+    seedArticle(feed.id, { url: urlOf('emoji'), full_text: '😀'.repeat(199) })
+    // 150 three-byte characters = 450 bytes.
+    seedArticle(feed.id, { url: urlOf('japanese'), full_text: 'あ'.repeat(150) })
+    // Not stale: at or over the threshold in characters.
+    seedArticle(feed.id, { url: urlOf('ascii-200'), full_text: 'a'.repeat(200) })
+    seedArticle(feed.id, { url: urlOf('emoji-200'), full_text: '😀'.repeat(200) })
+    seedArticle(feed.id, { url: urlOf('long'), full_text: 'word '.repeat(5000) })
+
+    expect(countStaleArticlesByFeed(feed.id, 200)).toBe(4)
+    expect(getArticlesNeedingRefresh(feed.id, 200).map(a => a.url).sort()).toEqual(
+      ['emoji', 'japanese', 'null', 'padded'].map(urlOf),
+    )
+  })
+
+  it('answers from idx_articles_stale_body instead of reading every body', () => {
+    const plan = getDb().prepare(`EXPLAIN QUERY PLAN SELECT id, url, full_text FROM articles WHERE ${STALE_BODY_WHERE}`)
+      .all(1, 200) as { detail: string }[]
+    expect(plan.map(r => r.detail).join('\n')).toContain('USING INDEX idx_articles_stale_body')
+  })
+
+  it('skips rows inside the refresh backoff window', () => {
+    const feed = seedFeed()
+    const id = seedArticle(feed.id, { full_text: 'short' })
+    expect(countStaleArticlesByFeed(feed.id, 200)).toBe(1)
+    getDb().prepare("UPDATE articles SET last_refresh_attempt_at = datetime('now') WHERE id = ?").run(id)
+    expect(countStaleArticlesByFeed(feed.id, 200)).toBe(0)
+    expect(getArticlesNeedingRefresh(feed.id, 200)).toEqual([])
   })
 })

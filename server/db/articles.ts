@@ -557,6 +557,18 @@ export function getArticleBodiesByFeed(feedId: number): { id: number; full_text:
 const REFRESH_ATTEMPT_BACKOFF = "datetime('now', '-1 day')"
 
 /**
+ * Shared WHERE for the per-feed stale-body queries (params: feedId, minLength).
+ * Both run synchronously on every feed in every sweep, so they must stay on
+ * idx_articles_stale_body (migration 0016): keep the length expression and the
+ * `purged_at IS NULL` term exactly as indexed, or the planner falls back to
+ * reading every body in the feed. The test pins the plan.
+ */
+export const STALE_BODY_WHERE = `feed_id = ?
+      AND purged_at IS NULL
+      AND length(coalesce(trim(full_text), '')) < ?
+      AND (last_refresh_attempt_at IS NULL OR datetime(last_refresh_attempt_at) < ${REFRESH_ATTEMPT_BACKOFF})`
+
+/**
  * Return id + url + full_text for active articles in the given feed whose
  * stored full_text trimmed length is below the threshold and that have not
  * been attempted within the backoff window. Used by the fetcher to detect
@@ -574,10 +586,7 @@ export function getArticlesNeedingRefresh(
   return getDb().prepare(`
     SELECT id, url, full_text
     FROM articles
-    WHERE feed_id = ?
-      AND purged_at IS NULL
-      AND length(coalesce(trim(full_text), '')) < ?
-      AND (last_refresh_attempt_at IS NULL OR datetime(last_refresh_attempt_at) < ${REFRESH_ATTEMPT_BACKOFF})
+    WHERE ${STALE_BODY_WHERE}
   `).all(feedId, minLength) as { id: number; url: string; full_text: string | null }[]
 }
 
@@ -593,10 +602,7 @@ export function countStaleArticlesByFeed(feedId: number, minLength: number): num
   const row = getDb().prepare(`
     SELECT COUNT(*) AS n
     FROM articles
-    WHERE feed_id = ?
-      AND purged_at IS NULL
-      AND length(coalesce(trim(full_text), '')) < ?
-      AND (last_refresh_attempt_at IS NULL OR datetime(last_refresh_attempt_at) < ${REFRESH_ATTEMPT_BACKOFF})
+    WHERE ${STALE_BODY_WHERE}
   `).get(feedId, minLength) as { n: number }
   return row.n
 }
@@ -699,6 +705,18 @@ export function backfillNormalizedArticleUrls(): { updated: number; deduped: num
 const backoffDeadline = (p = '') =>
   `datetime(${p}last_retry_at, '+' || (30 * (1 << MIN(${p}retry_count, 6))) || ' minutes')`
 
+/**
+ * Source for the retry queries, which run on every feed sweep. Without ANALYZE
+ * stats the planner treats `purged_at IS NULL` as selective and walks every
+ * active article through idx_articles_purged_at, reading `last_error` /
+ * `full_text` from each row: a near-full scan of the table (10-20 s against a
+ * cold page cache, blocking the event loop). Only articles that failed carry a
+ * `last_error`, so the partial index from migration 0002 holds a few hundred rows.
+ * The view can't take INDEXED BY, so these queries read the table and repeat
+ * the view's `purged_at IS NULL` themselves.
+ */
+const RETRY_CANDIDATES_FROM = 'articles a INDEXED BY idx_articles_last_error'
+
 export function getRetryArticles(
   maxAttempts = RETRY_MAX_ATTEMPTS,
   batchLimit = RETRY_BATCH_LIMIT,
@@ -707,9 +725,10 @@ export function getRetryArticles(
   // re-issue the very request the user disabled, and their bodies come from
   // the RSS payload instead.
   return getDb().prepare(`
-    SELECT a.* FROM active_articles a
+    SELECT a.* FROM ${RETRY_CANDIDATES_FROM}
     JOIN feeds f ON f.id = a.feed_id
-    WHERE a.last_error IS NOT NULL
+    WHERE a.purged_at IS NULL
+      AND a.last_error IS NOT NULL
       AND a.full_text IS NULL
       AND f.skip_full_text_fetch = 0
       AND a.retry_count < :max_attempts
@@ -740,9 +759,9 @@ export function getRetryStats(maxAttempts = RETRY_MAX_ATTEMPTS): RetryStats {
         ${backoffDeadline('a.')} > datetime('now')
       THEN 1 ELSE 0 END) AS backoff_waiting,
       SUM(CASE WHEN a.retry_count >= :max_attempts THEN 1 ELSE 0 END) AS exceeded
-    FROM active_articles a
+    FROM ${RETRY_CANDIDATES_FROM}
     JOIN feeds f ON f.id = a.feed_id
-    WHERE a.last_error IS NOT NULL AND a.full_text IS NULL
+    WHERE a.purged_at IS NULL AND a.last_error IS NOT NULL AND a.full_text IS NULL
       AND f.skip_full_text_fetch = 0
   `).get({ max_attempts: maxAttempts }) as { eligible: number | null; backoff_waiting: number | null; exceeded: number | null }
   return {
