@@ -214,6 +214,7 @@ export function FeedList({ isOpen, onClose, onBackdropClose, onCollapse, onMarkA
     renameInputRef, suppressClick,
     handleStartRenameFeed, handleStartRenameCategory,
     handleMarkAllReadFeed, handleMarkAllReadCategory,
+    handleArchiveFeed, handleUnarchiveFeed,
     handleDeleteFeed, handleDeleteCategory,
     handleMoveToCategory,
     handleFetchFeed, handleFetchCategory,
@@ -320,7 +321,7 @@ export function FeedList({ isOpen, onClose, onBackdropClose, onCollapse, onMarkA
             ? ''
             : 'rounded-lg'
         } ${
-          feed.disabled
+          feed.disabled || feed.archived_at
             ? 'text-muted'
             : selectedFeedId === feed.id && multiSelectedCount === 0
               ? 'font-medium text-accent'
@@ -356,10 +357,15 @@ export function FeedList({ isOpen, onClose, onBackdropClose, onCollapse, onMarkA
             {feed.disabled ? '⚠ ' : null}
             {feed.name}
           </span>
-          {!feed.disabled && feed.last_error && feed.article_count === 0 && (
+          {feed.archived_at && (
+            <span className="text-[10px] text-muted border border-border rounded px-1 leading-relaxed shrink-0">
+              {t('feeds.archivedBadge')}
+            </span>
+          )}
+          {!feed.disabled && !feed.archived_at && feed.last_error && feed.article_count === 0 && (
             <AlertTriangle size={13} className="text-warning shrink-0" />
           )}
-          {showFeedActivity === 'on' && !feed.disabled && isFeedInactive(feed) && (
+          {showFeedActivity === 'on' && !feed.disabled && !feed.archived_at && isFeedInactive(feed) && (
             <span className="text-[10px] text-muted ml-1 shrink-0">inactive</span>
           )}
         </div>
@@ -392,9 +398,12 @@ export function FeedList({ isOpen, onClose, onBackdropClose, onCollapse, onMarkA
       <FeedContextMenu
         key={feed.id}
         feedType={feed.type}
+        archived={!!feed.archived_at}
         categories={categories}
         onRename={() => handleStartRenameFeed(feed)}
         onMarkAllRead={(olderThan) => handleMarkAllReadFeed(feed, olderThan)}
+        onArchive={() => handleArchiveFeed(feed)}
+        onUnarchive={() => handleUnarchiveFeed(feed)}
         onDelete={() => handleDeleteFeed(feed)}
         onMoveToCategory={(catId) => handleMoveToCategory(feed, catId)}
         onFetch={() => handleFetchFeed(feed)}

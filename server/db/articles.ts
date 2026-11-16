@@ -723,7 +723,8 @@ export function getRetryArticles(
 ): Article[] {
   // Feeds opted out of full-text fetching are excluded: retrying them would
   // re-issue the very request the user disabled, and their bodies come from
-  // the RSS payload instead.
+  // the RSS payload instead. Archived feeds are excluded for the same reason:
+  // archiving means "stop fetching this feed", including its failed articles.
   return getDb().prepare(`
     SELECT a.* FROM ${RETRY_CANDIDATES_FROM}
     JOIN feeds f ON f.id = a.feed_id
@@ -731,6 +732,7 @@ export function getRetryArticles(
       AND a.last_error IS NOT NULL
       AND a.full_text IS NULL
       AND f.skip_full_text_fetch = 0
+      AND f.archived_at IS NULL
       AND a.retry_count < :max_attempts
       AND (
         a.last_retry_at IS NULL
@@ -763,6 +765,7 @@ export function getRetryStats(maxAttempts = RETRY_MAX_ATTEMPTS): RetryStats {
     JOIN feeds f ON f.id = a.feed_id
     WHERE a.purged_at IS NULL AND a.last_error IS NOT NULL AND a.full_text IS NULL
       AND f.skip_full_text_fetch = 0
+      AND f.archived_at IS NULL
   `).get({ max_attempts: maxAttempts }) as { eligible: number | null; backoff_waiting: number | null; exceeded: number | null }
   return {
     eligible: row.eligible ?? 0,

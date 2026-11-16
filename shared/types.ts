@@ -19,6 +19,8 @@ export interface Feed {
   last_error: string | null
   error_count: number
   disabled: number
+  /** When set, the feed is archived: kept with all its articles, but never fetched. */
+  archived_at: string | null
   requires_js_challenge: number
   /** When 1, skip full-text fetching and use the RSS content as the body. */
   skip_full_text_fetch: number

@@ -80,6 +80,7 @@ const UpdateFeedBody = z.object({
   rss_url: httpOrHttpsUrl.optional(),
   rss_bridge_url: z.string().nullable().optional(),
   disabled: z.number().optional(),
+  archived: z.boolean().optional(),
   category_id: z.number().nullable().optional(),
   skip_full_text_fetch: z.union([z.literal(0), z.literal(1)]).optional(),
 })
@@ -318,6 +319,10 @@ export async function feedRoutes(api: FastifyInstance): Promise<void> {
       const feed = getFeedById(params.id)
       if (!feed || feed.disabled) {
         reply.status(404).send({ error: 'Feed not found or disabled' })
+        return
+      }
+      if (feed.archived_at) {
+        reply.status(409).send({ error: 'Feed is archived; unarchive it to fetch articles' })
         return
       }
 

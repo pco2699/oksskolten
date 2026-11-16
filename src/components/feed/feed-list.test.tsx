@@ -63,6 +63,7 @@ function makeFeed(overrides: Partial<FeedWithCounts> = {}): FeedWithCounts {
     last_error: null,
     error_count: 0,
     disabled: 0,
+    archived_at: null,
     requires_js_challenge: 0,
     skip_full_text_fetch: 0,
     type: 'rss',
@@ -264,6 +265,24 @@ describe('FeedList', () => {
     )
     expect(feedBtn.textContent).toContain('⚠')
     expect(feedBtn.className).toContain('text-muted')
+  })
+
+  it('shows archived feeds with a badge and muted style, still navigable', () => {
+    const feeds = [makeFeed({ id: 3, name: 'Archived Feed', archived_at: '2026-01-01T00:00:00Z', category_id: null })]
+    renderFeedList(
+      {},
+      { feeds, bookmark_count: 0, like_count: 0, clip_feed_id: null },
+      { categories: [] },
+    )
+
+    const feedBtn = screen.getByText((_content, element) =>
+      element?.tagName === 'BUTTON' && !!element.textContent?.includes('Archived Feed'),
+    )
+    expect(feedBtn.textContent).toContain('Archived')
+    expect(feedBtn.className).toContain('text-muted')
+
+    fireEvent.click(feedBtn)
+    expect(mockNavigate).toHaveBeenCalledWith('/feeds/3')
   })
 
   it('highlights selected feed', () => {

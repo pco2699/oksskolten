@@ -47,6 +47,14 @@ const dict = {
   'feeds.markAllReadOlderThan1d': { ja: '1日以上前を既読にする', en: 'Older than 1 day', zh: '标记1天前的为已读'},
   'feeds.markAllReadOlderThan1w': { ja: '1週間以上前を既読にする', en: 'Older than 1 week', zh: '标记1周前的为已读'},
   'feeds.delete': { ja: '削除', en: 'Delete', zh: '删除'},
+  'feeds.archive': { ja: 'アーカイブ', en: 'Archive', zh: '归档'},
+  'feeds.unarchive': { ja: 'アーカイブを解除', en: 'Unarchive', zh: '取消归档'},
+  'feeds.archivedBadge': { ja: 'アーカイブ済み', en: 'Archived', zh: '已归档'},
+  'feeds.archiveHint': {
+    ja: 'アーカイブすると記事は残したまま、新しい記事の取得を停止します。',
+    en: 'Archiving keeps every existing article and stops fetching new ones.',
+    zh: '归档会保留所有现有文章，并停止获取新文章。'
+  },
   'feeds.deleteFeed': { ja: 'フィードを削除', en: 'Delete Feed', zh: '删除订阅源'},
   'feeds.reEnableFeed': { ja: 'フィードを再有効化', en: 'Re-enable Feed', zh: '重新启用订阅源'},
   'feeds.deleteConfirm': {

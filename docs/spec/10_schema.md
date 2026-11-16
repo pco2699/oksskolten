@@ -108,6 +108,7 @@ CREATE TABLE feeds (
   last_error      TEXT,                               -- Last fetch error
   error_count     INTEGER NOT NULL DEFAULT 0,         -- Consecutive error count
   disabled              INTEGER NOT NULL DEFAULT 0,   -- 1=auto-disabled (5 consecutive failures)
+  archived_at           TEXT,                         -- Archived timestamp; archived feeds keep their articles but are never fetched
   requires_js_challenge INTEGER NOT NULL DEFAULT 0,   -- 1=site requires bot verification (JS challenge) bypass
   skip_full_text_fetch  INTEGER NOT NULL DEFAULT 0,   -- 1=never fetch the origin page; render RSS content as the body
   etag                  TEXT,                         -- Previous response ETag (for conditional requests)
