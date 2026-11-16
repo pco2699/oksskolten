@@ -1,5 +1,7 @@
 # Changelog
 
+## [v0.6.1](https://github.com/pco2699/oksskolten/compare/v0.6.0...v0.6.1) - 2026-11-16
+
 ## [v0.6.0](https://github.com/pco2699/oksskolten/compare/v0.5.30...v0.6.0) - 2026-11-16
 ### New Features
 - feat: add feed archiving without deleting articles by @pco2699
