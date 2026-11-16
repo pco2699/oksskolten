@@ -277,6 +277,7 @@ Non-GET requests with a read-only API key return `403 { "error": "API key does n
       "articles_per_week": 2.5,
       "latest_published_at": "2026-03-01T12:00:00Z",
       "disabled": 0,
+      "archived_at": null,
       "last_error": null
     }
   ],
@@ -284,7 +285,7 @@ Non-GET requests with a read-only API key return `403 { "error": "API key does n
 }
 ```
 
-`article_count` and `unread_count` are computed via `COUNT` subqueries. `articles_per_week` is the number of articles in the last 28 days / 4.0. `latest_published_at` is `MAX(published_at)`. Feeds with `disabled = 1` are also returned (for displaying warnings in the UI). `category_name` is fetched via a LEFT JOIN with the `categories` table. `clip_feed_id` is the clip feed's ID (`null` if not yet created). The clip feed itself is also included in the `feeds` array (the frontend separates it based on `type`).
+`article_count` and `unread_count` are computed via `COUNT` subqueries. `articles_per_week` is the number of articles in the last 28 days / 4.0. `latest_published_at` is `MAX(published_at)`. Feeds with `disabled = 1` are also returned (for displaying warnings in the UI); archived feeds are returned too, because their articles remain browsable. `category_name` is fetched via a LEFT JOIN with the `categories` table. `clip_feed_id` is the clip feed's ID (`null` if not yet created). The clip feed itself is also included in the `feeds` array (the frontend separates it based on `type`).
 
 **GET /api/opml** — OPML export
 
@@ -728,12 +729,13 @@ The frontend then presents the user with a choice: "Subscribe to the whole site"
   "rss_url": "https://blog.example.com/rss/",
   "rss_bridge_url": "http://rss-bridge/?...",
   "disabled": 0,
+  "archived": false,
   "category_id": 2,
   "skip_full_text_fetch": 1
 }
 ```
 
-Updatable fields: `name`, `rss_url`, `rss_bridge_url`, `disabled` (`0` or `1`), `category_id`, `skip_full_text_fetch` (`0` or `1`). `url` (the site's homepage, used for re-detection) cannot be changed. `rss_url` must be an `http://` or `https://` URL. Setting `disabled: 0` also resets `error_count` to `0` and `last_error` to `NULL`. Setting `skip_full_text_fetch: 1` likewise clears `last_error` and `error_count`, because articles on such feeds are never fetched again and stored failures would otherwise linger as permanent feed errors. The same transition (`0` → `1`) additionally drops the stored body, summary, and translation of any article in the feed whose `full_text` is a bot-block page, so the next fetch replaces it with RSS content; genuine bodies are left untouched. Changing `rss_url` to a different value also clears `etag`, `last_modified`, `last_content_hash`, `last_error`, `error_count`, and `next_check_at`, so the next fetch hits the new URL fresh instead of reusing stale conditional-GET headers or an existing error backoff schedule.
+Updatable fields: `name`, `rss_url`, `rss_bridge_url`, `disabled` (`0` or `1`), `archived` (boolean), `category_id`, `skip_full_text_fetch` (`0` or `1`). `url` (the site's homepage, used for re-detection) cannot be changed. `rss_url` must be an `http://` or `https://` URL. Setting `disabled: 0` also resets `error_count` to `0` and `last_error` to `NULL`. Setting `archived: true` keeps the feed and all of its articles but stops the scheduled sweep, retries, and manual refresh from fetching it; `archived: false` restores normal fetching immediately by clearing `next_check_at`. Setting `skip_full_text_fetch: 1` likewise clears `last_error` and `error_count`, because articles on such feeds are never fetched again and stored failures would otherwise linger as permanent feed errors. The same transition (`0` → `1`) additionally drops the stored body, summary, and translation of any article in the feed whose `full_text` is a bot-block page, so the next fetch replaces it with RSS content; genuine bodies are left untouched. Changing `rss_url` to a different value also clears `etag`, `last_modified`, `last_content_hash`, `last_error`, `error_count`, and `next_check_at`, so the next fetch hits the new URL fresh instead of reusing stale conditional-GET headers or an existing error backoff schedule.
 
 ```json
 // Response: 200 (returns all feed fields)
@@ -746,6 +748,7 @@ Updatable fields: `name`, `rss_url`, `rss_bridge_url`, `disabled` (`0` or `1`), 
   "category_id": 2,
   "category_name": "Tech",
   "disabled": 0,
+  "archived_at": null,
   "last_error": null,
   "article_count": 12,
   "unread_count": 3

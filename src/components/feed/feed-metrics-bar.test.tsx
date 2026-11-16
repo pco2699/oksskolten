@@ -24,6 +24,7 @@ function makeFeed(overrides: Partial<FeedWithCounts> = {}): FeedWithCounts {
     last_error: null,
     error_count: 0,
     disabled: 0,
+    archived_at: null,
     requires_js_challenge: 0,
     skip_full_text_fetch: 0,
     type: 'rss',

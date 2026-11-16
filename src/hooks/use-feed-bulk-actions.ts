@@ -64,7 +64,7 @@ export function useFeedBulkActions({
   }, [getSelectedFeeds, mutateFeeds, clearSelection, onMarkAllRead])
 
   const handleBulkFetch = useCallback(async () => {
-    const selected = getSelectedFeeds().filter(f => !f.disabled)
+    const selected = getSelectedFeeds().filter(f => !f.disabled && !f.archived_at)
     clearSelection()
     for (const feed of selected) {
       const result = await startFeedFetch(feed.id)

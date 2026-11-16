@@ -1,5 +1,6 @@
 import {
   getEnabledFeeds,
+  getFeedById,
   countStaleArticlesByFeed,
   getArticlesNeedingRefresh,
   getExistingArticleUrls,
@@ -276,6 +277,7 @@ type FeedFetchOutcome =
     excerptsByUrl: Map<string, string>
   }
   | { status: 'not-modified' }
+  | { status: 'archived' }
   | { status: 'error' }
 
 /**
@@ -287,6 +289,14 @@ type FeedFetchOutcome =
  * is how the URL-dedup fix reached one and not the other.
  */
 async function collectFeedTasks(feed: Feed, opts?: { skipCache?: boolean }): Promise<FeedFetchOutcome> {
+  // Re-read the marker so a feed archived after the caller loaded its snapshot
+  // is still skipped. Manual fetch and re-detect pass in objects from an earlier
+  // request, and the sweep loads feeds before it starts fetching them.
+  if (getFeedById(feed.id)?.archived_at) {
+    log.info(`Feed ${feed.name}: archived, skipping fetch`)
+    return { status: 'archived' }
+  }
+
   let rssResult: FetchRssResult
   try {
     // Bypass the HTTP cache if this feed still has stale garbage-extracted
@@ -552,7 +562,7 @@ async function fetchAllFeedsInner(
           feedNewCounts.set(feed.id, 0)
           return
         }
-        if (outcome.status === 'error') return
+        if (outcome.status !== 'tasks') return
         allTasks.push(...outcome.tasks)
         feedNewCounts.set(feed.id, outcome.tasks.length)
         for (const [url, excerpt] of outcome.excerptsByUrl) excerptsByUrl.set(url, excerpt)

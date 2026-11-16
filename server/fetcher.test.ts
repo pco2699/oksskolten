@@ -620,6 +620,80 @@ describe('fetchAllFeeds', () => {
     expect(row.last_error).toBeNull()
   })
 
+  it('skips archived feeds in the scheduled sweep and keeps their articles', async () => {
+    const feed = seedFeed()
+    insertArticle({
+      feed_id: feed.id,
+      title: 'Already Stored',
+      url: 'https://example.com/stored',
+      published_at: '2024-01-01T00:00:00Z',
+      full_text: 'This article must survive archiving.',
+    })
+    updateFeed(feed.id, { archived: true })
+
+    const rssXml = rss20Xml('Test', [{ title: 'New', link: 'https://example.com/new' }])
+    mockFetch.mockImplementation((url: string | URL) => {
+      if (url.toString() === feed.rss_url) return Promise.resolve(mockResponse(rssXml, { headers: { 'content-type': 'application/rss+xml' } }))
+      return Promise.resolve(mockResponse(articleHtml()))
+    })
+
+    await fetchAllFeeds()
+
+    const requested = mockFetch.mock.calls.map(([url]) => url.toString())
+    expect(requested).not.toContain(feed.rss_url)
+    expect(requested).not.toContain('https://example.com/new')
+    expect(getArticleByUrl('https://example.com/stored')).toBeDefined()
+    expect(getArticleByUrl('https://example.com/new')).toBeUndefined()
+  })
+
+  it('does not fetch an archived feed on a direct refresh', async () => {
+    const feed = seedFeed()
+    updateFeed(feed.id, { archived: true })
+
+    await fetchSingleFeed(feed)
+
+    expect(mockFetch).not.toHaveBeenCalled()
+  })
+
+  it('does not retry failed articles belonging to an archived feed', async () => {
+    const feed = seedFeed()
+    insertArticle({
+      feed_id: feed.id,
+      title: 'Failed Article',
+      url: 'https://example.com/failed',
+      published_at: '2024-01-01T00:00:00Z',
+      last_error: 'fetchFullText: HTTP 500',
+    })
+    updateFeed(feed.id, { archived: true })
+
+    await fetchAllFeeds()
+
+    expect(mockFetch.mock.calls.map(([url]) => url.toString())).not.toContain('https://example.com/failed')
+  })
+
+  it('resumes fetching after a feed is unarchived', async () => {
+    const feed = seedFeed()
+    insertArticle({
+      feed_id: feed.id,
+      title: 'Stored Before Archive',
+      url: 'https://example.com/stored',
+      published_at: '2024-01-01T00:00:00Z',
+    })
+    updateFeed(feed.id, { archived: true })
+    updateFeed(feed.id, { archived: false })
+
+    const rssXml = rss20Xml('Test', [{ title: 'After Unarchive', link: 'https://example.com/after' }])
+    mockFetch.mockImplementation((url: string | URL) => {
+      if (url.toString() === feed.rss_url) return Promise.resolve(mockResponse(rssXml, { headers: { 'content-type': 'application/rss+xml' } }))
+      return Promise.resolve(mockResponse(articleHtml({ title: 'After Unarchive' })))
+    })
+
+    await fetchAllFeeds()
+
+    expect(getArticleByUrl('https://example.com/stored')).toBeDefined()
+    expect(getArticleByUrl('https://example.com/after')).toBeDefined()
+  })
+
   it('falls back to the RSS excerpt on a retry, not just on the first attempt', async () => {
     // The article is still listed in the feed with a usable description, but
     // its page cannot be fetched. A first attempt would fall back to the RSS

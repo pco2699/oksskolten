@@ -535,6 +535,53 @@ describe('PATCH /api/feeds/:id', () => {
     const row = getDb().prepare('SELECT full_text FROM articles WHERE id = ?').get(id) as { full_text: string | null }
     expect(row.full_text).toContain('Just a moment')
   })
+
+  it('archives a feed without deleting its articles, then unarchives it', async () => {
+    const feed = seedFeed({ rss_url: 'https://example.com/feed.xml' })
+    const { insertArticle, getDb } = await import('../db.js')
+    const articleId = insertArticle({
+      feed_id: feed.id,
+      title: 'Kept Article',
+      url: 'https://example.com/kept',
+      published_at: null,
+      full_text: 'Keep me after archiving.',
+    })
+
+    const archived = await app.inject({
+      method: 'PATCH',
+      url: `/api/feeds/${feed.id}`,
+      headers: json,
+      payload: { archived: true },
+    })
+
+    expect(archived.statusCode).toBe(200)
+    expect(archived.json().archived_at).toBeTruthy()
+    expect(getDb().prepare('SELECT id FROM articles WHERE id = ?').get(articleId)).toBeDefined()
+
+    const unarchived = await app.inject({
+      method: 'PATCH',
+      url: `/api/feeds/${feed.id}`,
+      headers: json,
+      payload: { archived: false },
+    })
+
+    expect(unarchived.statusCode).toBe(200)
+    expect(unarchived.json().archived_at).toBeNull()
+    expect(getDb().prepare('SELECT id FROM articles WHERE id = ?').get(articleId)).toBeDefined()
+  })
+
+  it('rejects a non-boolean archived value', async () => {
+    const feed = seedFeed()
+
+    const res = await app.inject({
+      method: 'PATCH',
+      url: `/api/feeds/${feed.id}`,
+      headers: json,
+      payload: { archived: 'yes' },
+    })
+
+    expect(res.statusCode).toBe(400)
+  })
 })
 
 // ---------------------------------------------------------------------------
@@ -583,6 +630,21 @@ describe('POST /api/feeds/:id/fetch', () => {
     })
     expect(res.statusCode).toBe(404)
     expect(res.json().error).toMatch(/disabled/)
+  })
+
+  it('returns 409 for an archived feed without fetching', async () => {
+    const feed = seedFeed({ rss_url: 'https://example.com/feed' })
+    const { updateFeed } = await import('../db.js')
+    updateFeed(feed.id, { archived: true })
+
+    const res = await app.inject({
+      method: 'POST',
+      url: `/api/feeds/${feed.id}/fetch`,
+    })
+
+    expect(res.statusCode).toBe(409)
+    expect(res.json().error).toMatch(/archived/)
+    expect(mockFetchSingleFeed).not.toHaveBeenCalled()
   })
 })
 

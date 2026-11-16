@@ -14,6 +14,7 @@ function makeFeed(overrides: Partial<FeedWithCounts> = {}): FeedWithCounts {
     last_error: null,
     error_count: 0,
     disabled: 0,
+    archived_at: null,
     requires_js_challenge: 0,
     skip_full_text_fetch: 0,
     type: 'rss',
@@ -61,6 +62,11 @@ describe('isFeedVisible', () => {
 
   it('keeps disabled feeds so they can still be re-enabled', () => {
     const feed = makeFeed({ unread_count: 0, disabled: 1 })
+    expect(isFeedVisible(feed, { hideZeroUnread: true, selectedFeedId: null })).toBe(true)
+  })
+
+  it('keeps archived feeds so their articles stay browsable and can be unarchived', () => {
+    const feed = makeFeed({ unread_count: 0, archived_at: '2026-01-01T00:00:00Z' })
     expect(isFeedVisible(feed, { hideZeroUnread: true, selectedFeedId: null })).toBe(true)
   })
 })

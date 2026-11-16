@@ -142,6 +142,45 @@ describe('updateFeed no-op', () => {
   })
 })
 
+describe('updateFeed archived', () => {
+  it('archives a feed and keeps its articles', () => {
+    const feed = seedFeed()
+    seedArticle(feed.id, { url: 'https://example.com/stays' })
+
+    const archived = updateFeed(feed.id, { archived: true })!
+
+    expect(archived.archived_at).toBeTruthy()
+    expect(getEnabledFeeds().some(f => f.id === feed.id)).toBe(false)
+
+    const listed = getFeeds().find(f => f.id === feed.id)!
+    expect(listed.archived_at).toBeTruthy()
+    expect(listed.article_count).toBe(1)
+  })
+
+  it('unarchives a feed and makes it eligible for fetching again', () => {
+    const feed = seedFeed()
+    const futureTime = new Date(Date.now() + 3600000).toISOString().replace(/\.\d{3}Z$/, 'Z')
+    updateFeedSchedule(feed.id, futureTime, 3600)
+    updateFeed(feed.id, { archived: true })
+
+    const unarchived = updateFeed(feed.id, { archived: false })!
+
+    expect(unarchived.archived_at).toBeNull()
+    // Unarchiving clears the old schedule so the feed is picked up immediately.
+    expect(unarchived.next_check_at).toBeNull()
+    expect(getEnabledFeeds().some(f => f.id === feed.id)).toBe(true)
+  })
+
+  it('keeps the original archive timestamp when archived again', () => {
+    const feed = seedFeed()
+    const first = updateFeed(feed.id, { archived: true })!
+
+    const second = updateFeed(feed.id, { archived: true })!
+
+    expect(second.archived_at).toBe(first.archived_at)
+  })
+})
+
 describe('createFeed with all options', () => {
   it('creates feed with rss_url and category', () => {
     const cat = createCategory('Tech')

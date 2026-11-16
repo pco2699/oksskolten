@@ -46,7 +46,7 @@ export function getFeedByRssUrl(rssUrl: string): Feed | undefined {
 
 export function getEnabledFeeds(): Feed[] {
   return getDb().prepare(
-    "SELECT * FROM feeds WHERE disabled = 0 AND type = 'rss' AND (next_check_at IS NULL OR next_check_at <= strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))",
+    "SELECT * FROM feeds WHERE disabled = 0 AND archived_at IS NULL AND type = 'rss' AND (next_check_at IS NULL OR next_check_at <= strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))",
   ).all() as Feed[]
 }
 
@@ -92,7 +92,7 @@ export function createFeed(data: {
 
 export function updateFeed(
   id: number,
-  data: { name?: string; rss_url?: string | null; rss_bridge_url?: string | null; disabled?: number; category_id?: number | null; requires_js_challenge?: number; skip_full_text_fetch?: number },
+  data: { name?: string; rss_url?: string | null; rss_bridge_url?: string | null; disabled?: number; archived?: boolean; category_id?: number | null; requires_js_challenge?: number; skip_full_text_fetch?: number },
 ): Feed | undefined {
   const feed = getFeedById(id)
   if (!feed) return undefined
@@ -125,6 +125,17 @@ export function updateFeed(
     if (data.disabled === 0) {
       fields.push('error_count = 0')
       fields.push("last_error = NULL")
+    }
+  }
+  if (data.archived !== undefined) {
+    if (data.archived) {
+      // Keep the first archive timestamp if the feed is already archived.
+      fields.push("archived_at = COALESCE(archived_at, strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))")
+    } else {
+      fields.push('archived_at = NULL')
+      // Unarchiving restores normal fetching immediately instead of waiting
+      // out a next_check_at that may have been scheduled before archiving.
+      if (feed.archived_at) fields.push('next_check_at = NULL')
     }
   }
   if (data.category_id !== undefined) {

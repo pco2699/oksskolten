@@ -1,5 +1,5 @@
 import { type ReactNode } from 'react'
-import { Pencil, CheckCheck, Trash2, FolderInput, RefreshCw, Search, Link2 } from 'lucide-react'
+import { Pencil, CheckCheck, Trash2, FolderInput, RefreshCw, Search, Link2, Archive, ArchiveRestore } from 'lucide-react'
 import { useI18n } from '../../lib/i18n'
 import {
   ContextMenu,
@@ -15,9 +15,12 @@ import {
 interface FeedMenuProps {
   children: ReactNode
   feedType?: 'rss' | 'clip'
+  archived?: boolean
   categories?: Array<{ id: number; name: string }>
   onRename: () => void
   onMarkAllRead: (olderThan?: '1d' | '1w') => void
+  onArchive?: () => void
+  onUnarchive?: () => void
   onDelete: () => void
   onMoveToCategory?: (categoryId: number | null) => void
   onFetch?: () => void
@@ -28,9 +31,12 @@ interface FeedMenuProps {
 export function FeedContextMenu({
   children,
   feedType,
+  archived = false,
   categories = [],
   onRename,
   onMarkAllRead,
+  onArchive,
+  onUnarchive,
   onDelete,
   onMoveToCategory,
   onFetch,
@@ -93,14 +99,14 @@ export function FeedContextMenu({
           </ContextMenuSub>
         )}
 
-        {onFetch && !isClip && (
+        {onFetch && !isClip && !archived && (
           <ContextMenuItem onSelect={onFetch}>
             <RefreshCw size={16} strokeWidth={1.5} />
             {t('feeds.fetch')}
           </ContextMenuItem>
         )}
 
-        {!isClip && onReDetect && (
+        {!isClip && !archived && onReDetect && (
           <ContextMenuItem onSelect={onReDetect}>
             <Search size={16} strokeWidth={1.5} />
             {t('feeds.reDetect')}
@@ -110,6 +116,18 @@ export function FeedContextMenu({
         {!isClip && (
           <>
             <ContextMenuSeparator />
+            {archived && onUnarchive && (
+              <ContextMenuItem onSelect={onUnarchive}>
+                <ArchiveRestore size={16} strokeWidth={1.5} />
+                {t('feeds.unarchive')}
+              </ContextMenuItem>
+            )}
+            {!archived && onArchive && (
+              <ContextMenuItem onSelect={onArchive}>
+                <Archive size={16} strokeWidth={1.5} />
+                {t('feeds.archive')}
+              </ContextMenuItem>
+            )}
             <ContextMenuItem onSelect={onDelete} className="text-error">
               <Trash2 size={16} strokeWidth={1.5} />
               {t('feeds.delete')}

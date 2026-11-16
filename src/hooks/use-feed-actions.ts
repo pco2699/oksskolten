@@ -81,6 +81,16 @@ export function useFeedActions({
     setConfirm({ type: 'delete-feed', feed })
   }
 
+  async function handleArchiveFeed(feed: FeedWithCounts) {
+    await apiPatch(`/api/feeds/${feed.id}`, { archived: true })
+    void mutateFeeds()
+  }
+
+  async function handleUnarchiveFeed(feed: FeedWithCounts) {
+    await apiPatch(`/api/feeds/${feed.id}`, { archived: false })
+    void mutateFeeds()
+  }
+
   function handleDeleteCategory(category: Category) {
     setConfirm({ type: 'delete-category', category })
   }
@@ -106,7 +116,7 @@ export function useFeedActions({
   async function handleFetchCategory(category: Category) {
     const categoryFeeds = categorized.get(category.id) ?? []
     const results = await Promise.all(
-      categoryFeeds.filter(f => !f.disabled).map(f => startFeedFetch(f.id))
+      categoryFeeds.filter(f => !f.disabled && !f.archived_at).map(f => startFeedFetch(f.id))
     )
     const combined: FetchResult = {
       totalNew: results.reduce((s, r) => s + r.totalNew, 0),
@@ -206,6 +216,8 @@ export function useFeedActions({
     handleStartRenameCategory,
     handleMarkAllReadFeed,
     handleMarkAllReadCategory,
+    handleArchiveFeed,
+    handleUnarchiveFeed,
     handleDeleteFeed,
     handleDeleteCategory,
     handleMoveToCategory,

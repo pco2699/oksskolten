@@ -19,11 +19,14 @@ export interface FeedVisibilityOptions {
  *   It disappears on the next navigation, once it is no longer selected.
  * - Disabled feeds stay visible. They carry no unread count by definition, and
  *   hiding them would leave no way to re-enable or delete them from the sidebar.
+ * - Archived feeds stay visible too, so their articles remain browsable and
+ *   they can be unarchived even after every article has been read.
  */
 export function isFeedVisible(feed: FeedWithCounts, options: FeedVisibilityOptions): boolean {
   if (!options.hideZeroUnread) return true
   if (feed.id === options.selectedFeedId) return true
   if (feed.disabled) return true
+  if (feed.archived_at) return true
   return feed.unread_count > 0
 }
 

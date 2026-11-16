@@ -22,6 +22,7 @@ function makeFeed(overrides: Partial<FeedWithCounts> = {}): FeedWithCounts {
     last_error: null,
     error_count: 0,
     disabled: 0,
+    archived_at: null,
     requires_js_challenge: 0,
     skip_full_text_fetch: 0,
     type: 'rss',
@@ -167,6 +168,30 @@ describe('useFeedActions', () => {
     })
   })
 
+  describe('archive', () => {
+    it('archives a feed', async () => {
+      const opts = defaultOpts()
+      const { result } = renderHook(() => useFeedActions(opts))
+      const feed = makeFeed({ id: 9 })
+
+      await act(async () => result.current.handleArchiveFeed(feed))
+
+      expect(apiPatch).toHaveBeenCalledWith('/api/feeds/9', { archived: true })
+      expect(opts.mutateFeeds).toHaveBeenCalled()
+    })
+
+    it('unarchives a feed', async () => {
+      const opts = defaultOpts()
+      const { result } = renderHook(() => useFeedActions(opts))
+      const feed = makeFeed({ id: 9, archived_at: '2026-01-01T00:00:00Z' })
+
+      await act(async () => result.current.handleUnarchiveFeed(feed))
+
+      expect(apiPatch).toHaveBeenCalledWith('/api/feeds/9', { archived: false })
+      expect(opts.mutateFeeds).toHaveBeenCalled()
+    })
+  })
+
   describe('delete', () => {
     it('sets confirm state for feed delete', () => {
       const { result } = renderHook(() => useFeedActions(defaultOpts()))
@@ -232,17 +257,19 @@ describe('useFeedActions', () => {
       const feed1 = makeFeed({ id: 10, disabled: 0 })
       const feed2 = makeFeed({ id: 11, disabled: 1 })
       const feed3 = makeFeed({ id: 12, disabled: 0 })
-      const categorized = new Map([[1, [feed1, feed2, feed3]]])
+      const feed4 = makeFeed({ id: 13, disabled: 0, archived_at: '2026-01-01T00:00:00Z' })
+      const categorized = new Map([[1, [feed1, feed2, feed3, feed4]]])
       const opts = defaultOpts({ categorized })
       const { result } = renderHook(() => useFeedActions(opts))
       const category = makeCategory({ id: 1 })
 
       await act(async () => result.current.handleFetchCategory(category))
 
-      // Only non-disabled feeds should be fetched
+      // Only non-disabled, non-archived feeds should be fetched
       expect(opts.startFeedFetch).toHaveBeenCalledWith(10)
       expect(opts.startFeedFetch).not.toHaveBeenCalledWith(11)
       expect(opts.startFeedFetch).toHaveBeenCalledWith(12)
+      expect(opts.startFeedFetch).not.toHaveBeenCalledWith(13)
     })
   })
 

@@ -72,6 +72,7 @@ interface SeedFeed {
   lang: string
   type: 'rss' | 'clip'
   disabled: number
+  archived_at: string | null
   error_count: number
   last_error: string | null
   requires_js_challenge: number
@@ -143,6 +144,7 @@ function createFeed(overrides: Partial<SeedFeed> & Pick<SeedFeed, 'name' | 'url'
     lang: getLocale(),
     type: 'rss',
     disabled: 0,
+    archived_at: null,
     error_count: 0,
     last_error: null,
     requires_js_challenge: 0,
@@ -372,7 +374,11 @@ export const demoStore = {
   updateFeed(id: number, patch: Record<string, unknown>) {
     const feed = feeds.find(f => f.id === id)
     if (!feed) return null
-    Object.assign(feed, patch)
+    const { archived, ...rest } = patch
+    Object.assign(feed, rest)
+    if (typeof archived === 'boolean') {
+      feed.archived_at = archived ? new Date().toISOString() : null
+    }
     return { feed: toFeedWithCounts(feed) }
   },
 
