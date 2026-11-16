@@ -1,5 +1,9 @@
 # Changelog
 
+## [v0.6.0](https://github.com/pco2699/oksskolten/compare/v0.5.30...v0.6.0) - 2026-11-16
+### New Features
+- feat: add feed archiving without deleting articles by @pco2699
+
 ## [v0.5.30](https://github.com/pco2699/oksskolten/compare/v0.5.29...v0.5.30) - 2026-11-14
 ### Others
 - perf: stop feed sweeps from scanning the articles table by @pco2699 in https://github.com/pco2699/oksskolten/pull/77
